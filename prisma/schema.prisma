@@ -1,0 +1,396 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RecordStatus {
+  PENDING
+  VERIFIED
+}
+
+enum ResidentStatus {
+  AKTIF
+  TIDAK_LAYAK
+  PENCEN_MENDATANG
+  DATA_TIDAK_LENGKAP
+  KELUAR
+}
+
+enum UnitStatus {
+  OCCUPIED
+  VACANT
+}
+
+enum OccupancyStatus {
+  CURRENT
+  PAST
+}
+
+enum TransactionCategory {
+  BAYARAN
+  CAJ_SEWA
+  CAJ_PENYELENGGARAAN
+  CAJ_PENALTI
+  CAJ_TAMBAHAN
+  REBAT
+  BAKI_AWAL
+  LAIN_LAIN
+}
+
+enum TransactionStatus {
+  NORMAL
+  DIBATALKAN
+  DILARASKAN
+  PEMBALIKAN
+  PELARASAN
+}
+
+enum AuditActionType {
+  CREATE
+  UPDATE
+  DELETE
+  VERIFY
+  LOGIN
+  LOGOUT
+  EXPORT
+  REVERSAL
+  ADJUSTMENT
+  IMPORT_EXTRACT
+}
+
+enum EntityType {
+  ADMIN_PROFILE
+  RESIDENT
+  QUARTER_CLASS
+  UNIT
+  UNIT_OCCUPANCY
+  MONTHLY_CHARGE
+  ADDITIONAL_CHARGE
+  REBATE
+  PAYMENT
+  TRANSACTION
+  ARREARS_SUMMARY
+}
+
+model AdminProfile {
+  /// Should match Supabase auth.users.id
+  id          String   @id @db.Uuid
+  fullName    String
+  email       String   @unique
+  phoneNumber String?
+  department  String?
+  role        String   @default("admin")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdResidents         Resident[]      @relation("ResidentCreatedBy")
+  verifiedResidents        Resident[]      @relation("ResidentVerifiedBy")
+  createdQuarterClasses    QuarterClass[]  @relation("QuarterClassCreatedBy")
+  verifiedQuarterClasses   QuarterClass[]  @relation("QuarterClassVerifiedBy")
+  createdUnits             Unit[]          @relation("UnitCreatedBy")
+  verifiedUnits            Unit[]          @relation("UnitVerifiedBy")
+  createdArrearsSummaries  ArrearsSummary[] @relation("ArrearsSummaryCreatedBy")
+  verifiedArrearsSummaries ArrearsSummary[] @relation("ArrearsSummaryVerifiedBy")
+  createdMonthlyCharges    MonthlyCharge[] @relation("MonthlyChargeCreatedBy")
+  verifiedMonthlyCharges   MonthlyCharge[] @relation("MonthlyChargeVerifiedBy")
+  createdPayments          Payment[]       @relation("PaymentCreatedBy")
+  verifiedPayments         Payment[]       @relation("PaymentVerifiedBy")
+  createdTransactions      Transaction[]   @relation("TransactionCreatedBy")
+  auditLogs                AuditLog[]
+}
+
+model Resident {
+  id             String         @id @default(uuid()) @db.Uuid
+  fullName       String
+  icNumber       String         @unique
+  phone          String?
+  email          String?
+  position       String?
+  department     String?
+  serviceLevel   String?
+  status         ResidentStatus @default(AKTIF)
+  description    String?
+
+  recordStatus   RecordStatus   @default(VERIFIED)
+
+  createdById    String?        @db.Uuid
+  verifiedById   String?        @db.Uuid
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  verifiedAt     DateTime?
+
+  createdBy      AdminProfile?  @relation("ResidentCreatedBy", fields: [createdById], references: [id])
+  verifiedBy     AdminProfile?  @relation("ResidentVerifiedBy", fields: [verifiedById], references: [id])
+
+  occupancies    UnitOccupancy[]
+  monthlyCharges MonthlyCharge[]
+  arrearsSummary ArrearsSummary?
+  payments       Payment[]
+  transactions   Transaction[]
+
+  @@index([fullName])
+  @@index([status])
+  @@index([recordStatus])
+}
+
+model QuarterClass {
+  id               String       @id @default(uuid()) @db.Uuid
+  className        String       @unique
+  rentalPrice      Decimal      @db.Decimal(12, 2)
+  maintenancePrice Decimal      @db.Decimal(12, 2)
+  penaltyPrice     Decimal      @db.Decimal(12, 2)
+
+  recordStatus     RecordStatus @default(VERIFIED)
+
+  createdById      String?      @db.Uuid
+  verifiedById     String?      @db.Uuid
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  verifiedAt       DateTime?
+
+  createdBy        AdminProfile? @relation("QuarterClassCreatedBy", fields: [createdById], references: [id])
+  verifiedBy       AdminProfile? @relation("QuarterClassVerifiedBy", fields: [verifiedById], references: [id])
+
+  units            Unit[]
+
+  @@index([recordStatus])
+}
+
+model Unit {
+  id             String       @id @default(uuid()) @db.Uuid
+  unitCode       String       @unique
+  status         UnitStatus   @default(VACANT)
+  recordStatus   RecordStatus @default(VERIFIED)
+
+  classId        String       @db.Uuid
+
+  createdById    String?      @db.Uuid
+  verifiedById   String?      @db.Uuid
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  verifiedAt     DateTime?
+
+  quarterClass   QuarterClass  @relation(fields: [classId], references: [id])
+  occupancies    UnitOccupancy[]
+  monthlyCharges MonthlyCharge[]
+
+  createdBy      AdminProfile? @relation("UnitCreatedBy", fields: [createdById], references: [id])
+  verifiedBy     AdminProfile? @relation("UnitVerifiedBy", fields: [verifiedById], references: [id])
+
+  @@index([classId])
+  @@index([status])
+  @@index([recordStatus])
+}
+
+model UnitOccupancy {
+  id          String          @id @default(uuid()) @db.Uuid
+  residentId  String          @db.Uuid
+  unitId      String          @db.Uuid
+  moveInDate  DateTime
+  moveOutDate DateTime?
+  status      OccupancyStatus @default(CURRENT)
+  notes       String?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  resident    Resident        @relation(fields: [residentId], references: [id])
+  unit        Unit            @relation(fields: [unitId], references: [id])
+
+  @@index([residentId])
+  @@index([unitId])
+  @@index([status])
+  @@index([moveInDate])
+}
+
+model ArrearsSummary {
+  id                 String       @id @default(uuid()) @db.Uuid
+  residentId         String       @unique @db.Uuid
+  totalArrearsAmount Decimal      @db.Decimal(12, 2) @default(0)
+  lastUpdatedMonth   DateTime?
+  description        String?
+
+  recordStatus       RecordStatus @default(VERIFIED)
+
+  createdById        String?      @db.Uuid
+  verifiedById       String?      @db.Uuid
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  verifiedAt         DateTime?
+
+  resident           Resident      @relation(fields: [residentId], references: [id])
+  createdBy          AdminProfile? @relation("ArrearsSummaryCreatedBy", fields: [createdById], references: [id])
+  verifiedBy         AdminProfile? @relation("ArrearsSummaryVerifiedBy", fields: [verifiedById], references: [id])
+
+  @@index([recordStatus])
+  @@index([lastUpdatedMonth])
+}
+
+model MonthlyCharge {
+  id                     String       @id @default(uuid()) @db.Uuid
+  residentId             String       @db.Uuid
+  unitId                 String?      @db.Uuid
+
+  /// Use the first day of the month to represent that month
+  chargeMonth            DateTime
+
+  rentalAmount           Decimal      @db.Decimal(12, 2) @default(0)
+  maintenanceAmount      Decimal      @db.Decimal(12, 2) @default(0)
+  penaltyAmount          Decimal      @db.Decimal(12, 2) @default(0)
+  additionalChargesTotal Decimal      @db.Decimal(12, 2) @default(0)
+  rebateTotal            Decimal      @db.Decimal(12, 2) @default(0)
+
+  totalMonthlyCharge     Decimal      @db.Decimal(12, 2) @default(0)
+  paymentReceived        Decimal      @db.Decimal(12, 2) @default(0)
+  balanceForMonth        Decimal      @db.Decimal(12, 2) @default(0)
+
+  notes                  String?
+  recordStatus           RecordStatus @default(VERIFIED)
+
+  createdById            String?      @db.Uuid
+  verifiedById           String?      @db.Uuid
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  verifiedAt             DateTime?
+
+  resident               Resident      @relation(fields: [residentId], references: [id])
+  unit                   Unit?         @relation(fields: [unitId], references: [id])
+
+  additionalCharges      AdditionalCharge[]
+  rebates                Rebate[]
+
+  createdBy              AdminProfile? @relation("MonthlyChargeCreatedBy", fields: [createdById], references: [id])
+  verifiedBy             AdminProfile? @relation("MonthlyChargeVerifiedBy", fields: [verifiedById], references: [id])
+
+  @@unique([residentId, chargeMonth])
+  @@index([residentId])
+  @@index([chargeMonth])
+  @@index([recordStatus])
+  @@index([unitId])
+}
+
+model AdditionalCharge {
+  id              String       @id @default(uuid()) @db.Uuid
+  monthlyChargeId String       @db.Uuid
+  chargeDate      DateTime
+  description     String
+  amount          Decimal      @db.Decimal(12, 2)
+  recordStatus    RecordStatus @default(VERIFIED)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  monthlyCharge   MonthlyCharge @relation(fields: [monthlyChargeId], references: [id])
+
+  @@index([monthlyChargeId])
+  @@index([chargeDate])
+  @@index([recordStatus])
+}
+
+model Rebate {
+  id              String       @id @default(uuid()) @db.Uuid
+  monthlyChargeId String       @db.Uuid
+  rebateDate      DateTime
+  description     String
+  amount          Decimal      @db.Decimal(12, 2)
+  recordStatus    RecordStatus @default(VERIFIED)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  monthlyCharge   MonthlyCharge @relation(fields: [monthlyChargeId], references: [id])
+
+  @@index([monthlyChargeId])
+  @@index([rebateDate])
+  @@index([recordStatus])
+}
+
+model Payment {
+  id            String       @id @default(uuid()) @db.Uuid
+  residentId    String       @db.Uuid
+  paymentDate   DateTime
+  receiptNo     String?
+  amount        Decimal      @db.Decimal(12, 2)
+  notes         String?
+  recordStatus  RecordStatus @default(VERIFIED)
+
+  createdById   String?      @db.Uuid
+  verifiedById  String?      @db.Uuid
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  verifiedAt    DateTime?
+
+  resident      Resident      @relation(fields: [residentId], references: [id])
+  transaction   Transaction?
+  createdBy     AdminProfile? @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  verifiedBy    AdminProfile? @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
+
+  @@index([residentId])
+  @@index([paymentDate])
+  @@index([receiptNo])
+  @@index([recordStatus])
+}
+
+model Transaction {
+  id                   String             @id @default(uuid()) @db.Uuid
+  residentId           String?            @db.Uuid
+  paymentId            String?            @unique @db.Uuid
+
+  transactionDate      DateTime
+  category             TransactionCategory
+  status               TransactionStatus  @default(NORMAL)
+
+  relatedTransactionId String?            @db.Uuid
+
+  debitAmount          Decimal            @db.Decimal(12, 2) @default(0)
+  creditAmount         Decimal            @db.Decimal(12, 2) @default(0)
+
+  receiptNo            String?
+  notes                String?
+  runningBalance       Decimal?           @db.Decimal(12, 2)
+
+  createdById          String?            @db.Uuid
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  resident             Resident?          @relation(fields: [residentId], references: [id])
+  payment              Payment?           @relation(fields: [paymentId], references: [id])
+
+  relatedTransaction   Transaction?       @relation("TransactionRelation", fields: [relatedTransactionId], references: [id])
+  childTransactions    Transaction[]      @relation("TransactionRelation")
+
+  createdBy            AdminProfile?      @relation("TransactionCreatedBy", fields: [createdById], references: [id])
+
+  @@index([residentId])
+  @@index([paymentId])
+  @@index([transactionDate])
+  @@index([category])
+  @@index([status])
+  @@index([relatedTransactionId])
+  @@index([receiptNo])
+}
+
+model AuditLog {
+  id          String          @id @default(uuid()) @db.Uuid
+  timestamp   DateTime        @default(now())
+
+  userId      String?         @db.Uuid
+  userName    String
+  moduleName  String
+  pageName    String?
+  actionType  AuditActionType
+  description String
+
+  entityType  EntityType?
+  entityId    String?         @db.Uuid
+
+  admin       AdminProfile?   @relation(fields: [userId], references: [id])
+
+  @@index([timestamp])
+  @@index([userId])
+  @@index([moduleName])
+  @@index([actionType])
+  @@index([entityType, entityId])
+}
