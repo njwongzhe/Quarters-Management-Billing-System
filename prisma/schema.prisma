@@ -9,6 +9,7 @@ datasource db {
 enum RecordStatus {
   PENDING
   VERIFIED
+  REJECTED
 }
 
 enum ResidentStatus {
@@ -61,6 +62,13 @@ enum AuditActionType {
   IMPORT_EXTRACT
 }
 
+enum DocumentCategory {
+  BAYARAN
+  TUNGGAKAN
+  PENGHUNI
+  KUARTERS
+}
+
 enum EntityType {
   ADMIN_PROFILE
   RESIDENT
@@ -100,6 +108,8 @@ model AdminProfile {
   createdPayments          Payment[]       @relation("PaymentCreatedBy")
   verifiedPayments         Payment[]       @relation("PaymentVerifiedBy")
   createdTransactions      Transaction[]   @relation("TransactionCreatedBy")
+  uploadedDocuments UploadedDocument[] @relation("DocumentUploadedBy")
+  verifiedDocuments UploadedDocument[] @relation("DocumentVerifiedBy")
   auditLogs                AuditLog[]
 }
 
@@ -370,6 +380,35 @@ model Transaction {
   @@index([status])
   @@index([relatedTransactionId])
   @@index([receiptNo])
+}
+
+model UploadedDocument {
+  id            String           @id @default(uuid()) @db.Uuid
+  fileName      String
+  originalName  String?
+  fileType      String
+  fileSize      Int
+  category      DocumentCategory
+
+  recordStatus  RecordStatus     @default(PENDING)
+
+  uploadedById  String?          @db.Uuid
+  verifiedById  String?          @db.Uuid
+
+  uploadedAt    DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  verifiedAt    DateTime?
+
+  notes         String?
+  remark        String?
+
+  uploadedBy    AdminProfile?    @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  verifiedBy    AdminProfile?    @relation("DocumentVerifiedBy", fields: [verifiedById], references: [id])
+
+  @@index([category])
+  @@index([recordStatus])
+  @@index([uploadedAt])
+  @@index([uploadedById])
 }
 
 model AuditLog {
