@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 
-import PenghuniClassRatesPanel from "./PenghuniClassRatesPanel";
-import PenghuniFeedbackBanner from "./PenghuniFeedbackBanner";
-import PenghuniOverviewCards from "./PenghuniOverviewCards";
-import PenghuniPageHeader from "./PenghuniPageHeader";
+import KuartersClassRatesPanel from "./KuartersClassRatesPanel";
+import KuartersFeedbackBanner from "./KuartersFeedbackBanner";
+import KuartersOverviewCards from "./KuartersOverviewCards";
+import KuartersPageHeader from "./KuartersPageHeader";
 import {
-  buildPenghuniSummaryCards,
+  buildKuartersSummaryCards,
   buildQuarterClassPagination,
   createEmptyQuarterClassFilters,
   createDraftFromQuarterClass,
@@ -16,19 +16,19 @@ import {
   filterQuarterClasses,
   hasActiveQuarterClassFilters,
   sortQuarterClasses,
-  type PenghuniEditorState,
-  type PenghuniNotice,
-  type PenghuniPageInitialData,
+  type KuartersEditorState,
+  type KuartersNotice,
+  type KuartersPageInitialData,
   type QuarterClassMutationResponse,
   type QuarterClassRecord,
   type QuarterClassDraft,
   validateQuarterClassDraft,
-} from "./penghuniHelpers";
+} from "./kuartersHelpers";
 
 type PendingAction = "save" | "delete" | null;
-type PenghuniPageClientProps = {
-  initialData: PenghuniPageInitialData;
-  initialNotice?: PenghuniNotice | null;
+type KuartersPageClientProps = {
+  initialData: KuartersPageInitialData;
+  initialNotice?: KuartersNotice | null;
 };
 type ApiResponseShape = {
   success: boolean;
@@ -54,18 +54,18 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error.message : fallbackMessage;
 }
 
-export default function PenghuniPageClient({
+export default function KuartersPageClient({
   initialData,
   initialNotice = null,
-}: PenghuniPageClientProps) {
+}: KuartersPageClientProps) {
   const [summary] = useState(initialData.summary);
   const [quarterClasses, setQuarterClasses] = useState<QuarterClassRecord[]>(
     initialData.quarterClasses,
   );
   const [currentPage, setCurrentPage] = useState(1);
-  const [editor, setEditor] = useState<PenghuniEditorState | null>(null);
+  const [editor, setEditor] = useState<KuartersEditorState | null>(null);
   const [filters, setFilters] = useState(createEmptyQuarterClassFilters);
-  const [notice, setNotice] = useState<PenghuniNotice | null>(initialNotice);
+  const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const hasActiveFilters = hasActiveQuarterClassFilters(filters);
@@ -79,7 +79,7 @@ export default function PenghuniPageClient({
     },
   );
 
-  function showNotice(nextNotice: PenghuniNotice) {
+  function showNotice(nextNotice: KuartersNotice) {
     setNotice(nextNotice);
   }
 
@@ -354,13 +354,13 @@ export default function PenghuniPageClient({
 
   return (
     <div className="flex flex-col gap-6 pb-8">
-      <PenghuniPageHeader />
-      <PenghuniFeedbackBanner
+      <KuartersPageHeader />
+      <KuartersFeedbackBanner
         notice={notice}
         onDismiss={() => setNotice(null)}
       />
-      <PenghuniOverviewCards cards={buildPenghuniSummaryCards(summary)} />
-      <PenghuniClassRatesPanel
+      <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
+      <KuartersClassRatesPanel
         currentPage={pagination.currentPage}
         editor={editor}
         filterQuery={filters.classNameQuery}

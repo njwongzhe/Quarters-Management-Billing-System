@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       },
     });
 
-    revalidatePath("/pages/6_penghuni");
+    revalidatePath("/pages/7_kuarters");
 
     return NextResponse.json(
       {

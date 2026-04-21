@@ -117,7 +117,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
-    revalidatePath("/pages/6_penghuni");
+    revalidatePath("/pages/7_kuarters");
 
     return NextResponse.json({
       success: true,
@@ -194,7 +194,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       where: { id },
     });
 
-    revalidatePath("/pages/6_penghuni");
+    revalidatePath("/pages/7_kuarters");
 
     return NextResponse.json({
       success: true,

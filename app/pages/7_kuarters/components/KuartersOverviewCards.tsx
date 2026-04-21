@@ -1,7 +1,7 @@
-import type { PenghuniSummaryCard } from "./penghuniHelpers";
+import type { KuartersSummaryCard } from "./kuartersHelpers";
 
-type PenghuniOverviewCardsProps = {
-  cards: PenghuniSummaryCard[];
+type KuartersOverviewCardsProps = {
+  cards: KuartersSummaryCard[];
 };
 
 const accentClasses = [
@@ -11,11 +11,11 @@ const accentClasses = [
   "border-l-4 border-l-xLengkap",
 ];
 
-function PenghuniStatCard({
+function KuartersStatCard({
   card,
   accentClass,
 }: {
-  card: PenghuniSummaryCard;
+  card: KuartersSummaryCard;
   accentClass: string;
 }) {
   return (
@@ -30,13 +30,13 @@ function PenghuniStatCard({
   );
 }
 
-export default function PenghuniOverviewCards({
+export default function KuartersOverviewCards({
   cards,
-}: PenghuniOverviewCardsProps) {
+}: KuartersOverviewCardsProps) {
   return (
     <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {cards.map((card, index) => (
-        <PenghuniStatCard
+        <KuartersStatCard
           key={card.label}
           card={card}
           accentClass={accentClasses[index] ?? accentClasses[0]}

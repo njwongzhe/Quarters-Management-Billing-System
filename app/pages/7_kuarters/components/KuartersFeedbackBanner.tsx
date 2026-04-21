@@ -1,9 +1,9 @@
 import Icon from "@/app/components/Icon";
 
-import type { NoticeTone, PenghuniNotice } from "./penghuniHelpers";
+import type { KuartersNotice, NoticeTone } from "./kuartersHelpers";
 
-type PenghuniFeedbackBannerProps = {
-  notice: PenghuniNotice | null;
+type KuartersFeedbackBannerProps = {
+  notice: KuartersNotice | null;
   onDismiss: () => void;
 };
 
@@ -28,10 +28,10 @@ const toneStyles: Record<
   },
 };
 
-export default function PenghuniFeedbackBanner({
+export default function KuartersFeedbackBanner({
   notice,
   onDismiss,
-}: PenghuniFeedbackBannerProps) {
+}: KuartersFeedbackBannerProps) {
   if (!notice) {
     return null;
   }

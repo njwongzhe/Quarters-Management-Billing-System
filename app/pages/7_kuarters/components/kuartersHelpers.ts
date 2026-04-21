@@ -2,12 +2,12 @@ export const EMPTY_QUARTER_CLASS_ID = "__new__";
 
 export type NoticeTone = "success" | "error" | "info";
 
-export type PenghuniNotice = {
+export type KuartersNotice = {
   tone: NoticeTone;
   message: string;
 };
 
-export type PenghuniSummaryCard = {
+export type KuartersSummaryCard = {
   label: string;
   value: string;
 };
@@ -41,7 +41,7 @@ export type QuarterClassFilters = {
   classNameQuery: string;
 };
 
-export type PenghuniEditorState = {
+export type KuartersEditorState = {
   mode: "create" | "edit";
   rowId: string;
   draft: QuarterClassDraft;
@@ -70,7 +70,7 @@ export type QuarterClassMutationResponse = {
   };
 };
 
-export type PenghuniPageInitialData = {
+export type KuartersPageInitialData = {
   summary: QuarterClassSummary | null;
   quarterClasses: QuarterClassRecord[];
 };
@@ -92,16 +92,16 @@ type BuildQuarterClassPaginationOptions = {
   hasActiveFilter?: boolean;
 };
 
-const emptySummaryCards: PenghuniSummaryCard[] = [
+const emptySummaryCards: KuartersSummaryCard[] = [
   { label: "Jumlah Unit", value: "--" },
   { label: "Unit Didiami", value: "--" },
   { label: "Unit Kosong", value: "--" },
   { label: "Kadar Penghunian", value: "--" },
 ];
 
-export function buildPenghuniSummaryCards(
+export function buildKuartersSummaryCards(
   summary: QuarterClassSummary | null,
-): PenghuniSummaryCard[] {
+): KuartersSummaryCard[] {
   if (!summary) {
     return emptySummaryCards;
   }

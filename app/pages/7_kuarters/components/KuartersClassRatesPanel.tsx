@@ -8,15 +8,15 @@ import {
   EMPTY_QUARTER_CLASS_ID,
   formatMoney,
   type PaginationItem,
-  type PenghuniEditorState,
+  type KuartersEditorState,
   type QuarterClassDraft,
   type QuarterClassRecord,
-} from "./penghuniHelpers";
+} from "./kuartersHelpers";
 
-type PenghuniClassRatesPanelProps = {
+type KuartersClassRatesPanelProps = {
   rates: QuarterClassRecord[];
   currentPage: number;
-  editor: PenghuniEditorState | null;
+  editor: KuartersEditorState | null;
   filterQuery: string;
   hasActiveFilters: boolean;
   onCancelEdit: () => void;
@@ -157,7 +157,7 @@ function InputField({
   );
 }
 
-export default function PenghuniClassRatesPanel({
+export default function KuartersClassRatesPanel({
   currentPage,
   editor,
   filterQuery,
@@ -178,7 +178,7 @@ export default function PenghuniClassRatesPanel({
   rates,
   recordSummaryText,
   totalPages,
-}: PenghuniClassRatesPanelProps) {
+}: KuartersClassRatesPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
 
