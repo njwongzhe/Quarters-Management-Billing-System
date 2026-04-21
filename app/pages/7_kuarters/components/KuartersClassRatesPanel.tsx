@@ -272,7 +272,7 @@ export default function KuartersClassRatesPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-lightGrey/20 bg-lightBlue/10 p-4 sm:p-5">
+    <section className="rounded-2xl border border-lightGrey/20 bg-lightBlue p-4 sm:p-5">
       <div className="flex flex-col gap-4 border-b border-lightGrey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-extrabold tracking-[-0.02em] text-darkGrey">
