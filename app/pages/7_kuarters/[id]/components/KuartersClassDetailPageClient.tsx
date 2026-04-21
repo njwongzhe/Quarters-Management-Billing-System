@@ -6,8 +6,6 @@ import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFe
 import KuartersOverviewCards from "@/app/pages/7_kuarters/components/KuartersOverviewCards";
 import {
   buildKuartersSummaryCards,
-  createEmptyQuarterClassFilters,
-  hasActiveQuarterClassFilters,
   type KuartersNotice,
 } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
@@ -21,8 +19,10 @@ import {
   buildQuarterUnitPagination,
   buildQuarterUnitSummary,
   createDraftFromQuarterUnit,
+  createEmptyQuarterUnitFilters,
   createEmptyQuarterUnitDraft,
   filterQuarterUnits,
+  hasActiveQuarterUnitFilters,
   sortQuarterUnits,
   validateQuarterUnitDraft,
   type KuartersClassDetailInitialData,
@@ -76,9 +76,7 @@ export default function KuartersClassDetailPageClient({
 }: KuartersClassDetailPageClientProps) {
   const [units, setUnits] = useState<QuarterUnitRecord[]>(initialData.units);
   const [currentPage, setCurrentPage] = useState(1);
-  const [filterQuery, setFilterQuery] = useState(
-    createEmptyQuarterClassFilters().classNameQuery,
-  );
+  const [filters, setFilters] = useState(createEmptyQuarterUnitFilters);
   const [editor, setEditor] = useState<KuartersUnitEditorState | null>(null);
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingUnitId, setPendingUnitId] = useState<string | null>(null);
@@ -94,10 +92,8 @@ export default function KuartersClassDetailPageClient({
     residentPicker.searchQuery,
   );
   const summary = buildQuarterUnitSummary(units);
-  const hasActiveFilters = hasActiveQuarterClassFilters({
-    classNameQuery: filterQuery,
-  });
-  const filteredUnits = filterQuarterUnits(units, filterQuery);
+  const hasActiveFilters = hasActiveQuarterUnitFilters(filters);
+  const filteredUnits = filterQuarterUnits(units, filters);
   const pagination = buildQuarterUnitPagination(filteredUnits, currentPage, {
     hasActiveFilter: hasActiveFilters,
     totalRecords: units.length,
@@ -186,12 +182,23 @@ export default function KuartersClassDetailPageClient({
 
   function handleFilterQueryChange(value: string) {
     setCurrentPage(1);
-    setFilterQuery(value);
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      query: value,
+    }));
+  }
+
+  function handleStatusFilterChange(value: "ALL" | "OCCUPIED" | "VACANT") {
+    setCurrentPage(1);
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      status: value,
+    }));
   }
 
   function handleClearFilter() {
     setCurrentPage(1);
-    setFilterQuery("");
+    setFilters(createEmptyQuarterUnitFilters());
   }
 
   function handleAddUnit() {
@@ -477,7 +484,7 @@ export default function KuartersClassDetailPageClient({
       closeResidentPicker();
       setEditor(null);
       setCurrentPage((previousPage) => {
-        const nextFilteredUnits = filterQuarterUnits(nextUnits, filterQuery);
+        const nextFilteredUnits = filterQuarterUnits(nextUnits, filters);
         const nextPagination = buildQuarterUnitPagination(
           nextFilteredUnits,
           previousPage,
@@ -525,7 +532,8 @@ export default function KuartersClassDetailPageClient({
       <KuartersUnitsPanel
         currentPage={pagination.currentPage}
         editor={editor}
-        filterQuery={filterQuery}
+        filterQuery={filters.query}
+        statusFilter={filters.status}
         hasActiveFilters={hasActiveFilters}
         isResidentPickerOpen={residentPicker.isOpen}
         onAddUnit={handleAddUnit}
@@ -535,6 +543,7 @@ export default function KuartersClassDetailPageClient({
         onDraftChange={handleDraftChange}
         onEditUnit={handleEditUnit}
         onFilterQueryChange={handleFilterQueryChange}
+        onStatusFilterChange={handleStatusFilterChange}
         onOpenResidentPicker={handleOpenResidentPicker}
         onPageChange={setCurrentPage}
         onSaveUnit={handleSaveUnit}

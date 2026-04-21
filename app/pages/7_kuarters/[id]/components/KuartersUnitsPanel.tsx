@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon";
 
@@ -9,6 +9,7 @@ import type {
   PaginationItem,
   QuarterUnitDraft,
   QuarterUnitRecord,
+  QuarterUnitStatusFilter,
 } from "./kuartersUnitHelpers";
 import {
   EMPTY_QUARTER_UNIT_ID,
@@ -20,6 +21,7 @@ type KuartersUnitsPanelProps = {
   currentPage: number;
   editor: KuartersUnitEditorState | null;
   filterQuery: string;
+  statusFilter: QuarterUnitStatusFilter;
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
   pageItems: PaginationItem[];
@@ -34,6 +36,7 @@ type KuartersUnitsPanelProps = {
   onDraftChange: (field: keyof QuarterUnitDraft, value: string) => void;
   onEditUnit: (unit: QuarterUnitRecord) => void;
   onFilterQueryChange: (value: string) => void;
+  onStatusFilterChange: (value: QuarterUnitStatusFilter) => void;
   onOpenResidentPicker: () => void;
   onPageChange: (page: number) => void;
   onSaveUnit: () => void;
@@ -44,16 +47,28 @@ function ToolbarButton({
   icon,
   label,
   onClick,
+  isActive = false,
+  hasPopup,
+  isExpanded,
 }: {
   icon: string;
   label: string;
   onClick: () => void;
+  isActive?: boolean;
+  hasPopup?: "menu";
+  isExpanded?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded-lg border border-lightGrey/20 bg-white p-2 text-grey transition-colors hover:border-darkblue hover:text-darkblue"
+      className={`inline-flex items-center justify-center rounded-lg border bg-white p-2 transition-colors ${
+        isActive
+          ? "border-darkblue text-darkblue"
+          : "border-lightGrey/20 text-grey hover:border-darkblue hover:text-darkblue"
+      }`}
       aria-label={label}
+      aria-expanded={isExpanded}
+      aria-haspopup={hasPopup}
       title={label}
       onClick={onClick}
     >
@@ -183,11 +198,24 @@ function getRowAccentClass(status: QuarterUnitRecord["status"]) {
     : "border-l-4 border-l-pencenDatang";
 }
 
+function getStatusFilterLabel(status: QuarterUnitStatusFilter) {
+  if (status === "OCCUPIED") {
+    return "Didiami";
+  }
+
+  if (status === "VACANT") {
+    return "Kosong";
+  }
+
+  return "Semua Status";
+}
+
 export default function KuartersUnitsPanel({
   units,
   currentPage,
   editor,
   filterQuery,
+  statusFilter,
   hasActiveFilters,
   isResidentPickerOpen,
   onAddUnit,
@@ -197,6 +225,7 @@ export default function KuartersUnitsPanel({
   onDraftChange,
   onEditUnit,
   onFilterQueryChange,
+  onStatusFilterChange,
   onOpenResidentPicker,
   onPageChange,
   onSaveUnit,
@@ -209,6 +238,8 @@ export default function KuartersUnitsPanel({
 }: KuartersUnitsPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
 
   const handlePointerDownOutsideEditor = useEffectEvent((event: PointerEvent) => {
     if (!editor || pendingAction || isResidentPickerOpen) {
@@ -228,6 +259,26 @@ export default function KuartersUnitsPanel({
     onCancelEdit();
   });
 
+  const handlePointerDownOutsideFilterMenu = useEffectEvent(
+    (event: PointerEvent) => {
+      if (!isFilterMenuOpen) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (filterMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsFilterMenuOpen(false);
+    },
+  );
+
   useEffect(() => {
     if (!editor || pendingAction || isResidentPickerOpen) {
       return;
@@ -242,6 +293,21 @@ export default function KuartersUnitsPanel({
       );
     };
   }, [editor, pendingAction, isResidentPickerOpen]);
+
+  useEffect(() => {
+    if (!isFilterMenuOpen) {
+      return;
+    }
+
+    document.addEventListener("pointerdown", handlePointerDownOutsideFilterMenu);
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDownOutsideFilterMenu,
+      );
+    };
+  }, [isFilterMenuOpen]);
 
   function renderActionCell(unit: QuarterUnitRecord, isEditing: boolean) {
     if (isEditing) {
@@ -310,6 +376,15 @@ export default function KuartersUnitsPanel({
     );
   }
 
+  function handleToggleFilterMenu() {
+    setIsFilterMenuOpen((currentState) => !currentState);
+  }
+
+  function handleSelectStatusFilter(value: QuarterUnitStatusFilter) {
+    onStatusFilterChange(value);
+    setIsFilterMenuOpen(false);
+  }
+
   return (
     <section className="rounded-2xl border border-lightGrey/20 bg-lightBlue/10 p-4 sm:p-5">
       <div className="flex flex-col gap-4 border-b border-lightGrey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -330,39 +405,98 @@ export default function KuartersUnitsPanel({
               onUnavailableFeature("Fungsi muat turun senarai unit belum tersedia lagi.")
             }
           />
-          <ToolbarButton
-            icon={commonIcons.filter}
-            label="Tapisan tambahan"
-            onClick={() =>
-              onUnavailableFeature(
-                "Tapisan tambahan untuk senarai unit belum tersedia lagi.",
-              )
-            }
-          />
+          <div ref={filterMenuRef} className="relative">
+            <ToolbarButton
+              icon={commonIcons.filter}
+              label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
+              isActive={statusFilter !== "ALL"}
+              hasPopup="menu"
+              isExpanded={isFilterMenuOpen}
+              onClick={handleToggleFilterMenu}
+            />
+
+            {isFilterMenuOpen ? (
+              <div
+                className="absolute right-0 top-full z-20 mt-2 w-56 rounded-2xl border border-lightGrey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+                role="menu"
+                aria-label="Tapisan status unit"
+              >
+                <div className="border-b border-lightGrey/20 px-3 pb-3 pt-2">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                    Status Unit
+                  </p>
+                  <p className="mt-1 text-sm text-grey">
+                    Pilih unit yang ingin dipaparkan.
+                  </p>
+                </div>
+
+                <div className="mt-2 flex flex-col gap-1">
+                  {(["ALL", "OCCUPIED", "VACANT"] as const).map((option) => {
+                    const isSelected = statusFilter === option;
+
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={isSelected}
+                        className={`flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                          isSelected
+                            ? "bg-lightBlue/15 text-darkblue"
+                            : "text-darkGrey hover:bg-background"
+                        }`}
+                        onClick={() => handleSelectStatusFilter(option)}
+                      >
+                        <span>{getStatusFilterLabel(option)}</span>
+                        {isSelected ? (
+                          <Icon
+                            icon="done"
+                            size={16}
+                            className="text-darkblue"
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
       <div className="mt-4 rounded-2xl border border-lightGrey/20 bg-white p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <label className="block flex-1">
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-              Carian Mengikut Unit atau Penghuni
-            </span>
-            <div className="flex items-center gap-3 rounded-xl border border-lightGrey/30 bg-background px-3 py-2 transition-colors focus-within:border-darkblue">
-              <Icon
-                icon={commonIcons.search}
-                size={18}
-                className="text-lightGrey"
-              />
-              <input
-                type="text"
-                value={filterQuery}
-                onChange={(event) => onFilterQueryChange(event.target.value)}
-                placeholder="Contoh: A-01-02 atau Ahmad"
-                className="w-full border-none bg-transparent text-sm font-medium text-darkGrey outline-none placeholder:text-lightGrey"
-              />
-            </div>
-          </label>
+          <div className="flex-1">
+            <label className="block">
+              <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                Carian Mengikut Unit atau Penghuni
+              </span>
+              <div className="flex items-center gap-3 rounded-xl border border-lightGrey/30 bg-background px-3 py-2 transition-colors focus-within:border-darkblue">
+                <Icon
+                  icon={commonIcons.search}
+                  size={18}
+                  className="text-lightGrey"
+                />
+                <input
+                  type="text"
+                  value={filterQuery}
+                  onChange={(event) => onFilterQueryChange(event.target.value)}
+                  placeholder="Contoh: A-01-02 atau Ahmad"
+                  className="w-full border-none bg-transparent text-sm font-medium text-darkGrey outline-none placeholder:text-lightGrey"
+                />
+              </div>
+            </label>
+
+            {statusFilter !== "ALL" ? (
+              <p className="mt-2 text-sm font-medium text-grey">
+                Tapisan aktif:{" "}
+                <span className="font-extrabold text-darkblue">
+                  {getStatusFilterLabel(statusFilter)}
+                </span>
+              </p>
+            ) : null}
+          </div>
 
           <div className="flex items-center gap-3 self-start lg:self-end">
             <button
@@ -442,7 +576,7 @@ export default function KuartersUnitsPanel({
                     className="px-6 py-10 text-center text-sm font-medium text-grey"
                   >
                     {hasActiveFilters
-                      ? "Tiada unit kuarters yang sepadan dengan carian semasa."
+                      ? "Tiada unit kuarters yang sepadan dengan tapisan semasa."
                       : "Tiada unit kuarters untuk dipaparkan buat masa ini."}
                   </td>
                 </tr>
