@@ -90,8 +90,8 @@ function PageButton({
       type="button"
       className={`min-h-8 min-w-8 rounded-md border px-2 text-sm transition-colors ${
         isActive
-          ? "border-darkBlue bg-darkBlue font-bold text-white"
-          : "border-lightGrey/30 bg-white text-grey hover:border-darkBlue hover:text-darkBlue"
+          ? "border-dark-blue bg-dark-blue font-bold text-white"
+          : "border-light-grey/30 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
       } disabled:cursor-not-allowed disabled:opacity-40`}
       aria-current={isActive ? "page" : undefined}
       disabled={disabled}
@@ -114,7 +114,7 @@ function ToolbarButton({
   return (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded-lg border border-lightGrey/20 bg-white p-2 text-grey transition-colors hover:border-darkBlue hover:text-darkBlue"
+      className="inline-flex items-center justify-center rounded-lg border border-light-grey/20 bg-white p-2 text-grey transition-colors hover:border-dark-blue hover:text-dark-blue"
       aria-label={label}
       onClick={onClick}
       title={label}
@@ -147,7 +147,7 @@ function InputField({
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className={`min-h-9 rounded-xl border border-lightGrey/35 bg-white px-4 py-2 text-sm font-semibold text-darkBlue outline-none transition-colors placeholder:text-lightGrey focus:border-darkBlue ${
+      className={`min-h-9 rounded-xl border border-light-grey/35 bg-white px-4 py-2 text-sm font-semibold text-dark-blue outline-none transition-colors placeholder:text-light-grey focus:border-dark-blue ${
         align === "start"
           ? "w-full min-w-35 text-left"
           : align === "end"
@@ -252,7 +252,7 @@ export default function KuartersClassRatesPanel({
               onEditRow(selectedQuarterClass);
             }
           }}
-          textClass="text-darkBlue"
+          textClass="text-dark-blue"
         />
         <ActionButton
           icon={commonIcons.eye}
@@ -272,10 +272,10 @@ export default function KuartersClassRatesPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-lightGrey/20 bg-lightBlue p-4 sm:p-5">
-      <div className="flex flex-col gap-4 border-b border-lightGrey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-2xl border border-light-grey/20 bg-light-blue p-4 sm:p-5">
+      <div className="flex flex-col gap-4 border-b border-light-grey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
-          <h2 className="text-xl font-extrabold tracking-[-0.02em] text-darkGrey">
+          <h2 className="text-xl font-extrabold tracking-[-0.02em] text-dark-grey">
             Senarai Kelas Kuarters
           </h2>
           <p className="text-sm text-grey">
@@ -294,25 +294,25 @@ export default function KuartersClassRatesPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-lightGrey/20 bg-white p-4">
+      <div className="mt-4 rounded-2xl border border-light-grey/20 bg-white p-4">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <label className="block flex-1">
               <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                 Carian Mengikut Kelas
               </span>
-              <div className="flex items-center gap-3 rounded-xl border border-lightGrey/30 bg-background px-3 py-2 transition-colors focus-within:border-darkBlue">
+              <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
                 <Icon
                   icon={commonIcons.search}
                   size={18}
-                  className="text-lightGrey"
+                  className="text-light-grey"
                 />
                 <input
                   type="text"
                   value={filterQuery}
                   onChange={(event) => onFilterQueryChange(event.target.value)}
                   placeholder="Contoh: Kelas A"
-                  className="w-full border-none bg-transparent text-sm font-medium text-darkGrey outline-none placeholder:text-lightGrey"
+                  className="w-full border-none bg-transparent text-sm font-medium text-dark-grey outline-none placeholder:text-light-grey"
                 />
               </div>
             </label>
@@ -320,7 +320,7 @@ export default function KuartersClassRatesPanel({
             <div className="flex items-center gap-3 self-start lg:self-end">
               <button
                 type="button"
-                className="inline-flex min-h-10 items-center rounded-xl border border-lightGrey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-darkBlue hover:text-darkBlue disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!hasActiveFilters}
                 onClick={onClearFilter}
               >
@@ -331,7 +331,7 @@ export default function KuartersClassRatesPanel({
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-lightGrey/20 bg-white">
+      <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="overflow-x-auto">
           {/* The table stays semantic so the edit and add flows can grow without changing the layout structure. */}
           <table className="w-full min-w-190 table-fixed border-collapse">
@@ -358,7 +358,7 @@ export default function KuartersClassRatesPanel({
               {isCreateRowVisible ? (
                 <tr
                   ref={editor?.mode === "create" ? editingRowRef : null}
-                  className="border-t border-lightGrey/20 bg-darkBlue/3"
+                  className="border-t border-light-grey/20 bg-dark-blue/3"
                 >
                   <td className="px-6 py-4">
                     <InputField
@@ -406,7 +406,7 @@ export default function KuartersClassRatesPanel({
               ) : null}
 
               {rates.length === 0 && !isCreateRowVisible ? (
-                <tr className="border-t border-lightGrey/20">
+                <tr className="border-t border-light-grey/20">
                   <td
                     colSpan={5}
                     className="px-6 py-10 text-center text-sm font-medium text-grey"
@@ -426,12 +426,12 @@ export default function KuartersClassRatesPanel({
                   <tr
                     key={rate.id}
                     ref={isEditing ? editingRowRef : null}
-                    className="border-t border-lightGrey/20"
+                    className="border-t border-light-grey/20"
                   >
-                    <td className="px-6 py-4 text-sm font-semibold text-darkGrey">
+                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                       <span className="block">{rate.className}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-darkGrey">
+                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.rentalPrice}
@@ -449,7 +449,7 @@ export default function KuartersClassRatesPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-darkGrey">
+                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.maintenancePrice}
@@ -467,7 +467,7 @@ export default function KuartersClassRatesPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-darkGrey">
+                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.penaltyPrice}
@@ -495,11 +495,11 @@ export default function KuartersClassRatesPanel({
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-lightGrey/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="flex flex-col gap-3 border-t border-light-grey/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-lightGrey/30 bg-white text-grey transition-colors disabled:opacity-40"
+              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors disabled:opacity-40"
               aria-label="Halaman sebelumnya"
               disabled={currentPage <= 1 || Boolean(pendingAction)}
               onClick={() => onPageChange(currentPage - 1)}
@@ -519,7 +519,7 @@ export default function KuartersClassRatesPanel({
 
             <button
               type="button"
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-lightGrey/30 bg-white text-grey transition-colors disabled:opacity-40"
+              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors disabled:opacity-40"
               aria-label="Halaman seterusnya"
               disabled={currentPage >= totalPages || Boolean(pendingAction)}
               onClick={() => onPageChange(currentPage + 1)}
@@ -535,7 +535,7 @@ export default function KuartersClassRatesPanel({
       <div className="mt-6 flex justify-end">
         <button
           type="button"
-          className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-darkBlue px-4 py-2 text-sm font-extrabold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-dark-blue px-4 py-2 text-sm font-extrabold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={Boolean(pendingAction)}
           onClick={onAddRow}
         >

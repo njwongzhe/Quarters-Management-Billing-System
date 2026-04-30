@@ -19,11 +19,11 @@ function RatePill({
   value: number | null;
 }) {
   return (
-    <div className="rounded-2xl border border-lightGrey/20 bg-white px-4 py-3 shadow-sm">
+    <div className="rounded-2xl border border-light-grey/20 bg-white px-4 py-3 shadow-sm">
       <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-grey">
         {label}
       </p>
-      <p className="mt-2 text-lg font-extrabold tracking-[-0.03em] text-darkGrey">
+      <p className="mt-2 text-lg font-extrabold tracking-[-0.03em] text-dark-grey">
         {value === null ? "--" : `RM ${formatMoney(value)}`}
       </p>
     </div>
@@ -40,14 +40,14 @@ export default function KuartersClassDetailHeader({
     <section className="space-y-4">
       <Link
         href="/pages/7_kuarters"
-        className="inline-flex items-center gap-2 text-sm font-semibold text-grey transition-colors hover:text-darkBlue"
+        className="inline-flex items-center gap-2 text-sm font-semibold text-grey transition-colors hover:text-dark-blue"
       >
         <Icon icon="arrow_back" size={18} />
         Kembali ke senarai kelas
       </Link>
 
       <div className="space-y-2">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-darkGrey md:text-[34px]">
+        <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-dark-grey md:text-[34px]">
           Kelas: {resolvedClassName}
         </h1>
         <p className="max-w-3xl text-sm text-grey md:text-base">

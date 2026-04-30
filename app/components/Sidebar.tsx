@@ -26,7 +26,7 @@ export default function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <aside className="h-full bg-darkGrey px-4 pt-6 pb-4">
+        <aside className="h-full bg-dark-grey px-4 pt-6 pb-4">
             <nav className="flex h-full flex-col gap-4">
                 <div className="flex flex-col gap-6">
                     {/* Logo */}
@@ -35,7 +35,7 @@ export default function Sidebar() {
                         <div className="flex flex-col">
                             <span className="text-sm font-bold text-white tracking-wider">KERAJAAN</span>
                             <span className="text-sm font-bold text-white tracking-wider">NEGERI JOHOR</span>
-                            <span className="text-[8.5px] text-lightGrey">System Pengurusan Kuarters</span>
+                            <span className="text-[8.5px] text-light-grey">System Pengurusan Kuarters</span>
                         </div>
                     </div>
 
@@ -51,7 +51,7 @@ export default function Sidebar() {
                                     className={`group flex items-center gap-2 rounded-md px-4 py-3 text-sm transition-colors ${
                                         active
                                         ? "bg-white/10 text-white border-l-5 border-l-blue-500"
-                                        : "hover:bg-white/10 hover:text-white text-lightGrey hover:border-l-5 hover:border-l-grey"
+                                        : "hover:bg-white/10 hover:text-white text-light-grey hover:border-l-5 hover:border-l-grey"
                                     }`}
                                 >
                                     {/* Icon */}
@@ -81,13 +81,13 @@ export default function Sidebar() {
                                     className={`group flex min-w-0 items-center gap-3 px-3 py-2 text-sm transition-colors ${
                                         active
                                             ? "bg-white/10 text-white"
-                                            : "text-lightGrey hover:bg-white/10 hover:text-white"
+                                            : "text-light-grey hover:bg-white/10 hover:text-white"
                                     }`}
                                 >
                                     <span className="material-symbols-outlined bg-[#2D367D] text-white rounded-md p-2" style={{ fontSize: "18px" }}>{route.icon}</span>
                                     <div className="flex min-w-0 flex-col">
                                         <span className="truncate text-xs font-bold text-white">Username</span>
-                                        <span className="text-lightGrey/80 font-extralight text-[10px]">Log Masuk: ---</span>
+                                        <span className="text-light-grey/80 font-extralight text-[10px]">Log Masuk: ---</span>
                                     </div>
                                 </Link>
                             );

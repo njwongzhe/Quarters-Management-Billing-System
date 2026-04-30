@@ -5,10 +5,10 @@ type KuartersOverviewCardsProps = {
 };
 
 const accentClasses = [
-  "border-l-4 border-l-darkBlue",
+  "border-l-4 border-l-dark-blue",
   "border-l-4 border-l-aktif",
-  "border-l-4 border-l-pencenDatang",
-  "border-l-4 border-l-xLengkap",
+  "border-l-4 border-l-pencen-datang",
+  "border-l-4 border-l-x-lengkap",
 ];
 
 function KuartersStatCard({
@@ -20,10 +20,10 @@ function KuartersStatCard({
 }) {
   return (
     <article
-      className={`rounded-xl border border-lightGrey/20 bg-white px-5 py-5 shadow-sm ${accentClass}`}
+      className={`rounded-xl border border-light-grey/20 bg-white px-5 py-5 shadow-sm ${accentClass}`}
     >
       <p className="text-sm font-medium text-grey md:text-base">{card.label}</p>
-      <p className="mt-3 text-4xl font-extrabold leading-none tracking-[-0.05em] text-darkGrey md:text-5xl">
+      <p className="mt-3 text-4xl font-extrabold leading-none tracking-[-0.05em] text-dark-grey md:text-5xl">
         {card.value}
       </p>
     </article>
