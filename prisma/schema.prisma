@@ -150,6 +150,7 @@ model Resident {
 model QuarterClass {
   id               String       @id @default(uuid()) @db.Uuid
   className        String       @unique
+  address          String?
   rentalPrice      Decimal      @db.Decimal(12, 2)
   maintenancePrice Decimal      @db.Decimal(12, 2)
   penaltyPrice     Decimal      @db.Decimal(12, 2)
@@ -204,7 +205,7 @@ model UnitOccupancy {
   moveInDate  DateTime
   moveOutDate DateTime?
   status      OccupancyStatus @default(CURRENT)
-  notes       String?
+  description String?
 
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -259,7 +260,7 @@ model MonthlyCharge {
   paymentReceived        Decimal      @db.Decimal(12, 2) @default(0)
   balanceForMonth        Decimal      @db.Decimal(12, 2) @default(0)
 
-  notes                  String?
+  description            String?
   recordStatus           RecordStatus @default(VERIFIED)
 
   createdById            String?      @db.Uuid
@@ -324,7 +325,7 @@ model Payment {
   paymentDate   DateTime
   receiptNo     String?
   amount        Decimal      @db.Decimal(12, 2)
-  notes         String?
+  description   String?
   recordStatus  RecordStatus @default(VERIFIED)
 
   createdById   String?      @db.Uuid
@@ -359,7 +360,7 @@ model Transaction {
   creditAmount         Decimal            @db.Decimal(12, 2) @default(0)
 
   receiptNo            String?
-  notes                String?
+  description          String?
   runningBalance       Decimal?           @db.Decimal(12, 2)
 
   createdById          String?            @db.Uuid
@@ -400,7 +401,7 @@ model UploadedDocument {
   updatedAt     DateTime         @updatedAt
   verifiedAt    DateTime?
 
-  notes         String?
+  description   String?
   remark        String?
 
   uploadedBy    AdminProfile?    @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
