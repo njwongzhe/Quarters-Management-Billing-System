@@ -41,9 +41,3 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
-middleware.ts
-app/not-found.tsx
-app/constants/routes.ts
-app/pages/0_authentication/components/AuthLogin.tsx
-app/pages/0_authentication/components/AuthRegister.tsx
-app/pages/0_authentication/components/AutthForgot.tsx

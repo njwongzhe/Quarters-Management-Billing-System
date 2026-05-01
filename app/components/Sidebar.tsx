@@ -2,21 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const routesNormal = [
-    { href: "/pages/1_laman_utama", label: "Laman Utama", icon: "home" },
-    { href: "/pages/2_muat_naik", label: "Muat Naik", icon: "upload" },
-    { href: "/pages/3_bayaran", label: "Bayaran", icon: "payment" },
-    { href: "/pages/4_tunggakan", label: "Tunggakan", icon: "warning" },
-    { href: "/pages/5_transaksi", label: "Transaksi", icon: "receipt" },
-    { href: "/pages/6_penghuni", label: "Pengurusan Penghuni", icon: "group" },
-    { href: "/pages/7_kuarters", label: "Pengurusan Kuarters", icon: "apartment" },
-    { href: "/pages/8_jejak_audit", label: "Jejak Audit", icon: "history" },
-];
-
-const routeProfile = [
-    { href: "/pages/9_profile", label: "Profile", icon: "person" },
-];
+import { PROFILE_ROUTES, SIDEBAR_ROUTES } from "../constants/routes"; 
 
 function isRouteActive(pathname: string, href: string) {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -41,7 +27,7 @@ export default function Sidebar() {
 
                     {/* Normal Routes */}
                     <div className="flex flex-col gap-1">
-                        {routesNormal.map((route) => {
+                        {SIDEBAR_ROUTES.map((route) => {
                             const active = isRouteActive(pathname, route.href);
 
                             return (
@@ -71,7 +57,7 @@ export default function Sidebar() {
 
                     {/* Profile */}
                     <div>
-                        {routeProfile.map((route) => {
+                        {PROFILE_ROUTES.map((route) => {
                             const active = isRouteActive(pathname, route.href);
 
                             return (

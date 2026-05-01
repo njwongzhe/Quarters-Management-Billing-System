@@ -3,5 +3,5 @@ export default function PagesLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <>{children}</>;
+  return children;
 }
