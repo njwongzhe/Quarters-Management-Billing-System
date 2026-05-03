@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { SESSION_COOKIE_NAME } from "@/app/constants/auth";
+import { SESSION_COOKIE_NAME } from "@/app/constants/auth-server";
 import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
 
 export async function POST(request: Request) {
