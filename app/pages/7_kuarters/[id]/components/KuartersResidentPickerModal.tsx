@@ -211,7 +211,7 @@ export default function KuartersResidentPickerModal({
                                 disabled={isSelected}
                                 onClick={() => onAssignResident(resident)}
                               >
-                                {isSelected ? "Dipilih" : "Assign"}
+                                {isSelected ? "Dipilih" : "Tetapkan"}
                               </button>
                             </td>
                           </tr>

@@ -22,6 +22,7 @@ export type QuarterCategorySummary = {
 export type QuarterCategoryRecord = {
   id: string;
   categoryName: string;
+  address: string | null;
   rentalPrice: number;
   maintenancePrice: number;
   penaltyPrice: number;
@@ -32,6 +33,7 @@ export type QuarterCategoryRecord = {
 
 export type QuarterCategoryDraft = {
   categoryName: string;
+  address: string;
   rentalPrice: string;
   maintenancePrice: string;
   penaltyPrice: string;
@@ -129,6 +131,7 @@ export function buildKuartersSummaryCards(
 export function createEmptyQuarterCategoryDraft(): QuarterCategoryDraft {
   return {
     categoryName: "",
+    address: "",
     rentalPrice: "",
     maintenancePrice: "",
     penaltyPrice: "",
@@ -146,6 +149,7 @@ export function createDraftFromQuarterCategory(
 ): QuarterCategoryDraft {
   return {
     categoryName: quarterCategory.categoryName,
+    address: quarterCategory.address ?? "",
     rentalPrice: formatEditableMoney(quarterCategory.rentalPrice),
     maintenancePrice: formatEditableMoney(quarterCategory.maintenancePrice),
     penaltyPrice: formatEditableMoney(quarterCategory.penaltyPrice),
@@ -158,16 +162,24 @@ export function validateQuarterCategoryDraft(
     requireCategoryName: boolean;
   },
 ) {
-  if (options.requireCategoryName) {
-    const normalizedCategoryName = draft.categoryName.trim().replace(/\s+/g, " "); // Replace multiple whitespace with single space for validation
+  const normalizedCategoryName = draft.categoryName.trim().replace(/\s+/g, " ");
 
-    if (normalizedCategoryName.length === 0) {
-      return "nama kategori tidak boleh kosong.";
-    }
+  if (options.requireCategoryName && normalizedCategoryName.length === 0) {
+    return "Nama kategori tidak boleh kosong.";
+  }
 
-    if (normalizedCategoryName.length > 100) {
-      return "nama kategori terlalu panjang. Sila gunakan maksimum 100 aksara.";
-    }
+  if (normalizedCategoryName.length > 100) {
+    return "Nama kategori terlalu panjang. Sila gunakan maksimum 100 aksara.";
+  }
+
+  const normalizedAddress = draft.address.trim().replace(/\s+/g, " ");
+
+  if (normalizedAddress.length === 0) {
+    return "Alamat tidak boleh kosong.";
+  }
+
+  if (normalizedAddress.length > 500) {
+    return "Alamat terlalu panjang. Sila gunakan maksimum 500 aksara.";
   }
 
   const moneyFieldError =
@@ -194,17 +206,22 @@ export function filterQuarterCategories(
   quarterCategories: QuarterCategoryRecord[],
   filters: QuarterCategoryFilters,
 ) {
-  const normalizedCategoryNameQuery = normalizeSearchValue(filters.categoryNameQuery);
+  const normalizedQuery = normalizeSearchValue(filters.categoryNameQuery);
 
-  if (normalizedCategoryNameQuery.length === 0) {
+  if (normalizedQuery.length === 0) {
     return quarterCategories;
   }
 
-  return quarterCategories.filter((quarterCategory) =>
-    normalizeSearchValue(quarterCategory.categoryName).includes(
-      normalizedCategoryNameQuery,
-    ),
-  );
+  return quarterCategories.filter((quarterCategory) => {
+    const searchableValues = [
+      quarterCategory.categoryName,
+      quarterCategory.address ?? "",
+    ];
+
+    return searchableValues.some((value) =>
+      normalizeSearchValue(value).includes(normalizedQuery),
+    );
+  });
 }
 
 export function buildQuarterCategoryPagination(

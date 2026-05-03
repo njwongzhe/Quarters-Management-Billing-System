@@ -6,8 +6,6 @@ import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFe
 import KuartersOverviewCards from "@/app/pages/7_kuarters/components/KuartersOverviewCards";
 import {
   buildKuartersSummaryCards,
-  createEmptyQuarterCategoryFilters,
-  hasActiveQuarterCategoryFilters,
   type KuartersNotice,
 } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
@@ -21,8 +19,10 @@ import {
   buildQuarterUnitPagination,
   buildQuarterUnitSummary,
   createDraftFromQuarterUnit,
+  createEmptyQuarterUnitFilters,
   createEmptyQuarterUnitDraft,
   filterQuarterUnits,
+  hasActiveQuarterUnitFilters,
   sortQuarterUnits,
   validateQuarterUnitDraft,
   type KuartersCategoryDetailInitialData,
@@ -76,9 +76,7 @@ export default function KuartersCategoryDetailPageClient({
 }: KuartersCategoryDetailPageClientProps) {
   const [units, setUnits] = useState<QuarterUnitRecord[]>(initialData.units);
   const [currentPage, setCurrentPage] = useState(1);
-  const [filterQuery, setFilterQuery] = useState(
-    createEmptyQuarterCategoryFilters().categoryNameQuery,
-  );
+  const [filters, setFilters] = useState(createEmptyQuarterUnitFilters);
   const [editor, setEditor] = useState<KuartersUnitEditorState | null>(null);
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingUnitId, setPendingUnitId] = useState<string | null>(null);
@@ -94,10 +92,8 @@ export default function KuartersCategoryDetailPageClient({
     residentPicker.searchQuery,
   );
   const summary = buildQuarterUnitSummary(units);
-  const hasActiveFilters = hasActiveQuarterCategoryFilters({
-    categoryNameQuery: filterQuery,
-  });
-  const filteredUnits = filterQuarterUnits(units, filterQuery);
+  const hasActiveFilters = hasActiveQuarterUnitFilters(filters);
+  const filteredUnits = filterQuarterUnits(units, filters);
   const pagination = buildQuarterUnitPagination(filteredUnits, currentPage, {
     hasActiveFilter: hasActiveFilters,
     totalRecords: units.length,
@@ -186,12 +182,23 @@ export default function KuartersCategoryDetailPageClient({
 
   function handleFilterQueryChange(value: string) {
     setCurrentPage(1);
-    setFilterQuery(value);
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      query: value,
+    }));
+  }
+
+  function handleStatusFilterChange(value: "ALL" | "OCCUPIED" | "VACANT") {
+    setCurrentPage(1);
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      status: value,
+    }));
   }
 
   function handleClearFilter() {
     setCurrentPage(1);
-    setFilterQuery("");
+    setFilters(createEmptyQuarterUnitFilters());
   }
 
   function handleAddUnit() {
@@ -253,6 +260,26 @@ export default function KuartersCategoryDetailPageClient({
       return;
     }
 
+    setResidentPicker({
+      isOpen: true,
+      isLoading: false,
+      errorMessage: null,
+      searchQuery: "",
+      residents: [],
+    });
+  }
+
+  function handleRequestAssignResident(unit: QuarterUnitRecord) {
+    if (!ensureActionIsAvailable()) {
+      return;
+    }
+
+    setEditor({
+      mode: "edit",
+      rowId: unit.id,
+      draft: createDraftFromQuarterUnit(unit),
+    });
+    setNotice(null);
     setResidentPicker({
       isOpen: true,
       isLoading: false,
@@ -477,7 +504,7 @@ export default function KuartersCategoryDetailPageClient({
       closeResidentPicker();
       setEditor(null);
       setCurrentPage((previousPage) => {
-        const nextFilteredUnits = filterQuarterUnits(nextUnits, filterQuery);
+        const nextFilteredUnits = filterQuarterUnits(nextUnits, filters);
         const nextPagination = buildQuarterUnitPagination(
           nextFilteredUnits,
           previousPage,
@@ -515,6 +542,7 @@ export default function KuartersCategoryDetailPageClient({
     <div className="flex flex-col gap-6 pb-8">
       <KuartersCategoryDetailHeader
         categoryName={initialData.categoryName}
+        address={initialData.address}
         rates={initialData.rates}
       />
       <KuartersFeedbackBanner
@@ -523,9 +551,14 @@ export default function KuartersCategoryDetailPageClient({
       />
       <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
       <KuartersUnitsPanel
+        address={initialData.address}
+        categoryId={initialData.id}
+        categoryName={initialData.categoryName}
         currentPage={pagination.currentPage}
         editor={editor}
-        filterQuery={filterQuery}
+        exportUnits={filteredUnits}
+        filterQuery={filters.query}
+        statusFilter={filters.status}
         hasActiveFilters={hasActiveFilters}
         isResidentPickerOpen={residentPicker.isOpen}
         onAddUnit={handleAddUnit}
@@ -535,6 +568,8 @@ export default function KuartersCategoryDetailPageClient({
         onDraftChange={handleDraftChange}
         onEditUnit={handleEditUnit}
         onFilterQueryChange={handleFilterQueryChange}
+        onRequestAssignResident={handleRequestAssignResident}
+        onStatusFilterChange={handleStatusFilterChange}
         onOpenResidentPicker={handleOpenResidentPicker}
         onPageChange={setCurrentPage}
         onSaveUnit={handleSaveUnit}

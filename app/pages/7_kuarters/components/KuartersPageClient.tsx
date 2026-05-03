@@ -167,7 +167,7 @@ export default function KuartersPageClient({
     }
 
     const validationMessage = validateQuarterCategoryDraft(editor.draft, {
-      requireCategoryName: editor.mode === "create",
+      requireCategoryName: true,
     });
 
     if (validationMessage) {
@@ -182,11 +182,14 @@ export default function KuartersPageClient({
       editor.mode === "create"
         ? {
             kategori: editor.draft.categoryName.trim(),
+            alamat: editor.draft.address.trim(),
             sewa: editor.draft.rentalPrice.trim(),
             senggara: editor.draft.maintenancePrice.trim(),
             penalti: editor.draft.penaltyPrice.trim(),
           }
         : {
+            kategori: editor.draft.categoryName.trim(),
+            alamat: editor.draft.address.trim(),
             sewa: editor.draft.rentalPrice.trim(),
             senggara: editor.draft.maintenancePrice.trim(),
             penalti: editor.draft.penaltyPrice.trim(),
@@ -347,13 +350,6 @@ export default function KuartersPageClient({
     }
   }
 
-  function handleUnavailableFeature(message: string) {
-    showNotice({
-      tone: "info",
-      message,
-    });
-  }
-
   function handleViewRow(quarterCategory: QuarterCategoryRecord) {
     if (!ensureActionIsAvailable()) {
       return;
@@ -373,6 +369,7 @@ export default function KuartersPageClient({
       <KuartersCategoryRatesPanel
         currentPage={pagination.currentPage}
         editor={editor}
+        exportRates={filteredQuarterCategories}
         filterQuery={filters.categoryNameQuery}
         hasActiveFilters={hasActiveFilters}
         onCancelEdit={handleCancelEdit}
@@ -389,7 +386,6 @@ export default function KuartersPageClient({
         onFilterQueryChange={handleFilterQueryChange}
         onPageChange={setCurrentPage}
         onSaveRow={handleSaveRow}
-        onUnavailableFeature={handleUnavailableFeature}
         onViewRow={handleViewRow}
         totalPages={pagination.totalPages}
       />

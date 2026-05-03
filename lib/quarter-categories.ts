@@ -3,6 +3,7 @@ import type { QuarterCategory } from "@prisma/client";
 export type QuarterCategoryListItem = {
   id: string;
   categoryName: string;
+  address: string | null;
   rentalPrice: number;
   maintenancePrice: number;
   penaltyPrice: number;
@@ -39,18 +40,31 @@ export type QuarterCategoryNumericField =
   | "maintenancePrice"
   | "penaltyPrice";
 
-export type QuarterCategoryUpdateInput = Partial<
-  Record<QuarterCategoryNumericField, number>
->;
+export type QuarterCategoryTextField = "categoryName" | "address";
+
+export type QuarterCategoryField =
+  | QuarterCategoryTextField
+  | QuarterCategoryNumericField;
+
+export type QuarterCategoryUpdateInput = {
+  categoryName?: string;
+  address?: string | null;
+  rentalPrice?: number;
+  maintenancePrice?: number;
+  penaltyPrice?: number;
+};
 
 export type QuarterCategoryCreateInput = {
   categoryName: string;
+  address: string | null;
   rentalPrice: number;
   maintenancePrice: number;
   penaltyPrice: number;
 };
 
-const fieldLabels: Record<QuarterCategoryNumericField, string> = {
+const fieldLabels: Record<QuarterCategoryField, string> = {
+  categoryName: "nama kategori",
+  address: "alamat",
   rentalPrice: "sewa",
   maintenancePrice: "senggara",
   penaltyPrice: "penalti",
@@ -62,6 +76,7 @@ export function mapQuarterCategoryForApi(
   return {
     id: quarterCategory.id,
     categoryName: quarterCategory.categoryName,
+    address: quarterCategory.address,
     rentalPrice: Number(quarterCategory.rentalPrice),
     maintenancePrice: Number(quarterCategory.maintenancePrice),
     penaltyPrice: Number(quarterCategory.penaltyPrice),
@@ -98,9 +113,24 @@ export function parseQuarterCategoryUpdateBody(
   }
 
   const payload = body as Record<string, unknown>;
-  return parseQuarterCategoryPrices(payload, {
+  const parsedFields = parseQuarterCategoryFields(payload, {
+    requireCategoryName: false,
     requireAllFields: false,
   });
+
+  if (!parsedFields.ok) {
+    return parsedFields;
+  }
+
+  if (Object.keys(parsedFields.data).length === 0) {
+    return {
+      ok: false,
+      message:
+        "Sila berikan sekurang-kurangnya satu nilai untuk nama kategori, alamat, sewa, senggara atau penalti.",
+    };
+  }
+
+  return parsedFields;
 }
 
 export function parseQuarterCategoryCreateBody(
@@ -120,6 +150,17 @@ export function parseQuarterCategoryCreateBody(
 
   if (!parsedCategoryName.ok) {
     return parsedCategoryName;
+  }
+
+  const parsedAddress = parseQuarterCategoryAddress(
+    payload.address ?? payload.alamat,
+    {
+      requireAddress: true,
+    },
+  );
+
+  if (!parsedAddress.ok) {
+    return parsedAddress;
   }
 
   const parsedPrices = parseQuarterCategoryPrices(payload, {
@@ -151,6 +192,7 @@ export function parseQuarterCategoryCreateBody(
     ok: true,
     data: {
       categoryName: parsedCategoryName.data,
+      address: parsedAddress.data,
       rentalPrice,
       maintenancePrice,
       penaltyPrice,
@@ -161,9 +203,9 @@ export function parseQuarterCategoryCreateBody(
 export function getChangedQuarterCategoryFields(
   current: QuarterCategory,
   updates: QuarterCategoryUpdateInput,
-): QuarterCategoryNumericField[] {
-  return (Object.keys(updates) as QuarterCategoryNumericField[]).filter((field) => {
-    const currentValue = getQuarterCategoryNumericValue(current, field);
+): QuarterCategoryField[] {
+  return (Object.keys(updates) as QuarterCategoryField[]).filter((field) => {
+    const currentValue = getQuarterCategoryValue(current, field);
     const updatedValue = updates[field];
 
     return updatedValue !== undefined && currentValue !== updatedValue;
@@ -172,7 +214,7 @@ export function getChangedQuarterCategoryFields(
 
 export function buildQuarterCategoryUpdatedMessage(
   categoryName: string,
-  changedFields: QuarterCategoryNumericField[],
+  changedFields: QuarterCategoryField[],
 ): string {
   if (changedFields.length === 0) {
     return `Tiada perubahan dibuat pada ${categoryName}.`;
@@ -181,7 +223,7 @@ export function buildQuarterCategoryUpdatedMessage(
   const labels = changedFields.map((field) => fieldLabels[field]);
   const joinedLabels = joinMalayList(labels);
 
-  return `Kadar ${joinedLabels} bagi ${categoryName} berjaya dikemas kini.`;
+  return `Maklumat ${joinedLabels} bagi ${categoryName} berjaya dikemas kini.`;
 }
 
 export function buildQuarterCategoryDeleteBlockedMessage(
@@ -198,15 +240,28 @@ export function buildQuarterCategoryCreatedMessage(categoryName: string): string
   return `${categoryName} berjaya ditambah.`;
 }
 
-export function buildQuarterCategoryDuplicateMessage(categoryName: string): string {
-  return `Nama kategori ${categoryName} sudah wujud. Sila gunakan nama kategori yang lain.`;
+export function buildQuarterCategoryDuplicateMessage(
+  categoryName: string,
+  address?: string | null,
+): string {
+  const resolvedAddress = address?.trim();
+
+  if (!resolvedAddress) {
+    return `Gabungan nama kategori ${categoryName} dan alamat tersebut sudah wujud. Sila gunakan gabungan yang lain.`;
+  }
+
+  return `Gabungan nama kategori ${categoryName} dan alamat ${resolvedAddress} sudah wujud. Sila gunakan gabungan yang lain.`;
 }
 
-function getQuarterCategoryNumericValue(
+function getQuarterCategoryValue(
   quarterCategory: QuarterCategory,
-  field: QuarterCategoryNumericField,
+  field: QuarterCategoryField,
 ) {
   switch (field) {
+    case "categoryName":
+      return quarterCategory.categoryName;
+    case "address":
+      return quarterCategory.address;
     case "rentalPrice":
       return Number(quarterCategory.rentalPrice);
     case "maintenancePrice":
@@ -214,6 +269,70 @@ function getQuarterCategoryNumericValue(
     case "penaltyPrice":
       return Number(quarterCategory.penaltyPrice);
   }
+}
+
+function parseQuarterCategoryFields(
+  payload: Record<string, unknown>,
+  options: {
+    requireCategoryName: boolean;
+    requireAllFields: boolean;
+  },
+): ParseSuccess<QuarterCategoryUpdateInput> | ParseFailure {
+  const updates: QuarterCategoryUpdateInput = {};
+  const rawCategoryName = payload.categoryName ?? payload.kategori ?? payload.kelas;
+  const rawAddress = payload.address ?? payload.alamat;
+
+  if (rawCategoryName !== undefined || options.requireCategoryName) {
+    const parsedCategoryName = parseQuarterCategoryName(rawCategoryName);
+
+    if (!parsedCategoryName.ok) {
+      return parsedCategoryName;
+    }
+
+    updates.categoryName = parsedCategoryName.data;
+  }
+
+  if (rawAddress !== undefined) {
+    const parsedAddress = parseQuarterCategoryAddress(rawAddress, {
+      requireAddress: true,
+    });
+
+    if (!parsedAddress.ok) {
+      return parsedAddress;
+    }
+
+    updates.address = parsedAddress.data;
+  }
+
+  const hasAnyPrice =
+    payload.rentalPrice !== undefined ||
+    payload.sewa !== undefined ||
+    payload.maintenancePrice !== undefined ||
+    payload.senggara !== undefined ||
+    payload.penaltyPrice !== undefined ||
+    payload.penalti !== undefined;
+
+  const parsedPrices =
+    options.requireAllFields || hasAnyPrice
+      ? parseQuarterCategoryPrices(payload, {
+          requireAllFields: options.requireAllFields,
+        })
+      : ({
+          ok: true,
+          data: {},
+        } as const);
+
+  if (!parsedPrices.ok) {
+    return parsedPrices;
+  }
+
+  return {
+    ok: true,
+    data: {
+      ...updates,
+      ...parsedPrices.data,
+    },
+  };
 }
 
 function parseMoneyInput(
@@ -281,6 +400,64 @@ function parseQuarterCategoryName(
     return {
       ok: false,
       message: "Nama kategori terlalu panjang. Sila gunakan maksimum 100 aksara.",
+    };
+  }
+
+  return {
+    ok: true,
+    data: normalizedValue,
+  };
+}
+
+function parseQuarterCategoryAddress(
+  value: unknown,
+  options: {
+    requireAddress: boolean;
+  } = {
+    requireAddress: false,
+  },
+): ParseSuccess<string | null> | ParseFailure {
+  if (value === undefined || value === null) {
+    if (options.requireAddress) {
+      return {
+        ok: false,
+        message: "Alamat tidak boleh kosong.",
+      };
+    }
+
+    return {
+      ok: true,
+      data: null,
+    };
+  }
+
+  if (typeof value !== "string") {
+    return {
+      ok: false,
+      message: "Alamat mesti dalam bentuk teks yang sah.",
+    };
+  }
+
+  const normalizedValue = value.trim().replace(/\s+/g, " ");
+
+  if (normalizedValue.length === 0) {
+    if (options.requireAddress) {
+      return {
+        ok: false,
+        message: "Alamat tidak boleh kosong.",
+      };
+    }
+
+    return {
+      ok: true,
+      data: null,
+    };
+  }
+
+  if (normalizedValue.length > 500) {
+    return {
+      ok: false,
+      message: "Alamat terlalu panjang. Sila gunakan maksimum 500 aksara.",
     };
   }
 

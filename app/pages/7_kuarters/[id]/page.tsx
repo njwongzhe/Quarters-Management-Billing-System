@@ -36,6 +36,7 @@ async function getInitialKuartersCategoryDetailData(id: string): Promise<{
         initialData: {
           id,
           categoryName: "",
+          address: null,
           rates: {
             rentalPrice: null,
             maintenancePrice: null,
@@ -61,6 +62,7 @@ async function getInitialKuartersCategoryDetailData(id: string): Promise<{
       initialData: {
         id,
         categoryName: "Maklumat kategori kuarters",
+        address: null,
         rates: {
           rentalPrice: null,
           maintenancePrice: null,

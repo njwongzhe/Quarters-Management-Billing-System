@@ -22,9 +22,38 @@ export type QuarterUnitListItem = {
   occupantName: string | null;
 };
 
+export type QuarterUnitOccupancyDetails = {
+  id: string;
+  occupantName: string;
+  occupantIcNumber: string;
+  occupantAge: number | null;
+  moveInDate: string;
+  moveOutDate: string | null;
+  status: "CURRENT" | "PAST";
+};
+
+export type QuarterUnitDetails = {
+  id: string;
+  unitCode: string;
+  status: UnitStatus;
+  category: {
+    id: string;
+    categoryName: string;
+    address: string | null;
+    rates: {
+      rentalPrice: number | null;
+      maintenancePrice: number | null;
+      penaltyPrice: number | null;
+    };
+  };
+  currentOccupancy: QuarterUnitOccupancyDetails | null;
+  occupancyHistory: QuarterUnitOccupancyDetails[];
+};
+
 export type QuarterCategoryUnitsDetail = {
   id: string;
   categoryName: string;
+  address: string | null;
   rates: {
     rentalPrice: number | null;
     maintenancePrice: number | null;
@@ -51,6 +80,29 @@ export type QuarterUnitUpdateBody = {
     occupantIcNumber: boolean;
   };
 };
+
+// Used to fetch the list of quarter units for a specific quarter category, including their current occupancy status, for display in the units panel of the quarter category detail page.
+export const quarterUnitDetailsInclude = {
+  quarterCategory: true,
+  occupancies: {
+    orderBy: [
+      {
+        status: "asc",
+      },
+      {
+        moveInDate: "desc",
+      },
+    ],
+    include: {
+      resident: {
+        select: {
+          fullName: true,
+          icNumber: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.UnitInclude;
 
 export const quarterUnitCurrentOccupancyInclude = {
   occupancies: {
@@ -86,6 +138,10 @@ export type UnitWithCurrentOccupancy = Prisma.UnitGetPayload<{
   include: typeof quarterUnitCurrentOccupancyInclude;
 }>;
 
+export type UnitWithDetails = Prisma.UnitGetPayload<{
+  include: typeof quarterUnitDetailsInclude;
+}>;
+
 export type QuarterCategoryWithUnits = Prisma.QuarterCategoryGetPayload<{
   include: typeof QuarterCategoryUnitsDetailInclude;
 }>;
@@ -104,6 +160,41 @@ export function mapQuarterUnitForApi(
   };
 }
 
+export function mapQuarterUnitDetailsForApi(
+  unit: UnitWithDetails,
+): QuarterUnitDetails {
+  const occupancyHistory = unit.occupancies.map((occupancy) => ({
+    id: occupancy.id,
+    occupantName: occupancy.resident.fullName,
+    occupantIcNumber: occupancy.resident.icNumber,
+    occupantAge: calculateAgeFromIcNumber(occupancy.resident.icNumber),
+    moveInDate: occupancy.moveInDate.toISOString(),
+    moveOutDate: occupancy.moveOutDate?.toISOString() ?? null,
+    status: occupancy.status,
+  }));
+  const currentOccupancy =
+    occupancyHistory.find((occupancy) => occupancy.status === "CURRENT") ??
+    null;
+
+  return {
+    id: unit.id,
+    unitCode: unit.unitCode,
+    status: unit.status,
+    category: {
+      id: unit.quarterCategory.id,
+      categoryName: unit.quarterCategory.categoryName,
+      address: unit.quarterCategory.address,
+      rates: {
+        rentalPrice: Number(unit.quarterCategory.rentalPrice),
+        maintenancePrice: Number(unit.quarterCategory.maintenancePrice),
+        penaltyPrice: Number(unit.quarterCategory.penaltyPrice),
+      },
+    },
+    currentOccupancy,
+    occupancyHistory,
+  };
+}
+
 export function mapQuarterCategoryUnitsDetailForApi(
   quarterCategory: QuarterCategoryWithUnits,
 ): QuarterCategoryUnitsDetail {
@@ -116,6 +207,7 @@ export function mapQuarterCategoryUnitsDetailForApi(
   return {
     id: quarterCategory.id,
     categoryName: quarterCategory.categoryName,
+    address: quarterCategory.address,
     rates: {
       rentalPrice: Number(quarterCategory.rentalPrice),
       maintenancePrice: Number(quarterCategory.maintenancePrice),
@@ -379,6 +471,58 @@ function parseOccupantIcNumber(
     ok: true,
     data: normalizedValue,
   };
+}
+
+function calculateAgeFromIcNumber(icNumber: string) {
+  const compactIcNumber = icNumber.replace(/\D/g, "");
+
+  if (compactIcNumber.length < 6) {
+    return null;
+  }
+
+  const year = Number(compactIcNumber.slice(0, 2));
+  const month = Number(compactIcNumber.slice(2, 4));
+  const day = Number(compactIcNumber.slice(4, 6));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const currentCentury = Math.floor(currentYear / 100) * 100;
+  const candidateYear = currentCentury + year;
+  const fullYear =
+    candidateYear > currentYear ? candidateYear - 100 : candidateYear;
+  const birthDate = new Date(fullYear, month - 1, day);
+
+  if (
+    birthDate.getFullYear() !== fullYear ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const hasBirthdayPassed =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() &&
+      today.getDate() >= birthDate.getDate());
+
+  if (!hasBirthdayPassed) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
 }
 
 // Checks if an object has a own property with the specified key, guarding against cases where the object might have a null prototype.
