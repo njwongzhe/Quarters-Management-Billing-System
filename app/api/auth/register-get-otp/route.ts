@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { prisma } from '@/lib/prisma';
+import { DOMAIN_RESTRICTION_SERVER, RESTRICTED_EMAIL_DOMAIN_SERVER } from '@/app/constants/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,6 +46,14 @@ export async function POST(request: Request) {
 
     if (!trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail)) {
       return NextResponse.json({ error: "Emel tidak sah." }, { status: 400 });
+    }
+
+    // Check domain restriction
+    if (DOMAIN_RESTRICTION_SERVER && !trimmedEmail.endsWith(RESTRICTED_EMAIL_DOMAIN_SERVER)) {
+      return NextResponse.json(
+        { error: `Emel mesti berakhir dengan ${RESTRICTED_EMAIL_DOMAIN_SERVER}.` },
+        { status: 400 }
+      );
     }
 
     const isRegistered = await isEmailAlreadyRegistered(trimmedEmail);
