@@ -7,6 +7,7 @@ import type { QuarterCategoryRates } from "./kuartersUnitHelpers";
 
 type KuartersCategoryDetailHeaderProps = {
   categoryName: string;
+  address: string | null;
   rates: QuarterCategoryRates;
 };
 
@@ -32,9 +33,11 @@ function RatePill({
 
 export default function KuartersCategoryDetailHeader({
   categoryName,
+  address,
   rates,
 }: KuartersCategoryDetailHeaderProps) {
   const resolvedCategoryName = categoryName.trim() || "Maklumat kategori kuarters";
+  const resolvedAddress = address?.trim() || "Alamat tidak tersedia";
 
   return (
     <section className="space-y-4">
@@ -50,6 +53,9 @@ export default function KuartersCategoryDetailHeader({
         <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-dark-grey md:text-[34px]">
           Kategori: {resolvedCategoryName}
         </h1>
+        <p className="max-w-3xl text-sm font-semibold text-dark-grey md:text-base">
+          Alamat: {resolvedAddress}
+        </p>
         <p className="max-w-3xl text-sm text-grey md:text-base">
           Pengurusan unit, penghuni semasa dan kadar berkaitan bagi kategori kuarters ini.
         </p>

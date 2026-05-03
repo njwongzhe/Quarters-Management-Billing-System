@@ -522,6 +522,7 @@ export default function KuartersCategoryDetailPageClient({
     <div className="flex flex-col gap-6 pb-8">
       <KuartersCategoryDetailHeader
         categoryName={initialData.categoryName}
+        address={initialData.address}
         rates={initialData.rates}
       />
       <KuartersFeedbackBanner
@@ -530,6 +531,7 @@ export default function KuartersCategoryDetailPageClient({
       />
       <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
       <KuartersUnitsPanel
+        categoryId={initialData.id}
         currentPage={pagination.currentPage}
         editor={editor}
         filterQuery={filters.query}

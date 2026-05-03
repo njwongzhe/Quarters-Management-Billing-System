@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maklumat Penghunian Unit</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+      padding: 32px;
+      color: #0f172a;
+    }
+
+    .modal {
+      width: 896px;
+      max-width: 100%;
+      background: #eff4ff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+    }
+
+    .modal-header {
+      height: 93px;
+      background: #151e66;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px 0 24px;
+    }
+
+    .header-title h1 {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      margin-bottom: 4px;
+    }
+
+    .header-title p {
+      font-size: 13px;
+      letter-spacing: 0.8px;
+      color: rgba(255, 255, 255, 0.7);
+      text-transform: uppercase;
+    }
+
+    .close-btn {
+      border: none;
+      background: transparent;
+      color: #fff;
+      font-size: 34px;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .close-btn:hover {
+      transform: scale(0.92);
+      opacity: 0.8;
+    }
+
+    .tabs {
+      height: 51px;
+      background: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      border-bottom: 1px solid rgba(198, 197, 210, 0.25);
+    }
+
+    .tab-btn {
+      min-width: 180px;
+      padding: 0 28px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: #7b7d8c;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .tab-btn.active {
+      color: #151e66;
+      border-bottom-color: #151e66;
+    }
+
+    .tab-btn:hover {
+      color: #151e66;
+    }
+
+    .modal-body {
+      padding: 34px 32px 32px;
+    }
+
+    .section {
+      margin-bottom: 38px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #151e66;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .section-title::before {
+      content: "";
+      width: 4px;
+      height: 17px;
+      background: #151e66;
+      border-radius: 1px;
+    }
+
+    .profile-link {
+      border: none;
+      background: transparent;
+      color: #151e66;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .profile-link span {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .profile-link:hover {
+      text-decoration: underline;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: #d4f0db;
+      color: #157437;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #157437;
+    }
+
+    .grid {
+      display: grid;
+      gap: 26px 24px;
+    }
+
+    .grid-3 {
+      grid-template-columns: 2fr 1.3fr 0.6fr;
+    }
+
+    .grid-4 {
+      grid-template-columns: 1fr 1fr 2.12fr;
+    }
+
+    .grid-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .grid-3-equal {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .field label {
+      display: block;
+      margin: 0 0 9px 4px;
+      color: #7b7d8c;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+    }
+
+    .input-box {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      border: 1px solid #dce3f2;
+      border-radius: 9px;
+      background: #eef4ff;
+      color: #0f172a;
+      padding: 0 15px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .input-box.strong {
+      font-weight: 800;
+    }
+
+    .input-box.success {
+      color: #086b20;
+      font-weight: 800;
+    }
+
+    .input-box.muted {
+      color: #a0a3b1;
+    }
+
+    .history-panel {
+      display: none;
+      min-height: 430px;
+      padding: 28px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid #dce3f2;
+    }
+
+    .history-panel h2 {
+      color: #151e66;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .history-panel p {
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 16px;
+      }
+
+      .modal-header {
+        padding: 0 20px;
+      }
+
+      .tabs {
+        justify-content: flex-start;
+        overflow-x: auto;
+      }
+
+      .tab-btn {
+        min-width: 160px;
+      }
+
+      .modal-body {
+        padding: 28px 20px;
+      }
+
+      .grid-3,
+      .grid-4,
+      .grid-2,
+      .grid-3-equal {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="modal" id="modal">
+    <header class="modal-header">
+      <div class="header-title">
+        <h1>MAKLUMAT PENGHUNIAN UNIT</h1>
+        <p>REKOD PENGHUNIAN UNIT</p>
+      </div>
+      <button class="close-btn" id="closeBtn" aria-label="Close modal">&times;</button>
+    </header>
+
+    <nav class="tabs" aria-label="Unit occupancy tabs">
+      <button class="tab-btn active" data-tab="unit">MAKLUMAT UNIT</button>
+      <button class="tab-btn" data-tab="history">SEJARAH PENGHUNIAN</button>
+    </nav>
+
+    <section class="modal-body" id="unitTab">
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">MAKLUMAT PENGHUNI</h2>
+          <button class="profile-link" type="button">PROFIL PENUH <span>&rsaquo;</span></button>
+        </div>
+
+        <div class="grid grid-3">
+          <div class="field">
+            <label>Nama Penghuni</label>
+            <div class="input-box">Ahmad Zulkifli Bin Ramli</div>
+          </div>
+
+          <div class="field">
+            <label>No. Kad Pengenalan</label>
+            <div class="input-box">850101-01-5123</div>
+          </div>
+
+          <div class="field">
+            <label>Umur</label>
+            <div class="input-box">39</div>
+          </div>
+        </div>
+
+        <div class="grid grid-4" style="margin-top: 26px;">
+          <div class="field">
+            <label>Tarikh Masuk</label>
+            <div class="input-box">15/01/2023</div>
+          </div>
+
+          <div class="field">
+            <label>Tarikh Keluar</label>
+            <div class="input-box muted">N/A</div>
+          </div>
+
+          <div class="field">
+            <label>Status</label>
+            <div class="input-box success">AKTIF</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" style="margin-bottom: 0;">
+        <div class="section-header">
+          <h2 class="section-title">MAKLUMAT UNIT</h2>
+          <div class="status-pill">Berpenghuni</div>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="field">
+            <label>Kelas</label>
+            <div class="input-box">Kelas C</div>
+          </div>
+
+          <div class="field">
+            <label>ID Unit</label>
+            <div class="input-box">A-01-01</div>
+          </div>
+        </div>
+
+        <div class="grid grid-3-equal" style="margin-top: 26px;">
+          <div class="field">
+            <label>Sewa (RM)</label>
+            <div class="input-box strong">400.00</div>
+          </div>
+
+          <div class="field">
+            <label>Senggara (RM)</label>
+            <div class="input-box strong">120.00</div>
+          </div>
+
+          <div class="field">
+            <label>Penalti (RM)</label>
+            <div class="input-box strong">0.00</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="modal-body history-panel" id="historyTab">
+      <h2>Sejarah Penghunian</h2>
+      <p>Bahagian ini boleh digunakan untuk memaparkan rekod penghuni terdahulu, tarikh masuk, tarikh keluar, dan status penghunian unit.</p>
+    </section>
+  </main>
+
+  <script>
+    const modal = document.getElementById("modal");
+    const closeBtn = document.getElementById("closeBtn");
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const unitTab = document.getElementById("unitTab");
+    const historyTab = document.getElementById("historyTab");
+
+    closeBtn.addEventListener("click", () => {
+      modal.style.display = "none";
+    });
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        tabButtons.forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+
+        const selectedTab = button.dataset.tab;
+
+        if (selectedTab === "unit") {
+          unitTab.style.display = "block";
+          historyTab.style.display = "none";
+        } else {
+          unitTab.style.display = "none";
+          historyTab.style.display = "block";
+        }
+      });
+    });
+  </script>
+</body>
+</html>

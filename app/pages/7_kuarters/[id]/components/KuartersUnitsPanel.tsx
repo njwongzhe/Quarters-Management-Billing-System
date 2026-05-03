@@ -15,9 +15,11 @@ import {
   EMPTY_QUARTER_UNIT_ID,
   formatQuarterUnitValue,
 } from "./kuartersUnitHelpers";
+import KuartersUnitDetailsOverlay from "./KuartersUnitDetailsOverlay";
 
 type KuartersUnitsPanelProps = {
   units: QuarterUnitRecord[];
+  categoryId: string;
   currentPage: number;
   editor: KuartersUnitEditorState | null;
   filterQuery: string;
@@ -61,10 +63,15 @@ function ToolbarButton({
   return (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded-lg border border-lightGrey/20 bg-white p-2 text-grey transition-colors hover:border-darkblue hover:text-darkblue"
+      className={`inline-flex items-center justify-center rounded-lg border p-2 transition-colors ${
+        isActive
+          ? "border-dark-blue bg-dark-blue text-white"
+          : "border-lightGrey/20 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
+      }`}
       aria-label={label}
       aria-expanded={isExpanded}
       aria-haspopup={hasPopup}
+      aria-pressed={isActive}
       title={label}
       onClick={onClick}
     >
@@ -208,6 +215,7 @@ function getStatusFilterLabel(status: QuarterUnitStatusFilter) {
 
 export default function KuartersUnitsPanel({
   units,
+  categoryId,
   currentPage,
   editor,
   filterQuery,
@@ -235,7 +243,15 @@ export default function KuartersUnitsPanel({
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(
+    filterQuery.trim().length > 0,
+  );
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const isSearchFilterActive = filterQuery.trim().length > 0;
+  const isStatusFilterActive = statusFilter !== "ALL";
+  const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
 
   const handlePointerDownOutsideEditor = useEffectEvent((event: PointerEvent) => {
     if (!editor || pendingAction || isResidentPickerOpen) {
@@ -305,6 +321,12 @@ export default function KuartersUnitsPanel({
     };
   }, [isFilterMenuOpen]);
 
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
+
   function renderActionCell(unit: QuarterUnitRecord, isEditing: boolean) {
     if (isEditing) {
       return (
@@ -340,11 +362,7 @@ export default function KuartersUnitsPanel({
           icon={commonIcons.eye}
           label={`Lihat ${unit.unitCode}`}
           disabled={Boolean(pendingAction)}
-          onClick={() =>
-            onUnavailableFeature(
-              `Paparan terperinci untuk unit ${unit.unitCode} belum tersedia lagi.`,
-            )
-          }
+          onClick={() => setSelectedUnitId(unit.id)}
           textClass="text-dark-blue"
         />
       </div>
@@ -376,6 +394,21 @@ export default function KuartersUnitsPanel({
     setIsFilterMenuOpen((currentState) => !currentState);
   }
 
+  function handleToggleSearch() {
+    if (isSearchOpen) {
+      onFilterQueryChange("");
+      setIsSearchOpen(false);
+      return;
+    }
+
+    setIsSearchOpen(true);
+  }
+
+  function handleClearSearch() {
+    onFilterQueryChange("");
+    setIsSearchOpen(false);
+  }
+
   function handleSelectStatusFilter(value: QuarterUnitStatusFilter) {
     onStatusFilterChange(value);
     setIsFilterMenuOpen(false);
@@ -383,6 +416,14 @@ export default function KuartersUnitsPanel({
 
   return (
     <section className="rounded-2xl border border-light-grey/20 bg-light-blue p-4 sm:p-5">
+      {selectedUnitId ? (
+        <KuartersUnitDetailsOverlay
+          categoryId={categoryId}
+          unitId={selectedUnitId}
+          onClose={() => setSelectedUnitId(null)}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-4 border-b border-light-grey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-extrabold tracking-[-0.02em] text-dark-grey">
@@ -395,17 +436,16 @@ export default function KuartersUnitsPanel({
 
         <div className="flex items-center gap-3 self-start">
           <ToolbarButton
-            icon={commonIcons.download}
-            label="Muat turun senarai unit"
-            onClick={() =>
-              onUnavailableFeature("Fungsi muat turun senarai unit belum tersedia lagi.")
-            }
+            icon={commonIcons.search}
+            label="Cari unit kuarters"
+            isActive={isSearchOpen}
+            onClick={handleToggleSearch}
           />
           <div ref={filterMenuRef} className="relative">
             <ToolbarButton
               icon={commonIcons.filter}
               label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
-              isActive={statusFilter !== "ALL"}
+              isActive={isFilterButtonActive}
               hasPopup="menu"
               isExpanded={isFilterMenuOpen}
               onClick={handleToggleFilterMenu}
@@ -458,9 +498,17 @@ export default function KuartersUnitsPanel({
               </div>
             ) : null}
           </div>
+          <ToolbarButton
+            icon={commonIcons.download}
+            label="Muat turun senarai unit"
+            onClick={() =>
+              onUnavailableFeature("Fungsi muat turun senarai unit belum tersedia lagi.")
+            }
+          />
         </div>
       </div>
 
+      {isSearchOpen ? (
       <div className="mt-4 rounded-2xl border border-light-grey/20 bg-white p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <label className="block flex-1">
@@ -474,6 +522,7 @@ export default function KuartersUnitsPanel({
                 className="text-lightGrey"
               />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={filterQuery}
                 onChange={(event) => onFilterQueryChange(event.target.value)}
@@ -487,14 +536,15 @@ export default function KuartersUnitsPanel({
             <button
               type="button"
               className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!hasActiveFilters}
-              onClick={onClearFilter}
+              disabled={!isSearchFilterActive}
+              onClick={handleClearSearch}
             >
               Kosongkan
             </button>
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="overflow-x-auto">
