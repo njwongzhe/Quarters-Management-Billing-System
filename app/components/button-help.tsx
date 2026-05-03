@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "./Icon";
 
 
-export default function HelpButton() {
+export default function ButtonHelp() {
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const helpRef = useRef<HTMLDivElement>(null);
     useEffect(() => {

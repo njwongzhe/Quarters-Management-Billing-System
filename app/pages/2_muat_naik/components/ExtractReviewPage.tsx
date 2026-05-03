@@ -39,7 +39,7 @@ const residents = [
     date: "12 Julai 2024",
     receipt: "RES-2024-001",
     amount: "450.00",
-    quarters: "Kelas C\nUnit 12-A, Blok B",
+    quarters: "Kategori C\nUnit 12-A, Blok B",
     contact: "012-3456789\nazam.sul@gmail.com",
     job: "Penolong Jurutera\nJA29\nJKR Daerah Johor Bahru",
   },
@@ -49,7 +49,7 @@ const residents = [
     date: "12 Julai 2024",
     receipt: "RES-2024-002",
     amount: "320.00",
-    quarters: "Kelas D\nUnit 05-C, Blok E",
+    quarters: "Kategori D\nUnit 05-C, Blok E",
     contact: "019-8765432\nyasmin.abd@moe.gov.my",
     job: "Guru Siswazah DG41\nSK Taman Universiti",
   },
@@ -59,7 +59,7 @@ const residents = [
     date: "12 Julai 2024",
     receipt: "RES-2024-003",
     amount: "150.00",
-    quarters: "Kelas B\nNo. 22, Jalan Perdana 4",
+    quarters: "Kategori B\nNo. 22, Jalan Perdana 4",
     contact: "017-1122334\nkhairul.idris@health.gov.my",
     job: "Pegawai Perubatan\nUD48\nHospital Sultanah Aminah",
   },
@@ -151,7 +151,7 @@ const reviewContent: Record<
         tone: "green",
       },
       {
-        label: "Total Kelas",
+        label: "Total Kategori",
         value: "12",
         helper: "Kategori Aktif",
         icon: "category",
@@ -165,7 +165,7 @@ const reviewContent: Record<
         tone: "blue",
       },
     ],
-    addLabel: "Tambah Kelas",
+    addLabel: "Tambah Kategori",
   },
 };
 
@@ -175,7 +175,7 @@ function StatCards({ stats }: { stats: StatCard[] }) {
       {stats.map((stat) => (
         <div
           key={stat.label}
-          className="min-h-[116px] rounded border border-[#E7EAF2] bg-white px-6 py-5 shadow-sm"
+          className="min-h-29 rounded border border-[#E7EAF2] bg-white px-6 py-5 shadow-sm"
         >
           <p className="text-[10px] font-extrabold uppercase text-[#667085]">
             {stat.label}
@@ -284,7 +284,7 @@ function PaymentTable({ kind }: { kind: "bayaran" | "tunggakan" }) {
               ) : null}
               <td className="px-4 py-4 text-right">
                 <input
-                  className="h-10 w-[92px] rounded-lg border border-[#E6EAF2] px-3 text-right font-extrabold"
+                  className="h-10 w-23 rounded-lg border border-[#E6EAF2] px-3 text-right font-extrabold"
                   defaultValue={resident.amount}
                   readOnly={index !== 0}
                 />
@@ -376,7 +376,7 @@ function ResidentTable({ records }: { records: ExtractedPenghuniRecord[] }) {
 }
 
 function QuartersTable() {
-  const classes = [
+  const categories = [
     ["C", "450.00", "50.00", "0.00"],
     ["F", "320.00", "30.00", "10.00"],
     ["E", "150.00", "20.00", "0.00"],
@@ -393,7 +393,7 @@ function QuartersTable() {
               <th className="w-10 px-5 py-4">
                 <input type="checkbox" className="h-4 w-4" />
               </th>
-              <th className="px-4 py-4">Kelas</th>
+              <th className="px-4 py-4">Kategori</th>
               <th className="px-4 py-4 text-right">Sewa (RM)</th>
               <th className="px-4 py-4 text-right">Senggara (RM)</th>
               <th className="px-4 py-4 text-right">Penalti (RM)</th>
@@ -401,7 +401,7 @@ function QuartersTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF1F7]">
-            {classes.map(([name, rent, maintenance, penalty], index) => (
+            {categories.map(([name, rent, maintenance, penalty], index) => (
               <tr key={name}>
                 <td className="px-5 py-4">
                   <input
@@ -416,7 +416,7 @@ function QuartersTable() {
                 {[rent, maintenance, penalty].map((value) => (
                   <td key={value} className="px-4 py-4 text-right">
                     <input
-                      className="h-9 w-[88px] rounded border border-[#E6EAF2] px-3 text-right font-extrabold"
+                      className="h-9 w-22 rounded border border-[#E6EAF2] px-3 text-right font-extrabold"
                       defaultValue={value}
                       readOnly={index !== 0}
                     />
@@ -429,7 +429,7 @@ function QuartersTable() {
             ))}
           </tbody>
         </table>
-        <Pagination label="Memaparkan 1-4 daripada 12 Kelas" />
+        <Pagination label="Memaparkan 1-4 daripada 12 Kategori" />
       </div>
 
       <div className="border-t border-[#DCE2F1] lg:border-l lg:border-t-0">
@@ -537,7 +537,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
   }, [kind, penghuniExtract, uploadedFileName]);
 
   return (
-    <section className="min-h-full bg-[#F8F9FF]">
+    <section className="min-h-full bg-background">
       <div className="flex w-full flex-col gap-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
@@ -562,7 +562,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
 
         <StatCards stats={content.stats} />
 
-        <div className="overflow-hidden rounded-xl border border-[#DCE7FF] bg-[#EFF4FF] shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-[#DCE7FF] bg-light-blue shadow-sm">
           <div className="flex items-start justify-between px-5 py-5">
             <div>
               <h2 className="text-lg font-extrabold text-[#07162F]">

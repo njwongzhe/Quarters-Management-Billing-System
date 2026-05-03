@@ -72,7 +72,7 @@ enum DocumentCategory {
 enum EntityType {
   ADMIN_PROFILE
   RESIDENT
-  QUARTER_CLASS
+  QUARTER_CATEGORY
   UNIT
   UNIT_OCCUPANCY
   MONTHLY_CHARGE
@@ -97,8 +97,8 @@ model AdminProfile {
 
   createdResidents         Resident[]      @relation("ResidentCreatedBy")
   verifiedResidents        Resident[]      @relation("ResidentVerifiedBy")
-  createdQuarterClasses    QuarterClass[]  @relation("QuarterClassCreatedBy")
-  verifiedQuarterClasses   QuarterClass[]  @relation("QuarterClassVerifiedBy")
+  createdQuarterCategories    QuarterCategory[]  @relation("QuarterCategoryCreatedBy")
+  verifiedQuarterCategories   QuarterCategory[]  @relation("QuarterCategoryVerifiedBy")
   createdUnits             Unit[]          @relation("UnitCreatedBy")
   verifiedUnits            Unit[]          @relation("UnitVerifiedBy")
   createdArrearsSummaries  ArrearsSummary[] @relation("ArrearsSummaryCreatedBy")
@@ -147,9 +147,9 @@ model Resident {
   @@index([recordStatus])
 }
 
-model QuarterClass {
+model QuarterCategory {
   id               String       @id @default(uuid()) @db.Uuid
-  className        String       @unique
+  categoryName     String
   address          String?
   rentalPrice      Decimal      @db.Decimal(12, 2)
   maintenancePrice Decimal      @db.Decimal(12, 2)
@@ -163,12 +163,13 @@ model QuarterClass {
   updatedAt        DateTime     @updatedAt
   verifiedAt       DateTime?
 
-  createdBy        AdminProfile? @relation("QuarterClassCreatedBy", fields: [createdById], references: [id])
-  verifiedBy       AdminProfile? @relation("QuarterClassVerifiedBy", fields: [verifiedById], references: [id])
+  createdBy        AdminProfile? @relation("QuarterCategoryCreatedBy", fields: [createdById], references: [id])
+  verifiedBy       AdminProfile? @relation("QuarterCategoryVerifiedBy", fields: [verifiedById], references: [id])
 
   units            Unit[]
 
   @@index([recordStatus])
+  @@unique([categoryName, address])
 }
 
 model Unit {
@@ -177,7 +178,7 @@ model Unit {
   status         UnitStatus   @default(VACANT)
   recordStatus   RecordStatus @default(VERIFIED)
 
-  classId        String       @db.Uuid
+  categoryId        String       @db.Uuid
 
   createdById    String?      @db.Uuid
   verifiedById   String?      @db.Uuid
@@ -185,15 +186,15 @@ model Unit {
   updatedAt      DateTime     @updatedAt
   verifiedAt     DateTime?
 
-  quarterClass   QuarterClass  @relation(fields: [classId], references: [id])
+  quarterCategory   QuarterCategory  @relation(fields: [categoryId], references: [id])
   occupancies    UnitOccupancy[]
   monthlyCharges MonthlyCharge[]
 
   createdBy      AdminProfile? @relation("UnitCreatedBy", fields: [createdById], references: [id])
   verifiedBy     AdminProfile? @relation("UnitVerifiedBy", fields: [verifiedById], references: [id])
 
-  @@index([classId])
-  @@unique([classId, unitCode])
+  @@index([categoryId])
+  @@unique([categoryId, unitCode])
   @@index([status])
   @@index([recordStatus])
 }

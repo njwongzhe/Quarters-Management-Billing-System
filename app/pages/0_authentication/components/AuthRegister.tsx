@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Icon from "@/app/components/Icon";
-import HelpButton from "@/app/components/HelpButton";
+import HelpButton from "../../../components/button-help";
+import { DOMAIN_RESTRICTION, RESTRICTED_EMAIL_DOMAIN } from "@/app/constants/auth";
 
 type AuthRegisterProps = {
 	onSwitchToLogin: () => void;
@@ -15,8 +16,8 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
 
 	// Email State & Validation
 	const [email, setEmail] = useState("");
-    const domainRestriction = false; // Set to true to enforce domain restriction.
-    const targetDomain = "@johor.gov.my"; // Only allow emails ending with this domain if domainRestriction is true.
+	const domainRestriction = DOMAIN_RESTRICTION; // Set in constants to enforce domain restriction.
+	const targetDomain = RESTRICTED_EMAIL_DOMAIN; // Only allow emails ending with this domain if domainRestriction is true.
 	const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 	const normalizedEmail = email.trim().toLowerCase();
     const isDomainValid = !domainRestriction || normalizedEmail.endsWith(targetDomain); // If domain restriction is disabled, all emails are considered valid. If enabled, only emails ending with targetDomain are valid.
@@ -58,7 +59,7 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
     // Helper function to handle sending OTP.
 	async function handleSendOtp() {
 		if (!isOtpAllowed) {
-			showMessage("error", isDomainValid ? "Emel tidak sah." : `Emel mesti berakhir dengan ${targetDomain}.`);
+			showMessage("error", isDomainValid ? "Emel tidak sah." : `Emel mesti berakhir dengan ${RESTRICTED_EMAIL_DOMAIN}.`);
 			return;
 		}
 

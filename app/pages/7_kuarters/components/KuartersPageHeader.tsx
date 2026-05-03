@@ -5,7 +5,7 @@ export default function KuartersPageHeader() {
         Pengurusan Kuarters
       </h1>
       <p className="max-w-3xl text-sm text-grey md:text-base">
-        Pengurusan tetapan kelas kuarters dan kadar sewaan.
+        Pengurusan tetapan kategori kuarters dan kadar sewaan.
       </p>
     </section>
   );

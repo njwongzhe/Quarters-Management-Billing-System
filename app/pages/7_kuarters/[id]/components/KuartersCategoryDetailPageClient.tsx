@@ -6,12 +6,10 @@ import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFe
 import KuartersOverviewCards from "@/app/pages/7_kuarters/components/KuartersOverviewCards";
 import {
   buildKuartersSummaryCards,
-  createEmptyQuarterClassFilters,
-  hasActiveQuarterClassFilters,
   type KuartersNotice,
 } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
-import KuartersClassDetailHeader from "./KuartersClassDetailHeader";
+import KuartersCategoryDetailHeader from "./KuartersCategoryDetailHeader";
 import KuartersResidentPickerModal from "./KuartersResidentPickerModal";
 import KuartersUnitsPanel from "./KuartersUnitsPanel";
 import {
@@ -21,11 +19,13 @@ import {
   buildQuarterUnitPagination,
   buildQuarterUnitSummary,
   createDraftFromQuarterUnit,
+  createEmptyQuarterUnitFilters,
   createEmptyQuarterUnitDraft,
   filterQuarterUnits,
+  hasActiveQuarterUnitFilters,
   sortQuarterUnits,
   validateQuarterUnitDraft,
-  type KuartersClassDetailInitialData,
+  type KuartersCategoryDetailInitialData,
   type KuartersUnitEditorState,
   type QuarterUnitDraft,
   type QuarterUnitMutationResponse,
@@ -41,8 +41,8 @@ type ResidentPickerState = {
   residents: AvailableResidentRecord[];
 };
 
-type KuartersClassDetailPageClientProps = {
-  initialData: KuartersClassDetailInitialData;
+type KuartersCategoryDetailPageClientProps = {
+  initialData: KuartersCategoryDetailInitialData;
   initialNotice?: KuartersNotice | null;
 };
 
@@ -70,15 +70,13 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error.message : fallbackMessage;
 }
 
-export default function KuartersClassDetailPageClient({
+export default function KuartersCategoryDetailPageClient({
   initialData,
   initialNotice = null,
-}: KuartersClassDetailPageClientProps) {
+}: KuartersCategoryDetailPageClientProps) {
   const [units, setUnits] = useState<QuarterUnitRecord[]>(initialData.units);
   const [currentPage, setCurrentPage] = useState(1);
-  const [filterQuery, setFilterQuery] = useState(
-    createEmptyQuarterClassFilters().classNameQuery,
-  );
+  const [filters, setFilters] = useState(createEmptyQuarterUnitFilters);
   const [editor, setEditor] = useState<KuartersUnitEditorState | null>(null);
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingUnitId, setPendingUnitId] = useState<string | null>(null);
@@ -94,10 +92,8 @@ export default function KuartersClassDetailPageClient({
     residentPicker.searchQuery,
   );
   const summary = buildQuarterUnitSummary(units);
-  const hasActiveFilters = hasActiveQuarterClassFilters({
-    classNameQuery: filterQuery,
-  });
-  const filteredUnits = filterQuarterUnits(units, filterQuery);
+  const hasActiveFilters = hasActiveQuarterUnitFilters(filters);
+  const filteredUnits = filterQuarterUnits(units, filters);
   const pagination = buildQuarterUnitPagination(filteredUnits, currentPage, {
     hasActiveFilter: hasActiveFilters,
     totalRecords: units.length,
@@ -186,12 +182,23 @@ export default function KuartersClassDetailPageClient({
 
   function handleFilterQueryChange(value: string) {
     setCurrentPage(1);
-    setFilterQuery(value);
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      query: value,
+    }));
+  }
+
+  function handleStatusFilterChange(value: "ALL" | "OCCUPIED" | "VACANT") {
+    setCurrentPage(1);
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      status: value,
+    }));
   }
 
   function handleClearFilter() {
     setCurrentPage(1);
-    setFilterQuery("");
+    setFilters(createEmptyQuarterUnitFilters());
   }
 
   function handleAddUnit() {
@@ -253,6 +260,26 @@ export default function KuartersClassDetailPageClient({
       return;
     }
 
+    setResidentPicker({
+      isOpen: true,
+      isLoading: false,
+      errorMessage: null,
+      searchQuery: "",
+      residents: [],
+    });
+  }
+
+  function handleRequestAssignResident(unit: QuarterUnitRecord) {
+    if (!ensureActionIsAvailable()) {
+      return;
+    }
+
+    setEditor({
+      mode: "edit",
+      rowId: unit.id,
+      draft: createDraftFromQuarterUnit(unit),
+    });
+    setNotice(null);
     setResidentPicker({
       isOpen: true,
       isLoading: false,
@@ -349,7 +376,7 @@ export default function KuartersClassDetailPageClient({
 
       const response =
         editor.mode === "create"
-          ? await fetch(`/api/quarter-classes/${initialData.id}/units`, {
+          ? await fetch(`/api/quarter-categories/${initialData.id}/units`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -357,7 +384,7 @@ export default function KuartersClassDetailPageClient({
               body: JSON.stringify(payload),
             })
           : await fetch(
-              `/api/quarter-classes/${initialData.id}/units/${editor.rowId}`,
+              `/api/quarter-categories/${initialData.id}/units/${editor.rowId}`,
               {
                 method: "PATCH",
                 headers: {
@@ -460,7 +487,7 @@ export default function KuartersClassDetailPageClient({
       setPendingAction("delete");
 
       const response = await fetch(
-        `/api/quarter-classes/${initialData.id}/units/${rowId}`,
+        `/api/quarter-categories/${initialData.id}/units/${rowId}`,
         {
           method: "DELETE",
         },
@@ -477,7 +504,7 @@ export default function KuartersClassDetailPageClient({
       closeResidentPicker();
       setEditor(null);
       setCurrentPage((previousPage) => {
-        const nextFilteredUnits = filterQuarterUnits(nextUnits, filterQuery);
+        const nextFilteredUnits = filterQuarterUnits(nextUnits, filters);
         const nextPagination = buildQuarterUnitPagination(
           nextFilteredUnits,
           previousPage,
@@ -513,8 +540,9 @@ export default function KuartersClassDetailPageClient({
 
   return (
     <div className="flex flex-col gap-6 pb-8">
-      <KuartersClassDetailHeader
-        className={initialData.className}
+      <KuartersCategoryDetailHeader
+        categoryName={initialData.categoryName}
+        address={initialData.address}
         rates={initialData.rates}
       />
       <KuartersFeedbackBanner
@@ -523,9 +551,14 @@ export default function KuartersClassDetailPageClient({
       />
       <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
       <KuartersUnitsPanel
+        address={initialData.address}
+        categoryId={initialData.id}
+        categoryName={initialData.categoryName}
         currentPage={pagination.currentPage}
         editor={editor}
-        filterQuery={filterQuery}
+        exportUnits={filteredUnits}
+        filterQuery={filters.query}
+        statusFilter={filters.status}
         hasActiveFilters={hasActiveFilters}
         isResidentPickerOpen={residentPicker.isOpen}
         onAddUnit={handleAddUnit}
@@ -535,6 +568,8 @@ export default function KuartersClassDetailPageClient({
         onDraftChange={handleDraftChange}
         onEditUnit={handleEditUnit}
         onFilterQueryChange={handleFilterQueryChange}
+        onRequestAssignResident={handleRequestAssignResident}
+        onStatusFilterChange={handleStatusFilterChange}
         onOpenResidentPicker={handleOpenResidentPicker}
         onPageChange={setCurrentPage}
         onSaveUnit={handleSaveUnit}

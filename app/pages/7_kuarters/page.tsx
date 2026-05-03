@@ -1,7 +1,7 @@
 import {
-  buildQuarterClassSummary,
-  mapQuarterClassForApi,
-} from "@/lib/quarter-classes";
+  buildQuarterCategorySummary,
+  mapQuarterCategoryForApi,
+} from "@/lib/quarter-categories";
 import { prisma } from "@/lib/prisma";
 
 import KuartersPageClient from "./components/KuartersPageClient";
@@ -17,11 +17,11 @@ async function getInitialKuartersPageData(): Promise<{
   initialNotice: KuartersNotice | null;
 }> {
   try {
-    const [quarterClasses, totalUnits, occupiedUnits, vacantUnits] =
+    const [quarterCategories, totalUnits, occupiedUnits, vacantUnits] =
       await prisma.$transaction([
-        prisma.quarterClass.findMany({
+        prisma.quarterCategory.findMany({
           orderBy: {
-            className: "asc",
+            categoryName: "asc",
           },
           include: {
             _count: {
@@ -46,12 +46,12 @@ async function getInitialKuartersPageData(): Promise<{
 
     return {
       initialData: {
-        summary: buildQuarterClassSummary({
+        summary: buildQuarterCategorySummary({
           totalUnits,
           occupiedUnits,
           vacantUnits,
         }),
-        quarterClasses: quarterClasses.map(mapQuarterClassForApi),
+        quarterCategories: quarterCategories.map(mapQuarterCategoryForApi),
       },
       initialNotice: null,
     };
@@ -61,11 +61,11 @@ async function getInitialKuartersPageData(): Promise<{
     return {
       initialData: {
         summary: null,
-        quarterClasses: [],
+        quarterCategories: [],
       },
       initialNotice: {
         tone: "error",
-        message: "Gagal mendapatkan data kelas kuarters.",
+        message: "Gagal mendapatkan data kategori kuarters.",
       },
     };
   }

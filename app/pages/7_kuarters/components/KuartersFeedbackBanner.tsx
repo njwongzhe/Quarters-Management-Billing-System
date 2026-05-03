@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
 import Icon from "@/app/components/Icon";
 
 import type { KuartersNotice, NoticeTone } from "./kuartersHelpers";
@@ -32,6 +36,26 @@ export default function KuartersFeedbackBanner({
   notice,
   onDismiss,
 }: KuartersFeedbackBannerProps) {
+  const onDismissRef = useRef(onDismiss);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      onDismissRef.current();
+    }, 5000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [notice]);
+
   if (!notice) {
     return null;
   }
@@ -40,7 +64,7 @@ export default function KuartersFeedbackBanner({
 
   return (
     <div
-      className={`flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 ${tone.containerClass}`}
+      className={`fixed bottom-24 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 items-start justify-between gap-3 rounded-2xl border px-4 py-3 shadow-[0_18px_45px_rgba(13,47,86,0.18)] backdrop-blur sm:bottom-8 ${tone.containerClass}`}
       role={notice.tone === "error" ? "alert" : "status"}
     >
       <div className="flex items-start gap-3">

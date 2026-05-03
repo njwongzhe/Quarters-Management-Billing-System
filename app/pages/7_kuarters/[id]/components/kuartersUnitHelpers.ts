@@ -1,17 +1,18 @@
 import type { UnitStatus } from "@prisma/client";
-import type { QuarterClassSummary } from "@/lib/quarter-classes";
+import type { QuarterCategorySummary } from "@/lib/quarter-categories";
 import type { AvailableResidentListItem } from "@/lib/residents";
 
 import type {
-  QuarterClassUnitsDetail,
+  QuarterCategoryUnitsDetail,
   QuarterUnitListItem,
 } from "@/lib/quarter-units";
 
 export const EMPTY_QUARTER_UNIT_ID = "__new__";
 
 export type QuarterUnitRecord = QuarterUnitListItem;
-export type KuartersClassDetailInitialData = QuarterClassUnitsDetail;
-export type QuarterClassRates = QuarterClassUnitsDetail["rates"];
+export type KuartersCategoryDetailInitialData = QuarterCategoryUnitsDetail;
+export type QuarterCategoryRates = QuarterCategoryUnitsDetail["rates"];
+export type QuarterUnitStatusFilter = "ALL" | "OCCUPIED" | "VACANT";
 
 export type QuarterUnitDraft = {
   unitCode: string;
@@ -62,6 +63,11 @@ export type QuarterUnitPaginationState = {
   summaryText: string;
 };
 
+export type QuarterUnitFilters = {
+  query: string;
+  status: QuarterUnitStatusFilter;
+};
+
 type BuildQuarterUnitPaginationOptions = {
   totalRecords?: number;
   hasActiveFilter?: boolean;
@@ -74,6 +80,13 @@ export function createEmptyQuarterUnitDraft(): QuarterUnitDraft {
     unitCode: "",
     occupantIcNumber: "",
     occupantName: "",
+  };
+}
+
+export function createEmptyQuarterUnitFilters(): QuarterUnitFilters {
+  return {
+    query: "",
+    status: "ALL",
   };
 }
 
@@ -118,7 +131,7 @@ export function sortQuarterUnits(units: QuarterUnitRecord[]) {
 
 export function buildQuarterUnitSummary(
   units: QuarterUnitRecord[],
-): QuarterClassSummary {
+): QuarterCategorySummary {
   const occupiedUnits = units.filter((unit) => unit.status === "OCCUPIED").length;
   const totalUnits = units.length;
   const vacantUnits = totalUnits - occupiedUnits;
@@ -135,17 +148,28 @@ export function buildQuarterUnitSummary(
   };
 }
 
+export function hasActiveQuarterUnitFilters(filters: QuarterUnitFilters) {
+  return filters.query.trim().length > 0 || filters.status !== "ALL";
+}
+
 export function filterQuarterUnits(
   units: QuarterUnitRecord[],
-  query: string,
+  filters: QuarterUnitFilters,
 ) {
-  const normalizedQuery = normalizeSearchValue(query);
-
-  if (normalizedQuery.length === 0) {
-    return units;
-  }
+  const normalizedQuery = normalizeSearchValue(filters.query);
 
   return units.filter((unit) => {
+    const matchesStatus =
+      filters.status === "ALL" || unit.status === filters.status;
+
+    if (!matchesStatus) {
+      return false;
+    }
+
+    if (normalizedQuery.length === 0) {
+      return true;
+    }
+
     const searchableValues = [
       unit.unitCode,
       unit.occupantIcNumber ?? "",
@@ -181,7 +205,7 @@ export function buildQuarterUnitPagination(
     summaryText:
       totalRecords === 0
         ? options.hasActiveFilter
-          ? "Tiada unit kuarters yang sepadan dengan carian semasa."
+          ? "Tiada unit kuarters yang sepadan dengan tapisan semasa."
           : "Tiada unit kuarters untuk dipaparkan."
         : options.hasActiveFilter && overallTotalRecords !== totalRecords
           ? `Menunjukkan ${startIndex + 1}-${endIndex} daripada ${totalRecords} unit ditapis daripada ${overallTotalRecords} unit`

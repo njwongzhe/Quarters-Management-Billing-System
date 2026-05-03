@@ -1,25 +1,37 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon";
+import {
+  downloadXlsxFile,
+  type XlsxCell,
+  type XlsxSheet,
+} from "@/lib/xlsx-export";
 
 import type {
   KuartersUnitEditorState,
   PaginationItem,
   QuarterUnitDraft,
   QuarterUnitRecord,
+  QuarterUnitStatusFilter,
 } from "./kuartersUnitHelpers";
 import {
   EMPTY_QUARTER_UNIT_ID,
   formatQuarterUnitValue,
 } from "./kuartersUnitHelpers";
+import KuartersUnitDetailsOverlay from "./KuartersUnitDetailsOverlay";
 
 type KuartersUnitsPanelProps = {
   units: QuarterUnitRecord[];
+  exportUnits: QuarterUnitRecord[];
+  categoryId: string;
+  categoryName: string;
+  address: string | null;
   currentPage: number;
   editor: KuartersUnitEditorState | null;
   filterQuery: string;
+  statusFilter: QuarterUnitStatusFilter;
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
   pageItems: PaginationItem[];
@@ -34,6 +46,8 @@ type KuartersUnitsPanelProps = {
   onDraftChange: (field: keyof QuarterUnitDraft, value: string) => void;
   onEditUnit: (unit: QuarterUnitRecord) => void;
   onFilterQueryChange: (value: string) => void;
+  onRequestAssignResident: (unit: QuarterUnitRecord) => void;
+  onStatusFilterChange: (value: QuarterUnitStatusFilter) => void;
   onOpenResidentPicker: () => void;
   onPageChange: (page: number) => void;
   onSaveUnit: () => void;
@@ -44,16 +58,29 @@ function ToolbarButton({
   icon,
   label,
   onClick,
+  isActive = false,
+  hasPopup,
+  isExpanded,
 }: {
   icon: string;
   label: string;
   onClick: () => void;
+  isActive?: boolean;
+  hasPopup?: "menu";
+  isExpanded?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded-lg border border-light-grey/20 bg-white p-2 text-grey transition-colors hover:border-dark-blue hover:text-dark-blue"
+      className={`inline-flex items-center justify-center rounded-lg border p-2 transition-colors ${
+        isActive
+          ? "border-dark-blue bg-dark-blue text-white"
+          : "border-lightGrey/20 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
+      }`}
       aria-label={label}
+      aria-expanded={isExpanded}
+      aria-haspopup={hasPopup}
+      aria-pressed={isActive}
       title={label}
       onClick={onClick}
     >
@@ -183,11 +210,28 @@ function getRowAccentClass(status: QuarterUnitRecord["status"]) {
     : "border-l-4 border-l-pencen-datang";
 }
 
+function getStatusFilterLabel(status: QuarterUnitStatusFilter) {
+  if (status === "OCCUPIED") {
+    return "Didiami";
+  }
+
+  if (status === "VACANT") {
+    return "Kosong";
+  }
+
+  return "Semua Status";
+}
+
 export default function KuartersUnitsPanel({
   units,
+  exportUnits,
+  categoryId,
+  categoryName,
+  address,
   currentPage,
   editor,
   filterQuery,
+  statusFilter,
   hasActiveFilters,
   isResidentPickerOpen,
   onAddUnit,
@@ -197,6 +241,8 @@ export default function KuartersUnitsPanel({
   onDraftChange,
   onEditUnit,
   onFilterQueryChange,
+  onRequestAssignResident,
+  onStatusFilterChange,
   onOpenResidentPicker,
   onPageChange,
   onSaveUnit,
@@ -209,6 +255,16 @@ export default function KuartersUnitsPanel({
 }: KuartersUnitsPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(
+    filterQuery.trim().length > 0,
+  );
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const isSearchFilterActive = filterQuery.trim().length > 0;
+  const isStatusFilterActive = statusFilter !== "ALL";
+  const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
 
   const handlePointerDownOutsideEditor = useEffectEvent((event: PointerEvent) => {
     if (!editor || pendingAction || isResidentPickerOpen) {
@@ -228,6 +284,26 @@ export default function KuartersUnitsPanel({
     onCancelEdit();
   });
 
+  const handlePointerDownOutsideFilterMenu = useEffectEvent(
+    (event: PointerEvent) => {
+      if (!isFilterMenuOpen) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (filterMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsFilterMenuOpen(false);
+    },
+  );
+
   useEffect(() => {
     if (!editor || pendingAction || isResidentPickerOpen) {
       return;
@@ -242,6 +318,27 @@ export default function KuartersUnitsPanel({
       );
     };
   }, [editor, pendingAction, isResidentPickerOpen]);
+
+  useEffect(() => {
+    if (!isFilterMenuOpen) {
+      return;
+    }
+
+    document.addEventListener("pointerdown", handlePointerDownOutsideFilterMenu);
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDownOutsideFilterMenu,
+      );
+    };
+  }, [isFilterMenuOpen]);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
 
   function renderActionCell(unit: QuarterUnitRecord, isEditing: boolean) {
     if (isEditing) {
@@ -278,11 +375,7 @@ export default function KuartersUnitsPanel({
           icon={commonIcons.eye}
           label={`Lihat ${unit.unitCode}`}
           disabled={Boolean(pendingAction)}
-          onClick={() =>
-            onUnavailableFeature(
-              `Paparan terperinci untuk unit ${unit.unitCode} belum tersedia lagi.`,
-            )
-          }
+          onClick={() => setSelectedUnitId(unit.id)}
           textClass="text-dark-blue"
         />
       </div>
@@ -310,8 +403,87 @@ export default function KuartersUnitsPanel({
     );
   }
 
+  function handleToggleFilterMenu() {
+    setIsFilterMenuOpen((currentState) => !currentState);
+  }
+
+  function handleToggleSearch() {
+    if (isSearchOpen) {
+      onFilterQueryChange("");
+      setIsSearchOpen(false);
+      return;
+    }
+
+    setIsSearchOpen(true);
+  }
+
+  function handleClearSearch() {
+    onFilterQueryChange("");
+    setIsSearchOpen(false);
+  }
+
+  function handleSelectStatusFilter(value: QuarterUnitStatusFilter) {
+    onStatusFilterChange(value);
+    setIsFilterMenuOpen(false);
+  }
+
+  function handleAssignResidentFromOverlay(unitId: string) {
+    const unit = units.find((item) => item.id === unitId);
+
+    if (!unit) {
+      onUnavailableFeature("Unit kuarters tidak ditemui untuk tetapan penghuni.");
+      return;
+    }
+
+    setSelectedUnitId(null);
+    onRequestAssignResident(unit);
+  }
+
+  function handleDownloadUnits() {
+    const headers: XlsxCell[] = [
+      { value: "ID Unit", style: "header" },
+      { value: "No. Kad Pengenalan Penghuni", style: "header" },
+      { value: "Nama Penghuni", style: "header" },
+      { value: "Status", style: "header", align: "center" },
+    ];
+    const rows: XlsxSheet["rows"] = exportUnits.map((unit) => [
+      unit.unitCode,
+      unit.occupantIcNumber ?? "N/A",
+      unit.occupantName ?? "N/A",
+      {
+        value: getStatusFilterLabel(unit.status),
+        align: "center",
+      },
+    ]);
+
+    downloadXlsxFile({
+      filename: buildUnitsExportFilename(categoryName, address),
+      sheets: [
+        {
+          name: "Senarai Unit",
+          columns: [
+            { width: 18 },
+            { width: 30 },
+            { width: 38 },
+            { width: 16 },
+          ],
+          rows: [headers, ...rows],
+        },
+      ],
+    });
+  }
+
   return (
     <section className="rounded-2xl border border-light-grey/20 bg-light-blue p-4 sm:p-5">
+      {selectedUnitId ? (
+        <KuartersUnitDetailsOverlay
+          categoryId={categoryId}
+          unitId={selectedUnitId}
+          onClose={() => setSelectedUnitId(null)}
+          onAssignOccupant={handleAssignResidentFromOverlay}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-4 border-b border-light-grey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-extrabold tracking-[-0.02em] text-dark-grey">
@@ -324,42 +496,96 @@ export default function KuartersUnitsPanel({
 
         <div className="flex items-center gap-3 self-start">
           <ToolbarButton
+            icon={commonIcons.search}
+            label="Cari unit kuarters"
+            isActive={isSearchOpen}
+            onClick={handleToggleSearch}
+          />
+          <div ref={filterMenuRef} className="relative">
+            <ToolbarButton
+              icon={commonIcons.filter}
+              label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
+              isActive={isFilterButtonActive}
+              hasPopup="menu"
+              isExpanded={isFilterMenuOpen}
+              onClick={handleToggleFilterMenu}
+            />
+
+            {isFilterMenuOpen ? (
+              <div
+                className="absolute right-0 top-full z-20 mt-2 w-56 rounded-2xl border border-lightGrey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+                role="menu"
+                aria-label="Tapisan status unit"
+              >
+                <div className="border-b border-lightGrey/20 px-3 pb-3 pt-2">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                    Status Unit
+                  </p>
+                  <p className="mt-1 text-sm text-grey">
+                    Pilih unit yang ingin dipaparkan.
+                  </p>
+                </div>
+
+                <div className="mt-2 flex flex-col gap-1">
+                  {(["ALL", "OCCUPIED", "VACANT"] as const).map((option) => {
+                    const isSelected = statusFilter === option;
+
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={isSelected}
+                        className={`flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                          isSelected
+                            ? "bg-lightBlue/15 text-darkblue"
+                            : "text-darkGrey hover:bg-background"
+                        }`}
+                        onClick={() => handleSelectStatusFilter(option)}
+                      >
+                        <span>{getStatusFilterLabel(option)}</span>
+                        {isSelected ? (
+                          <Icon
+                            icon="done"
+                            size={16}
+                            className="text-darkblue"
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <ToolbarButton
             icon={commonIcons.download}
             label="Muat turun senarai unit"
-            onClick={() =>
-              onUnavailableFeature("Fungsi muat turun senarai unit belum tersedia lagi.")
-            }
-          />
-          <ToolbarButton
-            icon={commonIcons.filter}
-            label="Tapisan tambahan"
-            onClick={() =>
-              onUnavailableFeature(
-                "Tapisan tambahan untuk senarai unit belum tersedia lagi.",
-              )
-            }
+            onClick={handleDownloadUnits}
           />
         </div>
       </div>
 
+      {isSearchOpen ? (
       <div className="mt-4 rounded-2xl border border-light-grey/20 bg-white p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <label className="block flex-1">
             <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
               Carian Mengikut Unit atau Penghuni
             </span>
-            <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
+            <div className="flex items-center gap-3 rounded-xl border border-lightGrey/30 bg-background px-3 py-2 transition-colors focus-within:border-darkblue">
               <Icon
                 icon={commonIcons.search}
                 size={18}
-                className="text-light-grey"
+                className="text-lightGrey"
               />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={filterQuery}
                 onChange={(event) => onFilterQueryChange(event.target.value)}
                 placeholder="Contoh: A-01-02 atau Ahmad"
-                className="w-full border-none bg-transparent text-sm font-medium text-dark-grey outline-none placeholder:text-light-grey"
+                className="w-full border-none bg-transparent text-sm font-medium text-darkGrey outline-none placeholder:text-lightGrey"
               />
             </div>
           </label>
@@ -368,14 +594,15 @@ export default function KuartersUnitsPanel({
             <button
               type="button"
               className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!hasActiveFilters}
-              onClick={onClearFilter}
+              disabled={!isSearchFilterActive}
+              onClick={handleClearSearch}
             >
               Kosongkan
             </button>
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="overflow-x-auto">
@@ -442,7 +669,7 @@ export default function KuartersUnitsPanel({
                     className="px-6 py-10 text-center text-sm font-medium text-grey"
                   >
                     {hasActiveFilters
-                      ? "Tiada unit kuarters yang sepadan dengan carian semasa."
+                      ? "Tiada unit kuarters yang sepadan dengan tapisan semasa."
                       : "Tiada unit kuarters untuk dipaparkan buat masa ini."}
                   </td>
                 </tr>
@@ -579,17 +806,34 @@ export default function KuartersUnitsPanel({
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-dark-blue px-4 py-2 text-sm font-extrabold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={Boolean(pendingAction)}
-          onClick={onAddUnit}
-        >
-          <Icon icon="add" size={18} />
-          Tambah Unit
-        </button>
-      </div>
+      <button
+        type="button"
+        className="fixed bottom-6 right-6 z-40 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-dark-blue px-5 py-3 text-sm font-extrabold text-white shadow-[0_18px_45px_rgba(13,47,86,0.28)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:bottom-8 sm:right-8"
+        disabled={Boolean(pendingAction)}
+        onClick={onAddUnit}
+      >
+        <Icon icon="add" size={20} />
+        Tambah Unit
+      </button>
     </section>
   );
+}
+
+function buildUnitsExportFilename(categoryName: string, address: string | null) {
+  return [
+    "senarai-unit-kuarters",
+    sanitizeFilenamePart(categoryName),
+    sanitizeFilenamePart(address ?? "tiada-alamat"),
+  ]
+    .filter(Boolean)
+    .join("-");
+}
+
+function sanitizeFilenamePart(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }

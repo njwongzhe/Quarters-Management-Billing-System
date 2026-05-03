@@ -1,4 +1,4 @@
-export const EMPTY_QUARTER_CLASS_ID = "__new__";
+export const EMPTY_QUARTER_CATEGORY_ID = "__new__";
 
 export type NoticeTone = "success" | "error" | "info";
 
@@ -12,16 +12,17 @@ export type KuartersSummaryCard = {
   value: string;
 };
 
-export type QuarterClassSummary = {
+export type QuarterCategorySummary = {
   totalUnits: number;
   occupiedUnits: number;
   vacantUnits: number;
   occupancyRate: number;
 };
 
-export type QuarterClassRecord = {
+export type QuarterCategoryRecord = {
   id: string;
-  className: string;
+  categoryName: string;
+  address: string | null;
   rentalPrice: number;
   maintenancePrice: number;
   penaltyPrice: number;
@@ -30,40 +31,41 @@ export type QuarterClassRecord = {
   updatedAt: string;
 };
 
-export type QuarterClassDraft = {
-  className: string;
+export type QuarterCategoryDraft = {
+  categoryName: string;
+  address: string;
   rentalPrice: string;
   maintenancePrice: string;
   penaltyPrice: string;
 };
 
-export type QuarterClassFilters = {
-  classNameQuery: string;
+export type QuarterCategoryFilters = {
+  categoryNameQuery: string;
 };
 
 export type KuartersEditorState = {
   mode: "create" | "edit";
   rowId: string;
-  draft: QuarterClassDraft;
+  draft: QuarterCategoryDraft;
 };
 
-export type QuarterClassesApiResponse = {
+export type QuarterCategoriesApiResponse = {
   success: boolean;
   message: string;
   data?: {
-    summary: QuarterClassSummary;
-    quarterClasses: QuarterClassRecord[];
+    summary: QuarterCategorySummary;
+    quarterCategories: QuarterCategoryRecord[];
     meta: {
       totalRecords: number;
     };
   };
 };
 
-export type QuarterClassMutationResponse = {
+export type QuarterCategoryMutationResponse = {
   success: boolean;
   message: string;
   data?: {
-    quarterClass?: QuarterClassRecord;
+    quarterCategory?: QuarterCategoryRecord;
     changedFields?: string[];
     id?: string;
     unitCount?: number;
@@ -71,23 +73,23 @@ export type QuarterClassMutationResponse = {
 };
 
 export type KuartersPageInitialData = {
-  summary: QuarterClassSummary | null;
-  quarterClasses: QuarterClassRecord[];
+  summary: QuarterCategorySummary | null;
+  quarterCategories: QuarterCategoryRecord[];
 };
 
-export const QUARTER_CLASS_PAGE_SIZE = 10;
+export const QUARTER_CATEGORY_PAGE_SIZE = 10;
 
 export type PaginationItem = number | "ellipsis";
 
-export type QuarterClassPaginationState = {
+export type QuarterCategoryPaginationState = {
   currentPage: number;
   totalPages: number;
-  visibleRecords: QuarterClassRecord[];
+  visibleRecords: QuarterCategoryRecord[];
   pageItems: PaginationItem[];
   summaryText: string;
 };
 
-type BuildQuarterClassPaginationOptions = {
+type BuildQuarterCategoryPaginationOptions = {
   totalRecords?: number;
   hasActiveFilter?: boolean;
 };
@@ -100,7 +102,7 @@ const emptySummaryCards: KuartersSummaryCard[] = [
 ];
 
 export function buildKuartersSummaryCards(
-  summary: QuarterClassSummary | null,
+  summary: QuarterCategorySummary | null,
 ): KuartersSummaryCard[] {
   if (!summary) {
     return emptySummaryCards;
@@ -126,48 +128,58 @@ export function buildKuartersSummaryCards(
   ];
 }
 
-export function createEmptyQuarterClassDraft(): QuarterClassDraft {
+export function createEmptyQuarterCategoryDraft(): QuarterCategoryDraft {
   return {
-    className: "",
+    categoryName: "",
+    address: "",
     rentalPrice: "",
     maintenancePrice: "",
     penaltyPrice: "",
   };
 }
 
-export function createEmptyQuarterClassFilters(): QuarterClassFilters {
+export function createEmptyQuarterCategoryFilters(): QuarterCategoryFilters {
   return {
-    classNameQuery: "",
+    categoryNameQuery: "",
   };
 }
 
-export function createDraftFromQuarterClass(
-  quarterClass: QuarterClassRecord,
-): QuarterClassDraft {
+export function createDraftFromQuarterCategory(
+  quarterCategory: QuarterCategoryRecord,
+): QuarterCategoryDraft {
   return {
-    className: quarterClass.className,
-    rentalPrice: formatEditableMoney(quarterClass.rentalPrice),
-    maintenancePrice: formatEditableMoney(quarterClass.maintenancePrice),
-    penaltyPrice: formatEditableMoney(quarterClass.penaltyPrice),
+    categoryName: quarterCategory.categoryName,
+    address: quarterCategory.address ?? "",
+    rentalPrice: formatEditableMoney(quarterCategory.rentalPrice),
+    maintenancePrice: formatEditableMoney(quarterCategory.maintenancePrice),
+    penaltyPrice: formatEditableMoney(quarterCategory.penaltyPrice),
   };
 }
 
-export function validateQuarterClassDraft(
-  draft: QuarterClassDraft,
+export function validateQuarterCategoryDraft(
+  draft: QuarterCategoryDraft,
   options: {
-    requireClassName: boolean;
+    requireCategoryName: boolean;
   },
 ) {
-  if (options.requireClassName) {
-    const normalizedClassName = draft.className.trim().replace(/\s+/g, " "); // Replace multiple whitespace with single space for validation
+  const normalizedCategoryName = draft.categoryName.trim().replace(/\s+/g, " ");
 
-    if (normalizedClassName.length === 0) {
-      return "Nama kelas tidak boleh kosong.";
-    }
+  if (options.requireCategoryName && normalizedCategoryName.length === 0) {
+    return "Nama kategori tidak boleh kosong.";
+  }
 
-    if (normalizedClassName.length > 100) {
-      return "Nama kelas terlalu panjang. Sila gunakan maksimum 100 aksara.";
-    }
+  if (normalizedCategoryName.length > 100) {
+    return "Nama kategori terlalu panjang. Sila gunakan maksimum 100 aksara.";
+  }
+
+  const normalizedAddress = draft.address.trim().replace(/\s+/g, " ");
+
+  if (normalizedAddress.length === 0) {
+    return "Alamat tidak boleh kosong.";
+  }
+
+  if (normalizedAddress.length > 500) {
+    return "Alamat terlalu panjang. Sila gunakan maksimum 500 aksara.";
   }
 
   const moneyFieldError =
@@ -178,63 +190,68 @@ export function validateQuarterClassDraft(
   return moneyFieldError;
 }
 
-export function sortQuarterClasses(quarterClasses: QuarterClassRecord[]) {
-  return [...quarterClasses].sort((left, right) =>
-    left.className.localeCompare(right.className, "ms", {
+export function sortQuarterCategories(quarterCategories: QuarterCategoryRecord[]) {
+  return [...quarterCategories].sort((left, right) =>
+    left.categoryName.localeCompare(right.categoryName, "ms", {
       sensitivity: "base",
     }),
   );
 }
 
-export function hasActiveQuarterClassFilters(filters: QuarterClassFilters) {
-  return filters.classNameQuery.trim().length > 0;
+export function hasActiveQuarterCategoryFilters(filters: QuarterCategoryFilters) {
+  return filters.categoryNameQuery.trim().length > 0;
 }
 
-export function filterQuarterClasses(
-  quarterClasses: QuarterClassRecord[],
-  filters: QuarterClassFilters,
+export function filterQuarterCategories(
+  quarterCategories: QuarterCategoryRecord[],
+  filters: QuarterCategoryFilters,
 ) {
-  const normalizedClassNameQuery = normalizeSearchValue(filters.classNameQuery);
+  const normalizedQuery = normalizeSearchValue(filters.categoryNameQuery);
 
-  if (normalizedClassNameQuery.length === 0) {
-    return quarterClasses;
+  if (normalizedQuery.length === 0) {
+    return quarterCategories;
   }
 
-  return quarterClasses.filter((quarterClass) =>
-    normalizeSearchValue(quarterClass.className).includes(
-      normalizedClassNameQuery,
-    ),
-  );
+  return quarterCategories.filter((quarterCategory) => {
+    const searchableValues = [
+      quarterCategory.categoryName,
+      quarterCategory.address ?? "",
+    ];
+
+    return searchableValues.some((value) =>
+      normalizeSearchValue(value).includes(normalizedQuery),
+    );
+  });
 }
 
-export function buildQuarterClassPagination(
-  quarterClasses: QuarterClassRecord[],
+export function buildQuarterCategoryPagination(
+  quarterCategories: QuarterCategoryRecord[],
   requestedPage: number,
-  options: BuildQuarterClassPaginationOptions = {},
-): QuarterClassPaginationState {
-  const totalRecords = quarterClasses.length;
+  options: BuildQuarterCategoryPaginationOptions = {},
+): QuarterCategoryPaginationState {
+  const totalRecords = quarterCategories.length;
   const overallTotalRecords = options.totalRecords ?? totalRecords;
   const totalPages = Math.max(
     1,
-    Math.ceil(totalRecords / QUARTER_CLASS_PAGE_SIZE),
+    Math.ceil(totalRecords / QUARTER_CATEGORY_PAGE_SIZE),
   );
   const currentPage = Math.min(Math.max(requestedPage, 1), totalPages);
-  const startIndex = (currentPage - 1) * QUARTER_CLASS_PAGE_SIZE;
+  const startIndex = (currentPage - 1) * QUARTER_CATEGORY_PAGE_SIZE;
   const endIndex = Math.min(
-    startIndex + QUARTER_CLASS_PAGE_SIZE,
+    startIndex + QUARTER_CATEGORY_PAGE_SIZE,
     totalRecords,
   );
 
   return {
     currentPage,
     totalPages,
-    visibleRecords: quarterClasses.slice(startIndex, endIndex),
+    visibleRecords: quarterCategories.slice(startIndex, endIndex),
     pageItems: buildPageItems(currentPage, totalPages),
     summaryText:
       totalRecords === 0
         ? options.hasActiveFilter
-          ? "Tiada rekod kelas kuarters yang sepadan dengan tapisan semasa."
-          : "Tiada rekod kelas kuarters untuk dipaparkan."
+          ? "Tiada rekod kategori kuarters yang sepadan dengan tapisan semasa."
+          : "Tiada rekod kategori kuarters untuk dipaparkan."
         : options.hasActiveFilter && overallTotalRecords !== totalRecords
           ? `Menunjukkan ${startIndex + 1}-${endIndex} daripada ${totalRecords} rekod ditapis daripada ${overallTotalRecords} rekod`
           : `Menunjukkan ${startIndex + 1}-${endIndex} daripada ${totalRecords} rekod`,
