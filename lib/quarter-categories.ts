@@ -1,8 +1,8 @@
-import type { QuarterClass } from "@prisma/client";
+import type { QuarterCategory } from "@prisma/client";
 
-export type QuarterClassListItem = {
+export type QuarterCategoryListItem = {
   id: string;
-  className: string;
+  categoryName: string;
   rentalPrice: number;
   maintenancePrice: number;
   penaltyPrice: number;
@@ -11,14 +11,14 @@ export type QuarterClassListItem = {
   updatedAt: string;
 };
 
-export type QuarterClassSummary = {
+export type QuarterCategorySummary = {
   totalUnits: number;
   occupiedUnits: number;
   vacantUnits: number;
   occupancyRate: number;
 };
 
-type QuarterClassWithUnitCount = QuarterClass & {
+type QuarterCategoryWithUnitCount = QuarterCategory & {
   _count: {
     units: number;
   };
@@ -34,48 +34,48 @@ type ParseFailure = {
   message: string;
 };
 
-export type QuarterClassNumericField =
+export type QuarterCategoryNumericField =
   | "rentalPrice"
   | "maintenancePrice"
   | "penaltyPrice";
 
-export type QuarterClassUpdateInput = Partial<
-  Record<QuarterClassNumericField, number>
+export type QuarterCategoryUpdateInput = Partial<
+  Record<QuarterCategoryNumericField, number>
 >;
 
-export type QuarterClassCreateInput = {
-  className: string;
+export type QuarterCategoryCreateInput = {
+  categoryName: string;
   rentalPrice: number;
   maintenancePrice: number;
   penaltyPrice: number;
 };
 
-const fieldLabels: Record<QuarterClassNumericField, string> = {
+const fieldLabels: Record<QuarterCategoryNumericField, string> = {
   rentalPrice: "sewa",
   maintenancePrice: "senggara",
   penaltyPrice: "penalti",
 };
 
-export function mapQuarterClassForApi(
-  quarterClass: QuarterClassWithUnitCount,
-): QuarterClassListItem {
+export function mapQuarterCategoryForApi(
+  quarterCategory: QuarterCategoryWithUnitCount,
+): QuarterCategoryListItem {
   return {
-    id: quarterClass.id,
-    className: quarterClass.className,
-    rentalPrice: Number(quarterClass.rentalPrice),
-    maintenancePrice: Number(quarterClass.maintenancePrice),
-    penaltyPrice: Number(quarterClass.penaltyPrice),
-    unitCount: quarterClass._count.units,
-    canDelete: quarterClass._count.units === 0,
-    updatedAt: quarterClass.updatedAt.toISOString(),
+    id: quarterCategory.id,
+    categoryName: quarterCategory.categoryName,
+    rentalPrice: Number(quarterCategory.rentalPrice),
+    maintenancePrice: Number(quarterCategory.maintenancePrice),
+    penaltyPrice: Number(quarterCategory.penaltyPrice),
+    unitCount: quarterCategory._count.units,
+    canDelete: quarterCategory._count.units === 0,
+    updatedAt: quarterCategory.updatedAt.toISOString(),
   };
 }
 
-export function buildQuarterClassSummary(summary: {
+export function buildQuarterCategorySummary(summary: {
   totalUnits: number;
   occupiedUnits: number;
   vacantUnits: number;
-}): QuarterClassSummary {
+}): QuarterCategorySummary {
   const occupancyRate =
     summary.totalUnits === 0
       ? 0
@@ -87,9 +87,9 @@ export function buildQuarterClassSummary(summary: {
   };
 }
 
-export function parseQuarterClassUpdateBody(
+export function parseQuarterCategoryUpdateBody(
   body: unknown,
-): ParseSuccess<QuarterClassUpdateInput> | ParseFailure {
+): ParseSuccess<QuarterCategoryUpdateInput> | ParseFailure {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return {
       ok: false,
@@ -98,14 +98,14 @@ export function parseQuarterClassUpdateBody(
   }
 
   const payload = body as Record<string, unknown>;
-  return parseQuarterClassPrices(payload, {
+  return parseQuarterCategoryPrices(payload, {
     requireAllFields: false,
   });
 }
 
-export function parseQuarterClassCreateBody(
+export function parseQuarterCategoryCreateBody(
   body: unknown,
-): ParseSuccess<QuarterClassCreateInput> | ParseFailure {
+): ParseSuccess<QuarterCategoryCreateInput> | ParseFailure {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return {
       ok: false,
@@ -114,13 +114,15 @@ export function parseQuarterClassCreateBody(
   }
 
   const payload = body as Record<string, unknown>;
-  const parsedClassName = parseQuarterClassName(payload.className ?? payload.kelas);
+  const parsedCategoryName = parseQuarterCategoryName(
+    payload.categoryName ?? payload.kategori ?? payload.kelas,
+  );
 
-  if (!parsedClassName.ok) {
-    return parsedClassName;
+  if (!parsedCategoryName.ok) {
+    return parsedCategoryName;
   }
 
-  const parsedPrices = parseQuarterClassPrices(payload, {
+  const parsedPrices = parseQuarterCategoryPrices(payload, {
     requireAllFields: true,
   });
 
@@ -141,14 +143,14 @@ export function parseQuarterClassCreateBody(
   ) {
     return {
       ok: false,
-      message: "Semua nilai kadar kelas kuarters perlu diisi.",
+      message: "Semua nilai kadar kategori kuarters perlu diisi.",
     };
   }
 
   return {
     ok: true,
     data: {
-      className: parsedClassName.data,
+      categoryName: parsedCategoryName.data,
       rentalPrice,
       maintenancePrice,
       penaltyPrice,
@@ -156,61 +158,61 @@ export function parseQuarterClassCreateBody(
   };
 }
 
-export function getChangedQuarterClassFields(
-  current: QuarterClass,
-  updates: QuarterClassUpdateInput,
-): QuarterClassNumericField[] {
-  return (Object.keys(updates) as QuarterClassNumericField[]).filter((field) => {
-    const currentValue = getQuarterClassNumericValue(current, field);
+export function getChangedQuarterCategoryFields(
+  current: QuarterCategory,
+  updates: QuarterCategoryUpdateInput,
+): QuarterCategoryNumericField[] {
+  return (Object.keys(updates) as QuarterCategoryNumericField[]).filter((field) => {
+    const currentValue = getQuarterCategoryNumericValue(current, field);
     const updatedValue = updates[field];
 
     return updatedValue !== undefined && currentValue !== updatedValue;
   });
 }
 
-export function buildQuarterClassUpdatedMessage(
-  className: string,
-  changedFields: QuarterClassNumericField[],
+export function buildQuarterCategoryUpdatedMessage(
+  categoryName: string,
+  changedFields: QuarterCategoryNumericField[],
 ): string {
   if (changedFields.length === 0) {
-    return `Tiada perubahan dibuat pada ${className}.`;
+    return `Tiada perubahan dibuat pada ${categoryName}.`;
   }
 
   const labels = changedFields.map((field) => fieldLabels[field]);
   const joinedLabels = joinMalayList(labels);
 
-  return `Kadar ${joinedLabels} bagi ${className} berjaya dikemas kini.`;
+  return `Kadar ${joinedLabels} bagi ${categoryName} berjaya dikemas kini.`;
 }
 
-export function buildQuarterClassDeleteBlockedMessage(
-  className: string,
+export function buildQuarterCategoryDeleteBlockedMessage(
+  categoryName: string,
   unitCount: number,
 ): string {
   // unitCount === 1 ? "unit" : "unit"; is used to handle singular vs plural in Malay, but since "unit" is the same in both cases, we can just return "unit" regardless of the count.
   const unitLabel = unitCount === 1 ? "unit" : "unit";
 
-  return `${className} tidak boleh dipadam kerana masih dirujuk oleh ${unitCount} ${unitLabel}.`;
+  return `${categoryName} tidak boleh dipadam kerana masih dirujuk oleh ${unitCount} ${unitLabel}.`;
 }
 
-export function buildQuarterClassCreatedMessage(className: string): string {
-  return `${className} berjaya ditambah.`;
+export function buildQuarterCategoryCreatedMessage(categoryName: string): string {
+  return `${categoryName} berjaya ditambah.`;
 }
 
-export function buildQuarterClassDuplicateMessage(className: string): string {
-  return `Nama kelas ${className} sudah wujud. Sila gunakan nama kelas yang lain.`;
+export function buildQuarterCategoryDuplicateMessage(categoryName: string): string {
+  return `Nama kategori ${categoryName} sudah wujud. Sila gunakan nama kategori yang lain.`;
 }
 
-function getQuarterClassNumericValue(
-  quarterClass: QuarterClass,
-  field: QuarterClassNumericField,
+function getQuarterCategoryNumericValue(
+  quarterCategory: QuarterCategory,
+  field: QuarterCategoryNumericField,
 ) {
   switch (field) {
     case "rentalPrice":
-      return Number(quarterClass.rentalPrice);
+      return Number(quarterCategory.rentalPrice);
     case "maintenancePrice":
-      return Number(quarterClass.maintenancePrice);
+      return Number(quarterCategory.maintenancePrice);
     case "penaltyPrice":
-      return Number(quarterClass.penaltyPrice);
+      return Number(quarterCategory.penaltyPrice);
   }
 }
 
@@ -256,13 +258,13 @@ function parseMoneyInput(
   };
 }
 
-function parseQuarterClassName(
+function parseQuarterCategoryName(
   value: unknown,
 ): ParseSuccess<string> | ParseFailure {
   if (typeof value !== "string") {
     return {
       ok: false,
-      message: "Nama kelas mesti dalam bentuk teks yang sah.",
+      message: "Nama kategori mesti dalam bentuk teks yang sah.",
     };
   }
 
@@ -271,14 +273,14 @@ function parseQuarterClassName(
   if (normalizedValue.length === 0) {
     return {
       ok: false,
-      message: "Nama kelas tidak boleh kosong.",
+      message: "Nama kategori tidak boleh kosong.",
     };
   }
 
   if (normalizedValue.length > 100) {
     return {
       ok: false,
-      message: "Nama kelas terlalu panjang. Sila gunakan maksimum 100 aksara.",
+      message: "Nama kategori terlalu panjang. Sila gunakan maksimum 100 aksara.",
     };
   }
 
@@ -288,15 +290,15 @@ function parseQuarterClassName(
   };
 }
 
-function parseQuarterClassPrices(
+function parseQuarterCategoryPrices(
   payload: Record<string, unknown>,
   options: {
     requireAllFields: boolean;
   },
-): ParseSuccess<QuarterClassUpdateInput> | ParseFailure {
-  const updates: QuarterClassUpdateInput = {};
+): ParseSuccess<QuarterCategoryUpdateInput> | ParseFailure {
+  const updates: QuarterCategoryUpdateInput = {};
 
-  const rawValues: Record<QuarterClassNumericField, unknown> = {
+  const rawValues: Record<QuarterCategoryNumericField, unknown> = {
     rentalPrice: payload.rentalPrice ?? payload.sewa,
     maintenancePrice: payload.maintenancePrice ?? payload.senggara,
     penaltyPrice: payload.penaltyPrice ?? payload.penalti,
@@ -304,7 +306,7 @@ function parseQuarterClassPrices(
 
   let providedFields = 0;
 
-  for (const field of Object.keys(rawValues) as QuarterClassNumericField[]) {
+  for (const field of Object.keys(rawValues) as QuarterCategoryNumericField[]) {
     const rawValue = rawValues[field];
 
     if (rawValue === undefined) {

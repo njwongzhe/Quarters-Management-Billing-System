@@ -39,7 +39,7 @@ const residents = [
     date: "12 Julai 2024",
     receipt: "RES-2024-001",
     amount: "450.00",
-    quarters: "Kelas C\nUnit 12-A, Blok B",
+    quarters: "Kategori C\nUnit 12-A, Blok B",
     contact: "012-3456789\nazam.sul@gmail.com",
     job: "Penolong Jurutera\nJA29\nJKR Daerah Johor Bahru",
   },
@@ -49,7 +49,7 @@ const residents = [
     date: "12 Julai 2024",
     receipt: "RES-2024-002",
     amount: "320.00",
-    quarters: "Kelas D\nUnit 05-C, Blok E",
+    quarters: "Kategori D\nUnit 05-C, Blok E",
     contact: "019-8765432\nyasmin.abd@moe.gov.my",
     job: "Guru Siswazah DG41\nSK Taman Universiti",
   },
@@ -59,7 +59,7 @@ const residents = [
     date: "12 Julai 2024",
     receipt: "RES-2024-003",
     amount: "150.00",
-    quarters: "Kelas B\nNo. 22, Jalan Perdana 4",
+    quarters: "Kategori B\nNo. 22, Jalan Perdana 4",
     contact: "017-1122334\nkhairul.idris@health.gov.my",
     job: "Pegawai Perubatan\nUD48\nHospital Sultanah Aminah",
   },
@@ -151,7 +151,7 @@ const reviewContent: Record<
         tone: "green",
       },
       {
-        label: "Total Kelas",
+        label: "Total Kategori",
         value: "12",
         helper: "Kategori Aktif",
         icon: "category",
@@ -165,7 +165,7 @@ const reviewContent: Record<
         tone: "blue",
       },
     ],
-    addLabel: "Tambah Kelas",
+    addLabel: "Tambah Kategori",
   },
 };
 
@@ -376,7 +376,7 @@ function ResidentTable({ records }: { records: ExtractedPenghuniRecord[] }) {
 }
 
 function QuartersTable() {
-  const classes = [
+  const categories = [
     ["C", "450.00", "50.00", "0.00"],
     ["F", "320.00", "30.00", "10.00"],
     ["E", "150.00", "20.00", "0.00"],
@@ -393,7 +393,7 @@ function QuartersTable() {
               <th className="w-10 px-5 py-4">
                 <input type="checkbox" className="h-4 w-4" />
               </th>
-              <th className="px-4 py-4">Kelas</th>
+              <th className="px-4 py-4">Kategori</th>
               <th className="px-4 py-4 text-right">Sewa (RM)</th>
               <th className="px-4 py-4 text-right">Senggara (RM)</th>
               <th className="px-4 py-4 text-right">Penalti (RM)</th>
@@ -401,7 +401,7 @@ function QuartersTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF1F7]">
-            {classes.map(([name, rent, maintenance, penalty], index) => (
+            {categories.map(([name, rent, maintenance, penalty], index) => (
               <tr key={name}>
                 <td className="px-5 py-4">
                   <input
@@ -429,7 +429,7 @@ function QuartersTable() {
             ))}
           </tbody>
         </table>
-        <Pagination label="Memaparkan 1-4 daripada 12 Kelas" />
+        <Pagination label="Memaparkan 1-4 daripada 12 Kategori" />
       </div>
 
       <div className="border-t border-[#DCE2F1] lg:border-l lg:border-t-0">

@@ -3,27 +3,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import KuartersClassRatesPanel from "./KuartersClassRatesPanel";
+import KuartersCategoryRatesPanel from "./KuartersCategoryRatesPanel";
 import KuartersFeedbackBanner from "./KuartersFeedbackBanner";
 import KuartersOverviewCards from "./KuartersOverviewCards";
 import KuartersPageHeader from "./KuartersPageHeader";
 import {
   buildKuartersSummaryCards,
-  buildQuarterClassPagination,
-  createEmptyQuarterClassFilters,
-  createDraftFromQuarterClass,
-  createEmptyQuarterClassDraft,
-  EMPTY_QUARTER_CLASS_ID,
-  filterQuarterClasses,
-  hasActiveQuarterClassFilters,
-  sortQuarterClasses,
+  buildQuarterCategoryPagination,
+  createEmptyQuarterCategoryFilters,
+  createDraftFromQuarterCategory,
+  createEmptyQuarterCategoryDraft,
+  EMPTY_QUARTER_CATEGORY_ID,
+  filterQuarterCategories,
+  hasActiveQuarterCategoryFilters,
+  sortQuarterCategories,
   type KuartersEditorState,
   type KuartersNotice,
   type KuartersPageInitialData,
-  type QuarterClassMutationResponse,
-  type QuarterClassRecord,
-  type QuarterClassDraft,
-  validateQuarterClassDraft,
+  type QuarterCategoryMutationResponse,
+  type QuarterCategoryRecord,
+  type QuarterCategoryDraft,
+  validateQuarterCategoryDraft,
 } from "./kuartersHelpers";
 
 type PendingAction = "save" | "delete" | null;
@@ -61,23 +61,23 @@ export default function KuartersPageClient({
 }: KuartersPageClientProps) {
   const router = useRouter();
   const [summary] = useState(initialData.summary);
-  const [quarterClasses, setQuarterClasses] = useState<QuarterClassRecord[]>(
-    initialData.quarterClasses,
+  const [quarterCategories, setQuarterCategories] = useState<QuarterCategoryRecord[]>(
+    initialData.quarterCategories,
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [editor, setEditor] = useState<KuartersEditorState | null>(null);
-  const [filters, setFilters] = useState(createEmptyQuarterClassFilters);
+  const [filters, setFilters] = useState(createEmptyQuarterCategoryFilters);
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const hasActiveFilters = hasActiveQuarterClassFilters(filters);
-  const filteredQuarterClasses = filterQuarterClasses(quarterClasses, filters);
-  const pagination = buildQuarterClassPagination(
-    filteredQuarterClasses,
+  const hasActiveFilters = hasActiveQuarterCategoryFilters(filters);
+  const filteredQuarterCategories = filterQuarterCategories(quarterCategories, filters);
+  const pagination = buildQuarterCategoryPagination(
+    filteredQuarterCategories,
     currentPage,
     {
       hasActiveFilter: hasActiveFilters,
-      totalRecords: quarterClasses.length,
+      totalRecords: quarterCategories.length,
     },
   );
 
@@ -105,26 +105,26 @@ export default function KuartersPageClient({
     setCurrentPage(1);
     setEditor({
       mode: "create",
-      rowId: EMPTY_QUARTER_CLASS_ID,
-      draft: createEmptyQuarterClassDraft(),
+      rowId: EMPTY_QUARTER_CATEGORY_ID,
+      draft: createEmptyQuarterCategoryDraft(),
     });
     setNotice(null);
   }
 
-  function handleEditRow(quarterClass: QuarterClassRecord) {
+  function handleEditRow(quarterCategory: QuarterCategoryRecord) {
     if (!ensureActionIsAvailable()) {
       return;
     }
 
     setEditor({
       mode: "edit",
-      rowId: quarterClass.id,
-      draft: createDraftFromQuarterClass(quarterClass),
+      rowId: quarterCategory.id,
+      draft: createDraftFromQuarterCategory(quarterCategory),
     });
     setNotice(null);
   }
 
-  function handleDraftChange(field: keyof QuarterClassDraft, value: string) {
+  function handleDraftChange(field: keyof QuarterCategoryDraft, value: string) {
     setEditor((currentEditor) => {
       if (!currentEditor) {
         return currentEditor;
@@ -152,13 +152,13 @@ export default function KuartersPageClient({
     setCurrentPage(1);
     setFilters((currentFilters) => ({
       ...currentFilters,
-      classNameQuery: value,
+      categoryNameQuery: value,
     }));
   }
 
   function handleClearFilter() {
     setCurrentPage(1);
-    setFilters(createEmptyQuarterClassFilters());
+    setFilters(createEmptyQuarterCategoryFilters());
   }
 
   async function handleSaveRow() {
@@ -166,8 +166,8 @@ export default function KuartersPageClient({
       return;
     }
 
-    const validationMessage = validateQuarterClassDraft(editor.draft, {
-      requireClassName: editor.mode === "create",
+    const validationMessage = validateQuarterCategoryDraft(editor.draft, {
+      requireCategoryName: editor.mode === "create",
     });
 
     if (validationMessage) {
@@ -181,7 +181,7 @@ export default function KuartersPageClient({
     const payload =
       editor.mode === "create"
         ? {
-            kelas: editor.draft.className.trim(),
+            kategori: editor.draft.categoryName.trim(),
             sewa: editor.draft.rentalPrice.trim(),
             senggara: editor.draft.maintenancePrice.trim(),
             penalti: editor.draft.penaltyPrice.trim(),
@@ -198,14 +198,14 @@ export default function KuartersPageClient({
 
       const response =
         editor.mode === "create"
-          ? await fetch("/api/quarter-classes", {
+          ? await fetch("/api/quarter-categories", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify(payload),
             })
-          : await fetch(`/api/quarter-classes/${editor.rowId}`, {
+          : await fetch(`/api/quarter-categories/${editor.rowId}`, {
               method: "PATCH",
               headers: {
                 "Content-Type": "application/json",
@@ -213,29 +213,29 @@ export default function KuartersPageClient({
               body: JSON.stringify(payload),
             });
 
-      const result = await parseApiResponse<QuarterClassMutationResponse>(
+      const result = await parseApiResponse<QuarterCategoryMutationResponse>(
         response,
         editor.mode === "create"
-          ? "Gagal menambah kelas kuarters."
-          : "Gagal mengemas kini kelas kuarters.",
+          ? "Gagal menambah kategori kuarters."
+          : "Gagal mengemas kini kategori kuarters.",
       );
 
-      const updatedQuarterClass = result.data?.quarterClass;
+      const updatedQuarterCategory = result.data?.quarterCategory;
 
-      if (!updatedQuarterClass) {
-        throw new Error("Maklumat kelas kuarters yang dikemas kini tidak diterima.");
+      if (!updatedQuarterCategory) {
+        throw new Error("Maklumat kategori kuarters yang dikemas kini tidak diterima.");
       }
 
-      const nextQuarterClasses =
+      const nextQuarterCategories =
         editor.mode === "create"
-          ? sortQuarterClasses([updatedQuarterClass, ...quarterClasses])
-          : quarterClasses.map((quarterClass) =>
-              quarterClass.id === updatedQuarterClass.id
-                ? updatedQuarterClass
-                : quarterClass,
+          ? sortQuarterCategories([updatedQuarterCategory, ...quarterCategories])
+          : quarterCategories.map((quarterCategory) =>
+              quarterCategory.id === updatedQuarterCategory.id
+                ? updatedQuarterCategory
+                : quarterCategory,
             );
 
-      setQuarterClasses(nextQuarterClasses);
+      setQuarterCategories(nextQuarterCategories);
       if (editor.mode === "create") {
         setCurrentPage(1);
       }
@@ -250,8 +250,8 @@ export default function KuartersPageClient({
         message: getErrorMessage(
           error,
           editor.mode === "create"
-            ? "Gagal menambah kelas kuarters."
-            : "Gagal mengemas kini kelas kuarters.",
+            ? "Gagal menambah kategori kuarters."
+            : "Gagal mengemas kini kategori kuarters.",
         ),
       });
     } finally {
@@ -265,9 +265,9 @@ export default function KuartersPageClient({
       return;
     }
 
-    if (rowId === EMPTY_QUARTER_CLASS_ID) {
+    if (rowId === EMPTY_QUARTER_CATEGORY_ID) {
       const shouldDiscard = window.confirm(
-        "Adakah anda pasti mahu membuang baris kelas baharu ini?",
+        "Adakah anda pasti mahu membuang baris kategori baharu ini?",
       );
 
       if (!shouldDiscard) {
@@ -277,23 +277,23 @@ export default function KuartersPageClient({
       setEditor(null);
       showNotice({
         tone: "info",
-        message: "Baris kelas baharu telah dibuang.",
+        message: "Baris kategori baharu telah dibuang.",
       });
       return;
     }
 
-    const quarterClass = quarterClasses.find((item) => item.id === rowId);
+    const quarterCategory = quarterCategories.find((item) => item.id === rowId);
 
-    if (!quarterClass) {
+    if (!quarterCategory) {
       showNotice({
         tone: "error",
-        message: "Kelas kuarters tidak ditemui.",
+        message: "Kategori kuarters tidak ditemui.",
       });
       return;
     }
 
     const shouldDelete = window.confirm(
-      `Adakah anda pasti mahu memadam ${quarterClass.className}? Tindakan ini tidak boleh dibatalkan.`,
+      `Adakah anda pasti mahu memadam ${quarterCategory.categoryName}? Tindakan ini tidak boleh dibatalkan.`,
     );
 
     if (!shouldDelete) {
@@ -304,29 +304,29 @@ export default function KuartersPageClient({
       setPendingRowId(rowId);
       setPendingAction("delete");
 
-      const response = await fetch(`/api/quarter-classes/${rowId}`, {
+      const response = await fetch(`/api/quarter-categories/${rowId}`, {
         method: "DELETE",
       });
-      const result = await parseApiResponse<QuarterClassMutationResponse>(
+      const result = await parseApiResponse<QuarterCategoryMutationResponse>(
         response,
-        "Gagal memadam kelas kuarters.",
+        "Gagal memadam kategori kuarters.",
       );
 
-      const nextQuarterClasses = quarterClasses.filter((item) => item.id !== rowId);
+      const nextQuarterCategories = quarterCategories.filter((item) => item.id !== rowId);
 
-      setQuarterClasses(nextQuarterClasses);
+      setQuarterCategories(nextQuarterCategories);
       setEditor(null);
       setCurrentPage((previousPage) => {
-        const nextFilteredQuarterClasses = filterQuarterClasses(
-          nextQuarterClasses,
+        const nextFilteredQuarterCategories = filterQuarterCategories(
+          nextQuarterCategories,
           filters,
         );
-        const nextPagination = buildQuarterClassPagination(
-          nextFilteredQuarterClasses,
+        const nextPagination = buildQuarterCategoryPagination(
+          nextFilteredQuarterCategories,
           previousPage,
           {
             hasActiveFilter: hasActiveFilters,
-            totalRecords: nextQuarterClasses.length,
+            totalRecords: nextQuarterCategories.length,
           },
         );
 
@@ -339,7 +339,7 @@ export default function KuartersPageClient({
     } catch (error) {
       showNotice({
         tone: "error",
-        message: getErrorMessage(error, "Gagal memadam kelas kuarters."),
+        message: getErrorMessage(error, "Gagal memadam kategori kuarters."),
       });
     } finally {
       setPendingRowId(null);
@@ -354,12 +354,12 @@ export default function KuartersPageClient({
     });
   }
 
-  function handleViewRow(quarterClass: QuarterClassRecord) {
+  function handleViewRow(quarterCategory: QuarterCategoryRecord) {
     if (!ensureActionIsAvailable()) {
       return;
     }
 
-    router.push(`/pages/7_kuarters/${quarterClass.id}`);
+    router.push(`/pages/7_kuarters/${quarterCategory.id}`);
   }
 
   return (
@@ -370,10 +370,10 @@ export default function KuartersPageClient({
         onDismiss={() => setNotice(null)}
       />
       <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
-      <KuartersClassRatesPanel
+      <KuartersCategoryRatesPanel
         currentPage={pagination.currentPage}
         editor={editor}
-        filterQuery={filters.classNameQuery}
+        filterQuery={filters.categoryNameQuery}
         hasActiveFilters={hasActiveFilters}
         onCancelEdit={handleCancelEdit}
         pendingAction={pendingAction}

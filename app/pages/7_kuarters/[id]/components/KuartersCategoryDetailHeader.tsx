@@ -3,11 +3,11 @@ import Link from "next/link";
 import Icon from "@/app/components/Icon";
 import { formatMoney } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
-import type { QuarterClassRates } from "./kuartersUnitHelpers";
+import type { QuarterCategoryRates } from "./kuartersUnitHelpers";
 
-type KuartersClassDetailHeaderProps = {
-  className: string;
-  rates: QuarterClassRates;
+type KuartersCategoryDetailHeaderProps = {
+  categoryName: string;
+  rates: QuarterCategoryRates;
 };
 
 // Used to display the rental, maintenance, and penalty rates for a quarter class in a visually distinct way. Each rate is shown in a "pill" style container with a label and the corresponding value formatted as currency. If a rate value is null, it displays "--" instead.
@@ -30,11 +30,11 @@ function RatePill({
   );
 }
 
-export default function KuartersClassDetailHeader({
-  className,
+export default function KuartersCategoryDetailHeader({
+  categoryName,
   rates,
-}: KuartersClassDetailHeaderProps) {
-  const resolvedClassName = className.trim() || "Maklumat Kelas Kuarters";
+}: KuartersCategoryDetailHeaderProps) {
+  const resolvedCategoryName = categoryName.trim() || "Maklumat kategori kuarters";
 
   return (
     <section className="space-y-4">
@@ -43,15 +43,15 @@ export default function KuartersClassDetailHeader({
         className="inline-flex items-center gap-2 text-sm font-semibold text-grey transition-colors hover:text-dark-blue"
       >
         <Icon icon="arrow_back" size={18} />
-        Kembali ke senarai kelas
+        Kembali ke Senarai Kategori
       </Link>
 
       <div className="space-y-2">
         <h1 className="text-3xl font-extrabold tracking-[-0.03em] text-dark-grey md:text-[34px]">
-          Kelas: {resolvedClassName}
+          Kategori: {resolvedCategoryName}
         </h1>
         <p className="max-w-3xl text-sm text-grey md:text-base">
-          Pengurusan unit, penghuni semasa dan kadar berkaitan bagi kelas kuarters ini.
+          Pengurusan unit, penghuni semasa dan kadar berkaitan bagi kategori kuarters ini.
         </p>
       </div>
 

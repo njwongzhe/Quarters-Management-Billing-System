@@ -5,16 +5,16 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import Icon, { commonIcons } from "@/app/components/Icon";
 
 import {
-  EMPTY_QUARTER_CLASS_ID,
+  EMPTY_QUARTER_CATEGORY_ID,
   formatMoney,
   type PaginationItem,
   type KuartersEditorState,
-  type QuarterClassDraft,
-  type QuarterClassRecord,
+  type QuarterCategoryDraft,
+  type QuarterCategoryRecord,
 } from "./kuartersHelpers";
 
-type KuartersClassRatesPanelProps = {
-  rates: QuarterClassRecord[];
+type KuartersCategoryRatesPanelProps = {
+  rates: QuarterCategoryRecord[];
   currentPage: number;
   editor: KuartersEditorState | null;
   filterQuery: string;
@@ -28,13 +28,13 @@ type KuartersClassRatesPanelProps = {
   onAddRow: () => void;
   onClearFilter: () => void;
   onDeleteRow: (rowId: string) => void;
-  onDraftChange: (field: keyof QuarterClassDraft, value: string) => void;
-  onEditRow: (quarterClass: QuarterClassRecord) => void;
+  onDraftChange: (field: keyof QuarterCategoryDraft, value: string) => void;
+  onEditRow: (quarterCategory: QuarterCategoryRecord) => void;
   onFilterQueryChange: (value: string) => void;
   onPageChange: (page: number) => void;
   onSaveRow: () => void;
   onUnavailableFeature: (message: string) => void;
-  onViewRow: (quarterClass: QuarterClassRecord) => void;
+  onViewRow: (quarterCategory: QuarterCategoryRecord) => void;
 };
 
 function ActionButton({
@@ -158,7 +158,7 @@ function InputField({
   );
 }
 
-export default function KuartersClassRatesPanel({
+export default function KuartersCategoryRatesPanel({
   currentPage,
   editor,
   filterQuery,
@@ -180,7 +180,7 @@ export default function KuartersClassRatesPanel({
   rates,
   recordSummaryText,
   totalPages,
-}: KuartersClassRatesPanelProps) {
+}: KuartersCategoryRatesPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -246,10 +246,10 @@ export default function KuartersClassRatesPanel({
           label="Edit"
           disabled={Boolean(pendingAction)}
           onClick={() => {
-            const selectedQuarterClass = rates.find((item) => item.id === rowId);
+            const selectedQuarterCategory = rates.find((item) => item.id === rowId);
 
-            if (selectedQuarterClass) {
-              onEditRow(selectedQuarterClass);
+            if (selectedQuarterCategory) {
+              onEditRow(selectedQuarterCategory);
             }
           }}
           textClass="text-dark-blue"
@@ -259,10 +259,10 @@ export default function KuartersClassRatesPanel({
           label="Lihat"
           disabled={Boolean(pendingAction)}
           onClick={() => {
-            const selectedQuarterClass = rates.find((item) => item.id === rowId);
+            const selectedQuarterCategory = rates.find((item) => item.id === rowId);
 
-            if (selectedQuarterClass) {
-              onViewRow(selectedQuarterClass);
+            if (selectedQuarterCategory) {
+              onViewRow(selectedQuarterCategory);
             }
           }}
           textClass="text-grey"
@@ -276,17 +276,17 @@ export default function KuartersClassRatesPanel({
       <div className="flex flex-col gap-4 border-b border-light-grey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-extrabold tracking-[-0.02em] text-dark-grey">
-            Senarai Kelas Kuarters
+            Senarai kategori kuarters
           </h2>
           <p className="text-sm text-grey">
-            Kemaskini maklumat yuran dan denda mengikut kelas kuarters.
+            Kemaskini maklumat yuran dan denda mengikut kategori kuarters.
           </p>
         </div>
 
         <div className="flex items-center gap-3 self-start">
           <ToolbarButton
             icon={commonIcons.download}
-            label="Muat turun data kelas kuarters"
+            label="Muat turun data kategori kuarters"
             onClick={() =>
               onUnavailableFeature("Fungsi muat turun belum tersedia lagi.")
             }
@@ -299,7 +299,7 @@ export default function KuartersClassRatesPanel({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <label className="block flex-1">
               <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                Carian Mengikut Kelas
+                Carian Mengikut Kategori
               </span>
               <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
                 <Icon
@@ -362,11 +362,11 @@ export default function KuartersClassRatesPanel({
                 >
                   <td className="px-6 py-4">
                     <InputField
-                      value={editor.draft.className}
-                      placeholder="Masukkan nama kelas"
+                      value={editor.draft.categoryName}
+                      placeholder="Masukkan nama kategori"
                       align="start"
-                      disabled={pendingRowId === EMPTY_QUARTER_CLASS_ID}
-                      onChange={(value) => onDraftChange("className", value)}
+                      disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
+                      onChange={(value) => onDraftChange("categoryName", value)}
                     />
                   </td>
                   <td className="px-6 py-4">
@@ -375,7 +375,7 @@ export default function KuartersClassRatesPanel({
                       placeholder="0.00"
                       align="center"
                       inputMode="decimal"
-                      disabled={pendingRowId === EMPTY_QUARTER_CLASS_ID}
+                      disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("rentalPrice", value)}
                     />
                   </td>
@@ -385,7 +385,7 @@ export default function KuartersClassRatesPanel({
                       placeholder="0.00"
                       align="center"
                       inputMode="decimal"
-                      disabled={pendingRowId === EMPTY_QUARTER_CLASS_ID}
+                      disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) =>
                         onDraftChange("maintenancePrice", value)
                       }
@@ -397,11 +397,11 @@ export default function KuartersClassRatesPanel({
                       placeholder="0.00"
                       align="center"
                       inputMode="decimal"
-                      disabled={pendingRowId === EMPTY_QUARTER_CLASS_ID}
+                      disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("penaltyPrice", value)}
                     />
                   </td>
-                  <td className="px-6 py-4">{renderActionCell(EMPTY_QUARTER_CLASS_ID, true)}</td>
+                  <td className="px-6 py-4">{renderActionCell(EMPTY_QUARTER_CATEGORY_ID, true)}</td>
                 </tr>
               ) : null}
 
@@ -412,8 +412,8 @@ export default function KuartersClassRatesPanel({
                     className="px-6 py-10 text-center text-sm font-medium text-grey"
                   >
                     {hasActiveFilters
-                      ? "Tiada kelas kuarters yang sepadan dengan tapisan semasa."
-                      : "Tiada kelas kuarters untuk dipaparkan buat masa ini."}
+                      ? "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
+                      : "Tiada kategori kuarters untuk dipaparkan buat masa ini."}
                   </td>
                 </tr>
               ) : null}
@@ -429,7 +429,7 @@ export default function KuartersClassRatesPanel({
                     className="border-t border-light-grey/20"
                   >
                     <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
-                      <span className="block">{rate.className}</span>
+                      <span className="block">{rate.categoryName}</span>
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
@@ -540,7 +540,7 @@ export default function KuartersClassRatesPanel({
           onClick={onAddRow}
         >
           <Icon icon="add" size={18} />
-          Tambah Kelas
+          Tambah Kategori
         </button>
       </div>
     </section>

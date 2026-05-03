@@ -2,12 +2,12 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import {
-  buildQuarterClassDeleteBlockedMessage,
-  buildQuarterClassUpdatedMessage,
-  getChangedQuarterClassFields,
-  mapQuarterClassForApi,
-  parseQuarterClassUpdateBody,
-} from "@/lib/quarter-classes";
+  buildQuarterCategoryDeleteBlockedMessage,
+  buildQuarterCategoryUpdatedMessage,
+  getChangedQuarterCategoryFields,
+  mapQuarterCategoryForApi,
+  parseQuarterCategoryUpdateBody,
+} from "@/lib/quarter-categories";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -48,7 +48,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const parsedBody = parseQuarterClassUpdateBody(body);
+    const parsedBody = parseQuarterCategoryUpdateBody(body);
 
     if (!parsedBody.ok) {
       return NextResponse.json(
@@ -62,7 +62,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const existingQuarterClass = await prisma.quarterClass.findUnique({
+    const existingQuarterCategory = await prisma.quarterCategory.findUnique({
       where: { id },
       // We need the unit count to determine if the class can be deleted and to include in the response after update, so we include it in the query here.
       include: {
@@ -74,11 +74,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
-    if (!existingQuarterClass) {
+    if (!existingQuarterCategory) {
       return NextResponse.json(
         {
           success: false,
-          message: "Kelas kuarters tidak ditemui.",
+          message: "Kategori kuarters tidak ditemui.",
         },
         {
           status: 404,
@@ -86,26 +86,26 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const changedFields = getChangedQuarterClassFields(
-      existingQuarterClass,
+    const changedFields = getChangedQuarterCategoryFields(
+      existingQuarterCategory,
       parsedBody.data,
     );
 
     if (changedFields.length === 0) {
       return NextResponse.json({
         success: true,
-        message: buildQuarterClassUpdatedMessage(
-          existingQuarterClass.className,
+        message: buildQuarterCategoryUpdatedMessage(
+          existingQuarterCategory.categoryName,
           changedFields,
         ),
         data: {
-          quarterClass: mapQuarterClassForApi(existingQuarterClass),
+          quarterCategory: mapQuarterCategoryForApi(existingQuarterCategory),
           changedFields,
         },
       });
     }
 
-    const updatedQuarterClass = await prisma.quarterClass.update({
+    const updatedQuarterCategory = await prisma.quarterCategory.update({
       where: { id },
       data: parsedBody.data,
       include: {
@@ -121,22 +121,22 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({
       success: true,
-      message: buildQuarterClassUpdatedMessage(
-        updatedQuarterClass.className,
+      message: buildQuarterCategoryUpdatedMessage(
+        updatedQuarterCategory.categoryName,
         changedFields,
       ),
       data: {
-        quarterClass: mapQuarterClassForApi(updatedQuarterClass),
+        quarterCategory: mapQuarterCategoryForApi(updatedQuarterCategory),
         changedFields,
       },
     });
   } catch (error) {
-    console.error("Gagal mengemas kini kelas kuarters:", error);
+    console.error("Gagal mengemas kini kategori kuarters:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Ralat pelayan berlaku semasa mengemas kini kelas kuarters.",
+        message: "Ralat pelayan berlaku semasa mengemas kini kategori kuarters.",
       },
       {
         status: 500,
@@ -149,7 +149,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const existingQuarterClass = await prisma.quarterClass.findUnique({
+    const existingQuarterCategory = await prisma.quarterCategory.findUnique({
       where: { id },
       include: {
         _count: {
@@ -160,11 +160,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
       },
     });
 
-    if (!existingQuarterClass) {
+    if (!existingQuarterCategory) {
       return NextResponse.json(
         {
           success: false,
-          message: "Kelas kuarters tidak ditemui.",
+          message: "Kategori kuarters tidak ditemui.",
         },
         {
           status: 404,
@@ -172,16 +172,16 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    if (existingQuarterClass._count.units > 0) {
+    if (existingQuarterCategory._count.units > 0) {
       return NextResponse.json(
         {
           success: false,
-          message: buildQuarterClassDeleteBlockedMessage(
-            existingQuarterClass.className,
-            existingQuarterClass._count.units,
+          message: buildQuarterCategoryDeleteBlockedMessage(
+            existingQuarterCategory.categoryName,
+            existingQuarterCategory._count.units,
           ),
           data: {
-            unitCount: existingQuarterClass._count.units,
+            unitCount: existingQuarterCategory._count.units,
           },
         },
         {
@@ -190,7 +190,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    await prisma.quarterClass.delete({
+    await prisma.quarterCategory.delete({
       where: { id },
     });
 
@@ -198,9 +198,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     return NextResponse.json({
       success: true,
-      message: `${existingQuarterClass.className} berjaya dipadam.`,
+      message: `${existingQuarterCategory.categoryName} berjaya dipadam.`,
       data: {
-        id: existingQuarterClass.id,
+        id: existingQuarterCategory.id,
       },
     });
   } catch (error) {
@@ -209,7 +209,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
         {
           success: false,
           message:
-            "Kelas kuarters tidak boleh dipadam kerana masih mempunyai unit yang dirujuk.",
+            "Kategori kuarters tidak boleh dipadam kerana masih mempunyai unit yang dirujuk.",
         },
         {
           status: 409,
@@ -217,12 +217,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    console.error("Gagal memadam kelas kuarters:", error);
+    console.error("Gagal memadam kategori kuarters:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Ralat pelayan berlaku semasa memadam kelas kuarters.",
+        message: "Ralat pelayan berlaku semasa memadam kategori kuarters.",
       },
       {
         status: 500,

@@ -2,40 +2,40 @@ import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import {
-  mapQuarterClassUnitsDetailForApi,
-  quarterClassUnitsDetailInclude,
-  type QuarterClassUnitsDetail,
+  mapQuarterCategoryUnitsDetailForApi,
+  QuarterCategoryUnitsDetailInclude,
+  type QuarterCategoryUnitsDetail,
 } from "@/lib/quarter-units";
 
 import type { KuartersNotice } from "../components/kuartersHelpers";
-import KuartersClassDetailPageClient from "./components/KuartersClassDetailPageClient";
+import KuartersCategoryDetailPageClient from "./components/KuartersCategoryDetailPageClient";
 
 export const dynamic = "force-dynamic";
 
-type KuartersClassDetailPageProps = {
+type KuartersCategoryDetailPageProps = {
   params: Promise<{
     id: string;
   }>;
 };
 
-async function getInitialKuartersClassDetailData(id: string): Promise<{
-  initialData: QuarterClassUnitsDetail;
+async function getInitialKuartersCategoryDetailData(id: string): Promise<{
+  initialData: QuarterCategoryUnitsDetail;
   initialNotice: KuartersNotice | null;
   isNotFound: boolean;
 }> {
   try {
-    const quarterClass = await prisma.quarterClass.findUnique({
+    const QuarterCategory = await prisma.quarterCategory.findUnique({
       where: {
         id,
       },
-      include: quarterClassUnitsDetailInclude,
+      include: QuarterCategoryUnitsDetailInclude,
     });
 
-    if (!quarterClass) {
+    if (!QuarterCategory) {
       return {
         initialData: {
           id,
-          className: "",
+          categoryName: "",
           rates: {
             rentalPrice: null,
             maintenancePrice: null,
@@ -50,17 +50,17 @@ async function getInitialKuartersClassDetailData(id: string): Promise<{
     }
 
     return {
-      initialData: mapQuarterClassUnitsDetailForApi(quarterClass),
+      initialData: mapQuarterCategoryUnitsDetailForApi(QuarterCategory),
       initialNotice: null,
       isNotFound: false,
     };
   } catch (error) {
-    console.error("Gagal memuatkan butiran kelas kuarters:", error);
+    console.error("Gagal memuatkan butiran kategori kuarters:", error);
 
     return {
       initialData: {
         id,
-        className: "Maklumat Kelas Kuarters",
+        categoryName: "Maklumat kategori kuarters",
         rates: {
           rentalPrice: null,
           maintenancePrice: null,
@@ -71,26 +71,26 @@ async function getInitialKuartersClassDetailData(id: string): Promise<{
       },
       initialNotice: {
         tone: "error",
-        message: "Gagal mendapatkan data butiran kelas kuarters.",
+        message: "Gagal mendapatkan data butiran kategori kuarters.",
       },
       isNotFound: false,
     };
   }
 }
 
-export default async function KuartersClassDetailPage({
+export default async function KuartersCategoryDetailPage({
   params,
-}: KuartersClassDetailPageProps) {
+}: KuartersCategoryDetailPageProps) {
   const { id } = await params;
   const { initialData, initialNotice, isNotFound } =
-    await getInitialKuartersClassDetailData(id);
+    await getInitialKuartersCategoryDetailData(id);
 
   if (isNotFound) {
     notFound();
   }
 
   return (
-    <KuartersClassDetailPageClient
+    <KuartersCategoryDetailPageClient
       initialData={initialData}
       initialNotice={initialNotice}
     />

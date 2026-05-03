@@ -1,6 +1,6 @@
 import type { Prisma, UnitStatus } from "@prisma/client";
 
-import { buildQuarterClassSummary, type QuarterClassSummary } from "./quarter-classes";
+import { buildQuarterCategorySummary, type QuarterCategorySummary } from "./quarter-categories";
 
 type ParseSuccess<T> = {
   ok: true;
@@ -22,15 +22,15 @@ export type QuarterUnitListItem = {
   occupantName: string | null;
 };
 
-export type QuarterClassUnitsDetail = {
+export type QuarterCategoryUnitsDetail = {
   id: string;
-  className: string;
+  categoryName: string;
   rates: {
     rentalPrice: number | null;
     maintenancePrice: number | null;
     penaltyPrice: number | null;
   };
-  summary: QuarterClassSummary | null;
+  summary: QuarterCategorySummary | null;
   units: QuarterUnitListItem[];
 };
 
@@ -73,21 +73,21 @@ export const quarterUnitCurrentOccupancyInclude = {
   },
 } satisfies Prisma.UnitInclude;
 
-export const quarterClassUnitsDetailInclude = {
+export const QuarterCategoryUnitsDetailInclude = {
   units: {
     orderBy: {
       unitCode: "asc",
     },
     include: quarterUnitCurrentOccupancyInclude,
   },
-} satisfies Prisma.QuarterClassInclude;
+} satisfies Prisma.QuarterCategoryInclude;
 
 export type UnitWithCurrentOccupancy = Prisma.UnitGetPayload<{
   include: typeof quarterUnitCurrentOccupancyInclude;
 }>;
 
-export type QuarterClassWithUnits = Prisma.QuarterClassGetPayload<{
-  include: typeof quarterClassUnitsDetailInclude;
+export type QuarterCategoryWithUnits = Prisma.QuarterCategoryGetPayload<{
+  include: typeof QuarterCategoryUnitsDetailInclude;
 }>;
 
 export function mapQuarterUnitForApi(
@@ -104,29 +104,29 @@ export function mapQuarterUnitForApi(
   };
 }
 
-export function mapQuarterClassUnitsDetailForApi(
-  quarterClass: QuarterClassWithUnits,
-): QuarterClassUnitsDetail {
-  const occupiedUnits = quarterClass.units.filter(
+export function mapQuarterCategoryUnitsDetailForApi(
+  quarterCategory: QuarterCategoryWithUnits,
+): QuarterCategoryUnitsDetail {
+  const occupiedUnits = quarterCategory.units.filter(
     (unit) => unit.status === "OCCUPIED",
   ).length;
-  const totalUnits = quarterClass.units.length;
+  const totalUnits = quarterCategory.units.length;
   const vacantUnits = totalUnits - occupiedUnits;
 
   return {
-    id: quarterClass.id,
-    className: quarterClass.className,
+    id: quarterCategory.id,
+    categoryName: quarterCategory.categoryName,
     rates: {
-      rentalPrice: Number(quarterClass.rentalPrice),
-      maintenancePrice: Number(quarterClass.maintenancePrice),
-      penaltyPrice: Number(quarterClass.penaltyPrice),
+      rentalPrice: Number(quarterCategory.rentalPrice),
+      maintenancePrice: Number(quarterCategory.maintenancePrice),
+      penaltyPrice: Number(quarterCategory.penaltyPrice),
     },
-    summary: buildQuarterClassSummary({
+    summary: buildQuarterCategorySummary({
       totalUnits,
       occupiedUnits,
       vacantUnits,
     }),
-    units: quarterClass.units.map(mapQuarterUnitForApi),
+    units: quarterCategory.units.map(mapQuarterUnitForApi),
   };
 }
 
@@ -234,9 +234,9 @@ export function parseQuarterUnitUpdateBody(
 
 export function buildQuarterUnitCreatedMessage(
   unitCode: string,
-  className: string,
+  categoryName: string,
 ) {
-  return `Unit ${unitCode} bagi ${className} berjaya ditambah.`;
+  return `Unit ${unitCode} bagi ${categoryName} berjaya ditambah.`;
 }
 
 export function buildQuarterUnitUpdatedMessage(
@@ -259,7 +259,7 @@ export function buildQuarterUnitDeletedMessage(unitCode: string) {
 }
 
 export function buildQuarterUnitDuplicateMessage(unitCode: string) {
-  return `Kod unit ${unitCode} sudah wujud dalam kelas ini. Sila gunakan kod unit yang lain.`;
+  return `Kod unit ${unitCode} sudah wujud dalam kategori ini. Sila gunakan kod unit yang lain.`;
 }
 
 export function buildQuarterUnitDeleteBlockedMessage(
@@ -295,10 +295,10 @@ export function buildQuarterUnitOccupancyConflictMessage(
   occupantName: string,
   occupantIcNumber: string,
   unitCode: string,
-  className?: string,
+  categoryName?: string,
 ) {
-  const unitReference = className
-    ? `unit ${unitCode} dalam kelas ${className}`
+  const unitReference = categoryName
+    ? `unit ${unitCode} dalam kategori ${categoryName}`
     : `unit ${unitCode}`;
 
   return `${occupantName} (${occupantIcNumber}) sedang dikaitkan dengan ${unitReference}. Sila kosongkan unit tersebut terlebih dahulu.`;

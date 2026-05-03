@@ -83,7 +83,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
       include: {
         ...quarterUnitCurrentOccupancyInclude,
-        quarterClass: {
+        quarterCategory: {
           select: {
             id: true,
           },
@@ -91,7 +91,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
 
-    if (!existingUnit || existingUnit.quarterClass.id !== id) {
+    if (!existingUnit || existingUnit.quarterCategory.id !== id) {
       return NextResponse.json(
         {
           success: false,
@@ -112,7 +112,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (nextUnitCode !== existingUnit.unitCode) {
       const conflictingUnit = await prisma.unit.findFirst({
         where: {
-          classId: id,
+          categoryId: id,
           unitCode: nextUnitCode,
           NOT: {
             id: unitId,
@@ -197,9 +197,9 @@ export async function PATCH(request: Request, context: RouteContext) {
               unit: {
                 select: {
                   unitCode: true,
-                  quarterClass: {
+                  quarterCategory: {
                     select: {
-                      className: true,
+                      categoryName: true,
                     },
                   },
                 },
@@ -215,7 +215,7 @@ export async function PATCH(request: Request, context: RouteContext) {
                   nextResident.fullName,
                   nextResident.icNumber,
                   conflictingOccupancy.unit.unitCode,
-                  conflictingOccupancy.unit.quarterClass.className,
+                  conflictingOccupancy.unit.quarterCategory.categoryName,
                 ),
                 data: {
                   unitCode: conflictingOccupancy.unit.unitCode,
@@ -308,7 +308,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(
         {
           success: false,
-          message: "Kod unit yang diberikan sudah wujud dalam kelas ini.",
+          message: "Kod unit yang diberikan sudah wujud dalam kategori ini.",
         },
         {
           status: 409,
@@ -339,7 +339,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
         id: unitId,
       },
       include: {
-        quarterClass: {
+        quarterCategory: {
           select: {
             id: true,
           },
@@ -353,7 +353,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       },
     });
 
-    if (!existingUnit || existingUnit.quarterClass.id !== id) {
+    if (!existingUnit || existingUnit.quarterCategory.id !== id) {
       return NextResponse.json(
         {
           success: false,

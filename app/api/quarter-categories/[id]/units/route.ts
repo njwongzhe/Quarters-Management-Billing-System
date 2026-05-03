@@ -6,10 +6,10 @@ import {
   buildQuarterUnitDuplicateMessage,
   buildQuarterUnitOccupancyConflictMessage,
   buildQuarterUnitResidentNotFoundMessage,
-  mapQuarterClassUnitsDetailForApi,
+  mapQuarterCategoryUnitsDetailForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitCreateBody,
-  quarterClassUnitsDetailInclude,
+  QuarterCategoryUnitsDetailInclude,
   quarterUnitCurrentOccupancyInclude,
 } from "@/lib/quarter-units";
 import { prisma } from "@/lib/prisma";
@@ -36,18 +36,18 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const quarterClass = await prisma.quarterClass.findUnique({
+    const quarterCategory = await prisma.quarterCategory.findUnique({
       where: {
         id,
       },
-      include: quarterClassUnitsDetailInclude,
+      include: QuarterCategoryUnitsDetailInclude,
     });
 
-    if (!quarterClass) {
+    if (!quarterCategory) {
       return NextResponse.json(
         {
           success: false,
-          message: "Kelas kuarters tidak ditemui.",
+          message: "Kategori kuarters tidak ditemui.",
         },
         {
           status: 404,
@@ -55,13 +55,13 @@ export async function GET(_request: Request, context: RouteContext) {
       );
     }
 
-    const detail = mapQuarterClassUnitsDetailForApi(quarterClass);
+    const detail = mapQuarterCategoryUnitsDetailForApi(quarterCategory);
 
     return NextResponse.json({
       success: true,
       message: "Data unit kuarters berjaya diambil.",
       data: {
-        quarterClass: detail,
+        quarterCategory: detail,
         meta: {
           totalRecords: detail.units.length,
         },
@@ -119,21 +119,21 @@ export async function POST(request: Request, context: RouteContext) {
 
     requestedUnitCode = parsedBody.data.unitCode;
 
-    const quarterClass = await prisma.quarterClass.findUnique({
+    const quarterCategory = await prisma.quarterCategory.findUnique({
       where: {
         id,
       },
       select: {
         id: true,
-        className: true,
+        categoryName: true,
       },
     });
 
-    if (!quarterClass) {
+    if (!quarterCategory) {
       return NextResponse.json(
         {
           success: false,
-          message: "Kelas kuarters tidak ditemui.",
+          message: "Kategori kuarters tidak ditemui.",
         },
         {
           status: 404,
@@ -143,7 +143,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     const existingUnit = await prisma.unit.findFirst({
       where: {
-        classId: id,
+        categoryId: id,
         unitCode: parsedBody.data.unitCode,
       },
       select: {
@@ -206,9 +206,9 @@ export async function POST(request: Request, context: RouteContext) {
           unit: {
             select: {
               unitCode: true,
-              quarterClass: {
+              quarterCategory: {
                 select: {
-                  className: true,
+                  categoryName: true,
                 },
               },
             },
@@ -224,7 +224,7 @@ export async function POST(request: Request, context: RouteContext) {
               resident.fullName,
               resident.icNumber,
               conflictingOccupancy.unit.unitCode,
-              conflictingOccupancy.unit.quarterClass.className,
+              conflictingOccupancy.unit.quarterCategory.categoryName,
             ),
             data: {
               unitCode: conflictingOccupancy.unit.unitCode,
@@ -241,7 +241,7 @@ export async function POST(request: Request, context: RouteContext) {
       data: {
         unitCode: parsedBody.data.unitCode,
         status: resident ? "OCCUPIED" : "VACANT",
-        classId: id,
+        categoryId: id,
         occupancies: resident
           ? {
               create: {
@@ -263,7 +263,7 @@ export async function POST(request: Request, context: RouteContext) {
         success: true,
         message: buildQuarterUnitCreatedMessage(
           createdUnit.unitCode,
-          quarterClass.className,
+          quarterCategory.categoryName,
         ),
         data: {
           unit: mapQuarterUnitForApi(createdUnit),
