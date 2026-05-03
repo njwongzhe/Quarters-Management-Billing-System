@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import {
   buildQuarterCategoryDeleteBlockedMessage,
+  buildQuarterCategoryDuplicateMessage,
   buildQuarterCategoryUpdatedMessage,
   getChangedQuarterCategoryFields,
   mapQuarterCategoryForApi,
@@ -28,8 +29,19 @@ function isPrismaForeignKeyError(error: unknown) {
   );
 }
 
+function isPrismaUniqueError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
+  let requestedCategoryName: string | null = null;
+  let requestedAddress: string | null = null;
 
   try {
     let body: unknown; // We declare body here so that we can assign it inside the try-catch block where we attempt to parse the JSON. This allows us to handle JSON parsing errors gracefully and return a proper error response if the JSON is invalid.
@@ -62,6 +74,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
+    requestedCategoryName =
+      typeof parsedBody.data.categoryName === "string"
+        ? parsedBody.data.categoryName
+        : null;
+    requestedAddress =
+      typeof parsedBody.data.address === "string" ? parsedBody.data.address : null;
+
     const existingQuarterCategory = await prisma.quarterCategory.findUnique({
       where: { id },
       // We need the unit count to determine if the category can be deleted and to include in the response after update, so we include it in the query here.
@@ -91,6 +110,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       parsedBody.data,
     );
 
+    const nextCategoryName =
+      parsedBody.data.categoryName ?? existingQuarterCategory.categoryName;
+    const nextAddress =
+      parsedBody.data.address !== undefined
+        ? parsedBody.data.address
+        : existingQuarterCategory.address;
+
+    requestedCategoryName = nextCategoryName;
+    requestedAddress = nextAddress;
+
     if (changedFields.length === 0) {
       return NextResponse.json({
         success: true,
@@ -103,6 +132,34 @@ export async function PATCH(request: Request, context: RouteContext) {
           changedFields,
         },
       });
+    }
+
+    const duplicateQuarterCategory = await prisma.quarterCategory.findFirst({
+      where: {
+        categoryName: nextCategoryName,
+        address: nextAddress,
+        NOT: {
+          id,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (duplicateQuarterCategory) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: buildQuarterCategoryDuplicateMessage(
+            nextCategoryName,
+            nextAddress,
+          ),
+        },
+        {
+          status: 409,
+        },
+      );
     }
 
     const updatedQuarterCategory = await prisma.quarterCategory.update({
@@ -131,6 +188,21 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
   } catch (error) {
+    if (isPrismaUniqueError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: buildQuarterCategoryDuplicateMessage(
+            requestedCategoryName ?? "tersebut",
+            requestedAddress,
+          ),
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     console.error("Gagal mengemas kini kategori kuarters:", error);
 
     return NextResponse.json(

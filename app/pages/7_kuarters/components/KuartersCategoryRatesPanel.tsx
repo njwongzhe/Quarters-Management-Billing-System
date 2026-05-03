@@ -334,19 +334,22 @@ export default function KuartersCategoryRatesPanel({
       <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="overflow-x-auto">
           {/* The table stays semantic so the edit and add flows can grow without changing the layout structure. */}
-          <table className="w-full min-w-190 table-fixed border-collapse">
+          <table className="w-full min-w-240 table-fixed border-collapse">
             <thead className="bg-background">
               <tr>
-                <th className="w-[28%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[20%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Kategori
                 </th>
-                <th className="w-[20%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[24%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                  Alamat
+                </th>
+                <th className="w-[16%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Sewa (RM)
                 </th>
-                <th className="w-[24%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[16%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Senggara (RM)
                 </th>
-                <th className="w-[18%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[14%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Penalti (RM)
                 </th>
                 <th className="w-[10%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
@@ -367,6 +370,15 @@ export default function KuartersCategoryRatesPanel({
                       align="start"
                       disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("categoryName", value)}
+                    />
+                  </td>
+                  <td className="px-6 py-4">
+                    <InputField
+                      value={editor.draft.address}
+                      placeholder="Masukkan alamat"
+                      align="start"
+                      disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
+                      onChange={(value) => onDraftChange("address", value)}
                     />
                   </td>
                   <td className="px-6 py-4">
@@ -408,7 +420,7 @@ export default function KuartersCategoryRatesPanel({
               {rates.length === 0 && !isCreateRowVisible ? (
                 <tr className="border-t border-light-grey/20">
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-6 py-10 text-center text-sm font-medium text-grey"
                   >
                     {hasActiveFilters
@@ -429,7 +441,34 @@ export default function KuartersCategoryRatesPanel({
                     className="border-t border-light-grey/20"
                   >
                     <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
-                      <span className="block">{rate.categoryName}</span>
+                      {isEditing ? (
+                        <InputField
+                          value={editor.draft.categoryName}
+                          placeholder="Masukkan nama kategori"
+                          align="start"
+                          disabled={isCurrentRowPending}
+                          onChange={(value) =>
+                            onDraftChange("categoryName", value)
+                          }
+                        />
+                      ) : (
+                        <span className="block">{rate.categoryName}</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                      {isEditing ? (
+                        <InputField
+                          value={editor.draft.address}
+                          placeholder="Masukkan alamat"
+                          align="start"
+                          disabled={isCurrentRowPending}
+                          onChange={(value) => onDraftChange("address", value)}
+                        />
+                      ) : (
+                        <span className="block whitespace-pre-wrap">
+                          {rate.address ?? "N/A"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (

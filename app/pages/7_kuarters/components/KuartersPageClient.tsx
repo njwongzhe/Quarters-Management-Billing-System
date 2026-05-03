@@ -167,7 +167,7 @@ export default function KuartersPageClient({
     }
 
     const validationMessage = validateQuarterCategoryDraft(editor.draft, {
-      requireCategoryName: editor.mode === "create",
+      requireCategoryName: true,
     });
 
     if (validationMessage) {
@@ -182,11 +182,14 @@ export default function KuartersPageClient({
       editor.mode === "create"
         ? {
             kategori: editor.draft.categoryName.trim(),
+            alamat: editor.draft.address.trim(),
             sewa: editor.draft.rentalPrice.trim(),
             senggara: editor.draft.maintenancePrice.trim(),
             penalti: editor.draft.penaltyPrice.trim(),
           }
         : {
+            kategori: editor.draft.categoryName.trim(),
+            alamat: editor.draft.address.trim(),
             sewa: editor.draft.rentalPrice.trim(),
             senggara: editor.draft.maintenancePrice.trim(),
             penalti: editor.draft.penaltyPrice.trim(),

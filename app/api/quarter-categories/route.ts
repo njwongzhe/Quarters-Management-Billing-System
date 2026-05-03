@@ -83,6 +83,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   let requestedCategoryName: string | null = null;
+  let requestedAddress: string | null = null;
 
   try {
     let body: unknown;
@@ -116,10 +117,12 @@ export async function POST(request: Request) {
     }
 
     requestedCategoryName = parsedBody.data.categoryName;
+    requestedAddress = parsedBody.data.address;
 
-    const existingQuarterCategory = await prisma.quarterCategory.findUnique({
+    const existingQuarterCategory = await prisma.quarterCategory.findFirst({
       where: {
         categoryName: parsedBody.data.categoryName,
+        address: parsedBody.data.address,
       },
       select: {
         id: true,
@@ -130,7 +133,10 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: buildQuarterCategoryDuplicateMessage(parsedBody.data.categoryName),
+          message: buildQuarterCategoryDuplicateMessage(
+            parsedBody.data.categoryName,
+            parsedBody.data.address,
+          ),
         },
         {
           status: 409,
@@ -170,6 +176,7 @@ export async function POST(request: Request) {
           success: false,
           message: buildQuarterCategoryDuplicateMessage(
             requestedCategoryName ?? "tersebut",
+            requestedAddress,
           ),
         },
         {
