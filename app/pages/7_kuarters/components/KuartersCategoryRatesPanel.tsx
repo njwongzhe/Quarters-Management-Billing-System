@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon";
 
@@ -106,16 +106,23 @@ function ToolbarButton({
   icon,
   label,
   onClick,
+  isActive = false,
 }: {
   icon: string;
   label: string;
   onClick: () => void;
+  isActive?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="inline-flex items-center justify-center rounded-lg border border-light-grey/20 bg-white p-2 text-grey transition-colors hover:border-dark-blue hover:text-dark-blue"
+      className={`inline-flex items-center justify-center rounded-lg border p-2 transition-colors ${
+        isActive
+          ? "border-dark-blue bg-dark-blue text-white"
+          : "border-light-grey/20 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
+      }`}
       aria-label={label}
+      aria-pressed={isActive}
       onClick={onClick}
       title={label}
     >
@@ -183,6 +190,8 @@ export default function KuartersCategoryRatesPanel({
 }: KuartersCategoryRatesPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(hasActiveFilters);
 
   const handlePointerDownOutsideEditor = useEffectEvent((event: PointerEvent) => {
     if (!editor || pendingAction) {
@@ -216,6 +225,27 @@ export default function KuartersCategoryRatesPanel({
       );
     };
   }, [editor, pendingAction]);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
+
+  function handleToggleSearch() {
+    if (isSearchOpen) {
+      onClearFilter();
+      setIsSearchOpen(false);
+      return;
+    }
+
+    setIsSearchOpen(true);
+  }
+
+  function handleClearSearch() {
+    onClearFilter();
+    setIsSearchOpen(false);
+  }
 
   function renderActionCell(rowId: string, isEditing: boolean) {
     if (isEditing) {
@@ -285,6 +315,12 @@ export default function KuartersCategoryRatesPanel({
 
         <div className="flex items-center gap-3 self-start">
           <ToolbarButton
+            icon={commonIcons.search}
+            label="Cari kategori kuarters"
+            isActive={isSearchOpen}
+            onClick={handleToggleSearch}
+          />
+          <ToolbarButton
             icon={commonIcons.download}
             label="Muat turun data kategori kuarters"
             onClick={() =>
@@ -294,12 +330,13 @@ export default function KuartersCategoryRatesPanel({
         </div>
       </div>
 
+      {isSearchOpen ? (
       <div className="mt-4 rounded-2xl border border-light-grey/20 bg-white p-4">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <label className="block flex-1">
               <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                Carian Mengikut Kategori
+                Carian Mengikut Kategori Atau Alamat
               </span>
               <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
                 <Icon
@@ -308,6 +345,7 @@ export default function KuartersCategoryRatesPanel({
                   className="text-light-grey"
                 />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={filterQuery}
                   onChange={(event) => onFilterQueryChange(event.target.value)}
@@ -322,7 +360,7 @@ export default function KuartersCategoryRatesPanel({
                 type="button"
                 className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!hasActiveFilters}
-                onClick={onClearFilter}
+                onClick={handleClearSearch}
               >
                 Kosongkan
               </button>
@@ -330,6 +368,7 @@ export default function KuartersCategoryRatesPanel({
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="overflow-x-auto">
@@ -352,7 +391,7 @@ export default function KuartersCategoryRatesPanel({
                 <th className="w-[14%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Penalti (RM)
                 </th>
-                <th className="w-[10%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[10%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Tindakan
                 </th>
               </tr>
@@ -413,7 +452,11 @@ export default function KuartersCategoryRatesPanel({
                       onChange={(value) => onDraftChange("penaltyPrice", value)}
                     />
                   </td>
-                  <td className="px-6 py-4">{renderActionCell(EMPTY_QUARTER_CATEGORY_ID, true)}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center">
+                      {renderActionCell(EMPTY_QUARTER_CATEGORY_ID, true)}
+                    </div>
+                  </td>
                 </tr>
               ) : null}
 
@@ -440,7 +483,7 @@ export default function KuartersCategoryRatesPanel({
                     ref={isEditing ? editingRowRef : null}
                     className="border-t border-light-grey/20"
                   >
-                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.categoryName}
@@ -452,10 +495,12 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block">{rate.categoryName}</span>
+                        <span className="block truncate" title={rate.categoryName}>
+                          {rate.categoryName}
+                        </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.address}
@@ -465,12 +510,15 @@ export default function KuartersCategoryRatesPanel({
                           onChange={(value) => onDraftChange("address", value)}
                         />
                       ) : (
-                        <span className="block whitespace-pre-wrap">
+                        <span
+                          className="block truncate"
+                          title={rate.address ?? "N/A"}
+                        >
                           {rate.address ?? "N/A"}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.rentalPrice}
@@ -483,12 +531,12 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block text-center">
+                        <span className="block truncate text-center">
                           {formatMoney(rate.rentalPrice)}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.maintenancePrice}
@@ -501,12 +549,12 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block text-center">
+                        <span className="block truncate text-center">
                           {formatMoney(rate.maintenancePrice)}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <InputField
                           value={editor.draft.penaltyPrice}
@@ -519,13 +567,15 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block text-center">
+                        <span className="block truncate text-center">
                           {formatMoney(rate.penaltyPrice)}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {renderActionCell(rate.id, isEditing)}
+                      <div className="flex justify-center">
+                        {renderActionCell(rate.id, isEditing)}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -571,17 +621,15 @@ export default function KuartersCategoryRatesPanel({
         </div>
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-dark-blue px-4 py-2 text-sm font-extrabold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={Boolean(pendingAction)}
-          onClick={onAddRow}
-        >
-          <Icon icon="add" size={18} />
-          Tambah Kategori
-        </button>
-      </div>
+      <button
+        type="button"
+        className="fixed bottom-6 right-6 z-40 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-dark-blue px-5 py-3 text-sm font-extrabold text-white shadow-[0_18px_45px_rgba(13,47,86,0.28)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:bottom-8 sm:right-8"
+        disabled={Boolean(pendingAction)}
+        onClick={onAddRow}
+      >
+        <Icon icon="add" size={20} />
+        Tambah Kategori
+      </button>
     </section>
   );
 }

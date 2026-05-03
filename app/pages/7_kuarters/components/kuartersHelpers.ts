@@ -206,17 +206,22 @@ export function filterQuarterCategories(
   quarterCategories: QuarterCategoryRecord[],
   filters: QuarterCategoryFilters,
 ) {
-  const normalizedCategoryNameQuery = normalizeSearchValue(filters.categoryNameQuery);
+  const normalizedQuery = normalizeSearchValue(filters.categoryNameQuery);
 
-  if (normalizedCategoryNameQuery.length === 0) {
+  if (normalizedQuery.length === 0) {
     return quarterCategories;
   }
 
-  return quarterCategories.filter((quarterCategory) =>
-    normalizeSearchValue(quarterCategory.categoryName).includes(
-      normalizedCategoryNameQuery,
-    ),
-  );
+  return quarterCategories.filter((quarterCategory) => {
+    const searchableValues = [
+      quarterCategory.categoryName,
+      quarterCategory.address ?? "",
+    ];
+
+    return searchableValues.some((value) =>
+      normalizeSearchValue(value).includes(normalizedQuery),
+    );
+  });
 }
 
 export function buildQuarterCategoryPagination(
