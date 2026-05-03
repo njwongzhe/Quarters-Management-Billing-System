@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# python microservice
+ai_service/.venv/
+ai_service/__pycache__/
+.pytest_cache/

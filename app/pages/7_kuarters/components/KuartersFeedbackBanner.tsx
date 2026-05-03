@@ -22,8 +22,8 @@ const toneStyles: Record<
     icon: "error",
   },
   info: {
-    containerClass: "border-darkblue/15 bg-lightBlue/10",
-    iconClass: "text-darkblue",
+    containerClass: "border-dark-blue/15 bg-light-blue/10",
+    iconClass: "text-dark-blue",
     icon: "info",
   },
 };
@@ -45,12 +45,12 @@ export default function KuartersFeedbackBanner({
     >
       <div className="flex items-start gap-3">
         <Icon icon={tone.icon} size={20} className={tone.iconClass} />
-        <p className="text-sm font-medium text-darkGrey">{notice.message}</p>
+        <p className="text-sm font-medium text-dark-grey">{notice.message}</p>
       </div>
 
       <button
         type="button"
-        className="inline-flex items-center justify-center rounded-md p-1 text-grey transition-colors hover:bg-white/60 hover:text-darkGrey"
+        className="inline-flex items-center justify-center rounded-md p-1 text-grey transition-colors hover:bg-white/60 hover:text-dark-grey"
         aria-label="Tutup mesej"
         onClick={onDismiss}
       >

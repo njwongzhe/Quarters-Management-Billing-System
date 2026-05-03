@@ -58,7 +58,7 @@ export default function KuartersResidentPickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-darkblue/35 p-4 backdrop-blur-[2px] md:p-6"
+      className="fixed inset-0 z-50 bg-dark-blue/35 p-4 backdrop-blur-[2px] md:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="resident-picker-title"
@@ -68,8 +68,8 @@ export default function KuartersResidentPickerModal({
         }
       }}
     >
-      <div className="mx-auto flex h-full max-h-195 w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-lightGrey/20 bg-white shadow-2xl">
-        <div className="flex flex-col gap-4 bg-darkblue px-6 py-5 text-white sm:flex-row sm:items-start sm:justify-between">
+      <div className="mx-auto flex h-full max-h-195 w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-light-grey/20 bg-white shadow-2xl">
+        <div className="flex flex-col gap-4 bg-dark-blue px-6 py-5 text-white sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/75">
               Pilih Penghuni
@@ -108,24 +108,24 @@ export default function KuartersResidentPickerModal({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-lightBlue/10 p-4 sm:p-5">
-          <div className="rounded-2xl border border-lightGrey/20 bg-white p-4">
+        <div className="flex min-h-0 flex-1 flex-col bg-light-blue/10 p-4 sm:p-5">
+          <div className="rounded-2xl border border-light-grey/20 bg-white p-4">
             <label className="block">
               <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                 Carian Mengikut IC atau Nama
               </span>
-              <div className="flex items-center gap-3 rounded-xl border border-lightGrey/30 bg-background px-3 py-2 transition-colors focus-within:border-darkblue">
+              <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
                 <Icon
                   icon={commonIcons.search}
                   size={18}
-                  className="text-lightGrey"
+                  className="text-light-grey"
                 />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(event) => onSearchQueryChange(event.target.value)}
                   placeholder="Contoh: 850101-01-5123 atau Ahmad"
-                  className="w-full border-none bg-transparent text-sm font-medium text-darkGrey outline-none placeholder:text-lightGrey"
+                  className="w-full border-none bg-transparent text-sm font-medium text-dark-grey outline-none placeholder:text-light-grey"
                 />
               </div>
             </label>
@@ -145,7 +145,7 @@ export default function KuartersResidentPickerModal({
             />
           </div>
 
-          <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl border border-lightGrey/20 bg-white">
+          <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
             <div className="h-full overflow-auto">
               <table className="w-full min-w-180 table-fixed border-collapse">
                 <thead className="sticky top-0 bg-background">
@@ -163,7 +163,7 @@ export default function KuartersResidentPickerModal({
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <tr className="border-t border-lightGrey/20">
+                    <tr className="border-t border-light-grey/20">
                       <td
                         colSpan={3}
                         className="px-6 py-10 text-center text-sm font-medium text-grey"
@@ -174,7 +174,7 @@ export default function KuartersResidentPickerModal({
                   ) : null}
 
                   {!isLoading && residents.length === 0 ? (
-                    <tr className="border-t border-lightGrey/20">
+                    <tr className="border-t border-light-grey/20">
                       <td
                         colSpan={3}
                         className="px-6 py-10 text-center text-sm font-medium text-grey"
@@ -192,12 +192,12 @@ export default function KuartersResidentPickerModal({
                         return (
                           <tr
                             key={resident.id}
-                            className="border-t border-lightGrey/20"
+                            className="border-t border-light-grey/20"
                           >
-                            <td className="px-6 py-4 text-sm font-semibold text-darkGrey">
+                            <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                               {resident.icNumber}
                             </td>
-                            <td className="px-6 py-4 text-sm font-semibold text-darkGrey">
+                            <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
                               {resident.fullName}
                             </td>
                             <td className="px-6 py-4">
@@ -205,8 +205,8 @@ export default function KuartersResidentPickerModal({
                                 type="button"
                                 className={`inline-flex min-h-10 items-center rounded-xl px-4 py-2 text-sm font-extrabold transition-colors ${
                                   isSelected
-                                    ? "cursor-not-allowed border border-lightGrey/25 bg-background text-grey"
-                                    : "bg-darkblue text-white hover:opacity-90"
+                                    ? "cursor-not-allowed border border-light-grey/25 bg-background text-grey"
+                                    : "bg-dark-blue text-white hover:opacity-90"
                                 }`}
                                 disabled={isSelected}
                                 onClick={() => onAssignResident(resident)}
