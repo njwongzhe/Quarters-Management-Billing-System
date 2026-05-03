@@ -175,7 +175,7 @@ function StatCards({ stats }: { stats: StatCard[] }) {
       {stats.map((stat) => (
         <div
           key={stat.label}
-          className="min-h-[116px] rounded border border-[#E7EAF2] bg-white px-6 py-5 shadow-sm"
+          className="min-h-29 rounded border border-[#E7EAF2] bg-white px-6 py-5 shadow-sm"
         >
           <p className="text-[10px] font-extrabold uppercase text-[#667085]">
             {stat.label}
@@ -284,7 +284,7 @@ function PaymentTable({ kind }: { kind: "bayaran" | "tunggakan" }) {
               ) : null}
               <td className="px-4 py-4 text-right">
                 <input
-                  className="h-10 w-[92px] rounded-lg border border-[#E6EAF2] px-3 text-right font-extrabold"
+                  className="h-10 w-23 rounded-lg border border-[#E6EAF2] px-3 text-right font-extrabold"
                   defaultValue={resident.amount}
                   readOnly={index !== 0}
                 />
@@ -416,7 +416,7 @@ function QuartersTable() {
                 {[rent, maintenance, penalty].map((value) => (
                   <td key={value} className="px-4 py-4 text-right">
                     <input
-                      className="h-9 w-[88px] rounded border border-[#E6EAF2] px-3 text-right font-extrabold"
+                      className="h-9 w-22 rounded border border-[#E6EAF2] px-3 text-right font-extrabold"
                       defaultValue={value}
                       readOnly={index !== 0}
                     />
@@ -537,7 +537,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
   }, [kind, penghuniExtract, uploadedFileName]);
 
   return (
-    <section className="min-h-full bg-[#F8F9FF]">
+    <section className="min-h-full bg-background">
       <div className="flex w-full flex-col gap-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
@@ -562,7 +562,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
 
         <StatCards stats={content.stats} />
 
-        <div className="overflow-hidden rounded-xl border border-[#DCE7FF] bg-[#EFF4FF] shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-[#DCE7FF] bg-light-blue shadow-sm">
           <div className="flex items-start justify-between px-5 py-5">
             <div>
               <h2 className="text-lg font-extrabold text-[#07162F]">

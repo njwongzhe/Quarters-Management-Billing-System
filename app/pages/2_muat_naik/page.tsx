@@ -166,7 +166,7 @@ export default function MuatNaikPage() {
   }
 
   return (
-    <section className="min-h-full bg-[#F8F9FF]">
+    <section className="min-h-full bg-background">
       <div className="flex w-full flex-col gap-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-[30px] font-extrabold leading-tight text-[#07162F]">
@@ -178,7 +178,7 @@ export default function MuatNaikPage() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 pt-3">
-          <div className="grid h-12 w-full max-w-[530px] grid-cols-4 rounded-xl bg-[#EFF4FF] p-1.5 shadow-[inset_0_0_0_1px_rgba(219,226,242,0.45)]">
+          <div className="grid h-12 w-full max-w-132.5 grid-cols-4 rounded-xl bg-light-blue p-1.5 shadow-[inset_0_0_0_1px_rgba(219,226,242,0.45)]">
             {categories.map((category) => {
               const isActive = activeCategory === category;
 
@@ -210,8 +210,8 @@ export default function MuatNaikPage() {
           </button>
         </div>
 
-        <div className="flex min-h-[330px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#C6CDDD] bg-white px-6 text-center">
-          <div className="mb-6 flex h-[72px] w-[72px] items-center justify-center rounded-xl bg-[#EFF4FF] text-dark-blue">
+        <div className="flex min-h-82.5 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#C6CDDD] bg-white px-6 text-center">
+          <div className="mb-6 flex h-18 w-18 items-center justify-center rounded-xl bg-light-blue text-dark-blue">
             <Icon icon="cloud_upload" size={38} weight={700} />
           </div>
           <h2 className="text-[22px] font-extrabold leading-tight text-[#07162F]">
@@ -270,7 +270,7 @@ export default function MuatNaikPage() {
 
           <div className="overflow-hidden rounded-xl border border-[#DCE2F1] bg-white shadow-sm">
             <table className="w-full table-fixed border-collapse text-left">
-              <thead className="bg-[#EFF4FF] text-[10px] font-extrabold uppercase tracking-wide text-[#4B5567]">
+              <thead className="bg-light-blue text-[10px] font-extrabold uppercase tracking-wide text-[#4B5567]">
                 <tr>
                   <th className="w-[38%] px-6 py-4">Nama Dokumen</th>
                   <th className="w-[20%] px-5 py-4">Pemuat Naik</th>
@@ -280,7 +280,7 @@ export default function MuatNaikPage() {
               </thead>
               <tbody className="divide-y divide-[#EEF1F7] text-xs">
                 {activeRows.map((row) => (
-                  <tr key={row.name} className="h-[58px]">
+                  <tr key={row.name} className="h-14.5">
                     <td className="px-6 py-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <span
