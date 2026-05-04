@@ -36,9 +36,10 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const quarterCategory = await prisma.quarterCategory.findUnique({
+    const quarterCategory = await prisma.quarterCategory.findFirst({
       where: {
         id,
+        recordStatus: "VERIFIED",
       },
       include: QuarterCategoryUnitsDetailInclude,
     });
