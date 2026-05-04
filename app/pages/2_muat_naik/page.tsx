@@ -1,9 +1,15 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "../../components/Icon";
 import { ROUTES } from "../../constants/routes";
+import {
+  CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY,
+  type ExtractResult,
+  type ProcessingDraft,
+  formatDraftDateTime,
+} from "./components/extract-review-shared";
 
 const categories = ["Bayaran", "Tunggakan", "Penghuni", "Kuarters"] as const;
 
@@ -16,87 +22,10 @@ const reviewRoutes: Record<Category, string> = {
   Kuarters: "kuarters",
 };
 
-const processingRows: Record<
-  Category,
-  {
-    name: string;
-    uploader: string;
-    time: string;
-    tone: "red" | "green";
-    icon: string;
-  }[]
-> = {
-  Bayaran: [
-    {
-      name: "Penyata_Gaji_Jan_2024.pdf",
-      uploader: "Ahmad Zaki",
-      time: "12 Julai 2024, 10:30 AM",
-      tone: "red",
-      icon: "picture_as_pdf",
-    },
-    {
-      name: "Resit_Bayaran_Julai.xlsx",
-      uploader: "Siti Nurhaliza",
-      time: "12 Julai 2024, 09:15 AM",
-      tone: "green",
-      icon: "table",
-    },
-    {
-      name: "Ringkasan_Bayaran_Kulai.pdf",
-      uploader: "Admin JKR",
-      time: "11 Julai 2024, 04:45 PM",
-      tone: "red",
-      icon: "picture_as_pdf",
-    },
-  ],
-  Tunggakan: [
-    {
-      name: "Senarai_Tunggakan_Julai.xlsx",
-      uploader: "Admin JKR",
-      time: "12 Julai 2024, 11:05 AM",
-      tone: "green",
-      icon: "table",
-    },
-    {
-      name: "Notis_Tunggakan_Blok_B.pdf",
-      uploader: "Ahmad Zaki",
-      time: "11 Julai 2024, 03:20 PM",
-      tone: "red",
-      icon: "picture_as_pdf",
-    },
-  ],
-  Penghuni: [
-    {
-      name: "Data_Penghuni_Blok_A.xlsx",
-      uploader: "Siti Nurhaliza",
-      time: "12 Julai 2024, 09:15 AM",
-      tone: "green",
-      icon: "table",
-    },
-    {
-      name: "Borang_Penghuni_Baharu.pdf",
-      uploader: "Admin JKR",
-      time: "10 Julai 2024, 02:10 PM",
-      tone: "red",
-      icon: "picture_as_pdf",
-    },
-  ],
-  Kuarters: [
-    {
-      name: "Laporan_Kuarters_Kulai.pdf",
-      uploader: "Admin JKR",
-      time: "11 Julai 2024, 04:45 PM",
-      tone: "red",
-      icon: "picture_as_pdf",
-    },
-    {
-      name: "Inventori_Unit_Kuarters.xlsx",
-      uploader: "Siti Nurhaliza",
-      time: "09 Julai 2024, 08:40 AM",
-      tone: "green",
-      icon: "table",
-    },
-  ],
+const draftKindByCategory: Partial<Record<Category, ProcessingDraft["kind"]>> = {
+  Bayaran: "bayaran",
+  Penghuni: "penghuni",
+  Kuarters: "kuarters",
 };
 
 export default function MuatNaikPage() {
@@ -106,8 +35,53 @@ export default function MuatNaikPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingError, setProcessingError] = useState("");
+  const [processingDrafts, setProcessingDrafts] = useState<ProcessingDraft[]>(
+    [],
+  );
+  const [isLoadingQueue, setIsLoadingQueue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeRows = processingRows[activeCategory];
+  const activeDraftKind = draftKindByCategory[activeCategory];
+  const activeRows = useMemo(
+    () =>
+      activeDraftKind
+        ? processingDrafts.filter((draft) => draft.kind === activeDraftKind)
+        : [],
+    [activeDraftKind, processingDrafts],
+  );
+
+  useEffect(() => {
+    async function loadProcessingDrafts() {
+      if (!activeDraftKind) {
+        setProcessingDrafts([]);
+        return;
+      }
+
+      setIsLoadingQueue(true);
+
+      try {
+        const category = activeDraftKind.toUpperCase();
+        const response = await fetch(`/api/uploaded-documents?category=${category}`);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.message ?? "Gagal mendapatkan barisan pemprosesan.");
+        }
+
+        setProcessingDrafts(result.data?.documents ?? []);
+      } catch (error) {
+        setProcessingError(
+          error instanceof Error
+            ? error.message
+            : "Gagal mendapatkan barisan pemprosesan.",
+        );
+        setProcessingDrafts([]);
+      } finally {
+        setIsLoadingQueue(false);
+      }
+    }
+
+    void loadProcessingDrafts();
+  }, [activeDraftKind]);
 
   function handleChooseFile() {
     fileInputRef.current?.click();
@@ -141,7 +115,7 @@ export default function MuatNaikPage() {
       const apiBaseUrl =
         process.env.NEXT_PUBLIC_AI_SERVICE_URL ?? "http://127.0.0.1:8000";
       const extractKind = reviewRoutes[activeCategory];
-      const response = await fetch(`${apiBaseUrl}/extract/${extractKind}`, {
+      const response = await fetch(`${apiBaseUrl}/extract/${extractKind}?limit=10`, {
         method: "POST",
         body: formData,
       });
@@ -154,6 +128,30 @@ export default function MuatNaikPage() {
       }
 
       const extractedData = await response.json();
+      const saveResponse = await fetch("/api/uploaded-documents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          kind: extractKind,
+          fileName: selectedFile.name,
+          fileType: selectedFile.type || selectedFile.name.split(".").pop() || "file",
+          fileSize: selectedFile.size,
+          extractResult: extractedData as ExtractResult,
+        }),
+      });
+      const saveResult = await saveResponse.json();
+
+      if (!saveResponse.ok || !saveResult.data?.document) {
+        throw new Error(
+          saveResult?.message ?? "Gagal menyimpan dokumen ke pangkalan data.",
+        );
+      }
+
+      const draft = saveResult.data.document as ProcessingDraft;
+      setProcessingDrafts((currentDrafts) => [draft, ...currentDrafts]);
+      sessionStorage.setItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY, draft.id);
       sessionStorage.setItem(`${extractKind}ExtractResult`, JSON.stringify(extractedData));
       sessionStorage.setItem(`${extractKind}ExtractFileName`, selectedFile.name);
       router.push(`${ROUTES.muatNaik}/semakan/${extractKind}`);
@@ -167,6 +165,40 @@ export default function MuatNaikPage() {
     } finally {
       setIsProcessing(false);
     }
+  }
+
+  function handleContinueDraft(draft: ProcessingDraft) {
+    sessionStorage.setItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY, draft.id);
+    sessionStorage.setItem(
+      `${draft.kind}ExtractResult`,
+      JSON.stringify(draft.extractResult),
+    );
+    sessionStorage.setItem(`${draft.kind}ExtractFileName`, draft.fileName);
+    router.push(`${ROUTES.muatNaik}/semakan/${draft.kind}`);
+  }
+
+  async function handleDeleteDraft(draftId: string) {
+    const response = await fetch(`/api/uploaded-documents/${draftId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      setProcessingError(result?.message ?? "Gagal memadam dokumen.");
+      return;
+    }
+
+    setProcessingDrafts((currentDrafts) =>
+      currentDrafts.filter((draft) => draft.id !== draftId),
+    );
+  }
+
+  function getDraftIcon(draft: ProcessingDraft) {
+    return draft.fileName.toLowerCase().endsWith(".pdf") ? "picture_as_pdf" : "table";
+  }
+
+  function getDraftTone(draft: ProcessingDraft) {
+    return draft.fileName.toLowerCase().endsWith(".pdf") ? "red" : "green";
   }
 
   return (
@@ -283,30 +315,49 @@ export default function MuatNaikPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EEF1F7] text-xs">
-                {activeRows.map((row) => (
-                  <tr key={row.name} className="h-14.5">
+                {isLoadingQueue ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
+                    >
+                      Memuatkan barisan pemprosesan...
+                    </td>
+                  </tr>
+                ) : activeRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
+                    >
+                      Tiada fail {activeCategory.toLowerCase()} sedang menunggu.
+                    </td>
+                  </tr>
+                ) : (
+                  activeRows.map((row) => (
+                  <tr key={row.id} className="h-14.5">
                     <td className="px-6 py-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <span
                           className={[
                             "flex h-7 w-7 shrink-0 items-center justify-center rounded",
-                            row.tone === "green"
+                            getDraftTone(row) === "green"
                               ? "bg-[#EAF8EF] text-green"
                               : "bg-[#FFF0F0] text-red",
                           ].join(" ")}
                         >
-                          <Icon icon={row.icon} size={16} filled weight={600} />
+                          <Icon icon={getDraftIcon(row)} size={16} filled weight={600} />
                         </span>
                         <span className="truncate font-extrabold text-[#172033]">
-                          {row.name}
+                          {row.fileName}
                         </span>
                       </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-[#3B465A]">
-                      {row.uploader}
+                      {row.uploadedBy}
                     </td>
                     <td className="px-5 py-4 font-medium text-[#3B465A]">
-                      {row.time}
+                      {formatDraftDateTime(row.uploadedAt)}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center gap-5">
@@ -314,6 +365,7 @@ export default function MuatNaikPage() {
                           type="button"
                           className="text-dark-blue transition hover:text-[#2D367D]"
                           title="Lihat"
+                          onClick={() => handleContinueDraft(row)}
                         >
                           <Icon icon="visibility" size={18} weight={600} />
                         </button>
@@ -321,13 +373,14 @@ export default function MuatNaikPage() {
                           type="button"
                           className="text-red transition hover:text-[#8F1111]"
                           title="Padam"
+                          onClick={() => handleDeleteDraft(row.id)}
                         >
                           <Icon icon="delete" size={18} weight={600} />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

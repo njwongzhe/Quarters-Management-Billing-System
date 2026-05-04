@@ -11,9 +11,11 @@ import {
 export default function BayaranReviewTable({
   records,
   onTotalAmountChange,
+  onRecordsChange,
 }: {
   records: ExtractedBayaranRecord[];
   onTotalAmountChange?: (totalAmount: string) => void;
+  onRecordsChange?: (records: ExtractedBayaranRecord[], totalAmount: string) => void;
 }) {
   const initialRows = records.map((record, index) => ({
     ...record,
@@ -36,6 +38,25 @@ export default function BayaranReviewTable({
 
   const calculateTotalAmount = (rows: typeof draftRows) =>
     rows.reduce((total, row) => total + (Number(row.amaunRm) || 0), 0).toFixed(2);
+  const stripRowIds = (rows: typeof draftRows): ExtractedBayaranRecord[] =>
+    rows.map((row) => ({
+      paymentId: row.paymentId,
+      residentId: row.residentId,
+      residentRecordStatus: row.residentRecordStatus,
+      page: row.page,
+      jabatanCode: row.jabatanCode,
+      jabatanName: row.jabatanName,
+      ptjpkCode: row.ptjpkCode,
+      ptjpkName: row.ptjpkName,
+      bil: row.bil,
+      noRujukan: row.noRujukan,
+      noGajiNoKp: row.noGajiNoKp,
+      nama: row.nama,
+      amaunRm: row.amaunRm,
+      tarikh: row.tarikh,
+      noResit: row.noResit,
+      catatan: row.catatan,
+    }));
 
   const updateDraft = (id: string, field: "amaunRm" | "catatan", value: string) => {
     setDraftRows((currentRows) =>
@@ -56,7 +77,9 @@ export default function BayaranReviewTable({
         const nextRows = currentRows.map((row) =>
           row.id === id ? { ...row, ...draft } : row,
         );
-        onTotalAmountChange?.(calculateTotalAmount(nextRows));
+        const totalAmount = calculateTotalAmount(nextRows);
+        onTotalAmountChange?.(totalAmount);
+        onRecordsChange?.(stripRowIds(nextRows), totalAmount);
         return nextRows;
       },
     );
@@ -71,7 +94,9 @@ export default function BayaranReviewTable({
     const id = pendingDeleteId;
     setSavedRows((currentRows) => {
       const nextRows = currentRows.filter((row) => row.id !== id);
-      onTotalAmountChange?.(calculateTotalAmount(nextRows));
+      const totalAmount = calculateTotalAmount(nextRows);
+      onTotalAmountChange?.(totalAmount);
+      onRecordsChange?.(stripRowIds(nextRows), totalAmount);
       return nextRows;
     });
     setDraftRows((currentRows) => currentRows.filter((row) => row.id !== id));

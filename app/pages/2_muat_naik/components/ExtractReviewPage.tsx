@@ -1,18 +1,22 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 import Icon from "../../../components/Icon";
+import { ROUTES } from "../../../constants/routes";
 import BayaranReviewTable from "./BayaranReviewTable";
 import KuartersReviewTable from "./KuartersReviewTable";
 import PenghuniReviewTable from "./PenghuniReviewTable";
 import TunggakanReviewTable from "./TunggakanReviewTable";
+import {
+  CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY,
+} from "./extract-review-shared";
 import type {
   BayaranExtractResult,
   ExtractedPenghuniRecord,
   ExtractedQuarterRecord,
   ExtractedBayaranRecord,
-  KuartersExtractResult,
-  PenghuniExtractResult,
+  ExtractResult,
 } from "./extract-review-shared";
 
 export type ReviewKind = "bayaran" | "tunggakan" | "penghuni" | "kuarters";
@@ -164,12 +168,17 @@ function ReviewTable({
   kind,
   bayaranRecords,
   onBayaranTotalAmountChange,
+  onBayaranRecordsChange,
   penghuniRecords,
   kuartersRecords,
 }: {
   kind: ReviewKind;
   bayaranRecords: ExtractedBayaranRecord[];
   onBayaranTotalAmountChange?: (totalAmount: string) => void;
+  onBayaranRecordsChange?: (
+    records: ExtractedBayaranRecord[],
+    totalAmount: string,
+  ) => void;
   penghuniRecords: ExtractedPenghuniRecord[];
   kuartersRecords: ExtractedQuarterRecord[];
 }) {
@@ -178,6 +187,7 @@ function ReviewTable({
       <BayaranReviewTable
         records={bayaranRecords}
         onTotalAmountChange={onBayaranTotalAmountChange}
+        onRecordsChange={onBayaranRecordsChange}
       />
     );
   }
@@ -194,9 +204,12 @@ function ReviewTable({
 }
 
 export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
+  const router = useRouter();
   const [bayaranEditedTotalAmount, setBayaranEditedTotalAmount] = useState<
     string | null
   >(null);
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
   const storedExtract = useSyncExternalStore(
     subscribeToSessionStorage,
     () =>
@@ -219,10 +232,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
     }
 
     try {
-      return JSON.parse(storedExtract) as
-        | BayaranExtractResult
-        | PenghuniExtractResult
-        | KuartersExtractResult;
+      return JSON.parse(storedExtract) as ExtractResult;
     } catch {
       return null;
     }
@@ -233,6 +243,81 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
     extractResult?.documentType === "penghuni" ? extractResult : null;
   const kuartersExtract =
     extractResult?.documentType === "kuarters" ? extractResult : null;
+
+  const updateCurrentBayaranDraft = async (
+    records: ExtractedBayaranRecord[],
+    totalAmount: string,
+  ) => {
+    if (!bayaranExtract) {
+      return;
+    }
+
+    const nextExtract: BayaranExtractResult = {
+      ...bayaranExtract,
+      recordCount: records.length,
+      totalAmount,
+      records,
+    };
+    const draftId = window.sessionStorage.getItem(
+      CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY,
+    );
+
+    window.sessionStorage.setItem("bayaranExtractResult", JSON.stringify(nextExtract));
+
+    if (!draftId) {
+      return;
+    }
+
+    await fetch(`/api/uploaded-documents/${draftId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        extractResult: nextExtract,
+      }),
+    });
+  };
+
+  const handleReviewLater = () => {
+    router.push(ROUTES.muatNaik);
+  };
+
+  const handleVerifyData = async () => {
+    const draftId = window.sessionStorage.getItem(
+      CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY,
+    );
+
+    if (!draftId) {
+      setVerificationMessage("Dokumen semakan tidak ditemui.");
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationMessage("");
+
+    try {
+      const response = await fetch(`/api/uploaded-documents/${draftId}/verify`, {
+        method: "POST",
+      });
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(result?.message ?? "Gagal mengesahkan data.");
+      }
+
+      window.sessionStorage.removeItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY);
+      window.sessionStorage.removeItem(`${kind}ExtractResult`);
+      window.sessionStorage.removeItem(`${kind}ExtractFileName`);
+      router.push(ROUTES.muatNaik);
+    } catch (error) {
+      setVerificationMessage(
+        error instanceof Error ? error.message : "Gagal mengesahkan data.",
+      );
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const content = useMemo(() => {
     const baseContent = reviewContent[kind];
@@ -341,7 +426,11 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
             </div>
           </div>
 
-          <button className="inline-flex h-11 items-center justify-center gap-2 rounded border border-[#E1E5EF] bg-white px-6 text-xs font-extrabold text-[#344054] shadow-sm">
+          <button
+            type="button"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded border border-[#E1E5EF] bg-white px-6 text-xs font-extrabold text-[#344054] shadow-sm"
+            onClick={handleReviewLater}
+          >
             <Icon icon="history" size={16} weight={600} />
             Semak Nanti
           </button>
@@ -366,6 +455,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
               kind={kind}
               bayaranRecords={bayaranExtract?.records ?? []}
               onBayaranTotalAmountChange={setBayaranEditedTotalAmount}
+              onBayaranRecordsChange={updateCurrentBayaranDraft}
               penghuniRecords={penghuniExtract?.records ?? []}
               kuartersRecords={kuartersExtract?.records ?? []}
             />
@@ -379,16 +469,31 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
           </button>
 
           <div className="flex flex-wrap gap-3">
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded bg-dark-blue px-7 text-xs font-extrabold text-white shadow-sm">
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded bg-dark-blue px-7 text-xs font-extrabold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-[#6B7280]"
+              onClick={handleVerifyData}
+              disabled={isVerifying}
+            >
               <Icon icon="settings_backup_restore" size={15} weight={700} />
-              Sahkan Data
+              {isVerifying ? "Mengesahkan..." : "Sahkan Data"}
             </button>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded bg-green px-7 text-xs font-extrabold text-white shadow-sm">
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded bg-green px-7 text-xs font-extrabold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-[#6B7280]"
+              onClick={handleVerifyData}
+              disabled={isVerifying}
+            >
               <Icon icon="done_all" size={15} weight={700} />
-              Sahkan Semua Data
+              {isVerifying ? "Mengesahkan..." : "Sahkan Semua Data"}
             </button>
           </div>
         </div>
+        {verificationMessage ? (
+          <p className="text-right text-xs font-bold text-red">
+            {verificationMessage}
+          </p>
+        ) : null}
       </div>
     </section>
   );

@@ -50,9 +50,10 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id, unitId } = await context.params;
 
   try {
-    const unit = await prisma.unit.findUnique({
+    const unit = await prisma.unit.findFirst({
       where: {
         id: unitId,
+        recordStatus: "VERIFIED",
       },
       include: quarterUnitDetailsInclude,
     });

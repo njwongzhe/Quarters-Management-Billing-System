@@ -24,9 +24,10 @@ async function getInitialKuartersCategoryDetailData(id: string): Promise<{
   isNotFound: boolean;
 }> {
   try {
-    const QuarterCategory = await prisma.quarterCategory.findUnique({
+    const QuarterCategory = await prisma.quarterCategory.findFirst({
       where: {
         id,
+        recordStatus: "VERIFIED",
       },
       include: QuarterCategoryUnitsDetailInclude,
     });

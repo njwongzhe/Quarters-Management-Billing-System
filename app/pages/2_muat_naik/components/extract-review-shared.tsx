@@ -50,6 +50,9 @@ export type KuartersExtractResult = {
 };
 
 export type ExtractedBayaranRecord = {
+  paymentId?: string;
+  residentId?: string;
+  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
   page: number;
   jabatanCode: string;
   jabatanName: string;
@@ -72,6 +75,40 @@ export type BayaranExtractResult = {
   paymentMonth: string;
   records: ExtractedBayaranRecord[];
 };
+
+export type ExtractResult =
+  | BayaranExtractResult
+  | PenghuniExtractResult
+  | KuartersExtractResult;
+
+export type ProcessingDraft = {
+  id: string;
+  kind: "bayaran" | "penghuni" | "kuarters";
+  fileName: string;
+  fileType: string;
+  fileSize?: number;
+  uploadedBy: string;
+  uploadedAt: string;
+  extractResult: ExtractResult;
+};
+
+export const CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY = "currentExtractDraftId";
+
+export function formatDraftDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleString("ms-MY", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export const sampleResidents = [
   {

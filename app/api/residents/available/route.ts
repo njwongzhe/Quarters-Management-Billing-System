@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const residents = await prisma.resident.findMany({
       where: {
         status: "AKTIF",
+        recordStatus: "VERIFIED",
         occupancies: {
           none: {
             status: "CURRENT",
