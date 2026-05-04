@@ -45,7 +45,7 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
 
 	// Overall Form Validity
 	// Form is valid if all individual validations pass.
-	const isFormValid = isNameValid && isPasswordValid && isPasswordMatch && isEmailValid && isOtpValid && isOtpSent;
+	const isRegisterAllowed = isNameValid && isPasswordValid && isPasswordMatch && isEmailValid && isOtpValid && isOtpSent;
 
 	// Loading State
 	const isLoading = isSendingOtp || isVerifyingOtp;
@@ -97,7 +97,7 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
 			return;
 		}
 
-		if (!isFormValid) {
+		if (!isRegisterAllowed) {
 			showMessage("error", "Sila lengkapkan semua butiran dengan betul.");
 			return;
 		}
@@ -348,7 +348,7 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
 		                        type="submit"
 		                        className={`
 		                            flex justify-center font-bold text-white bg-dark-blue rounded-lg p-2
-		                            ${!isFormValid || isLoading ? "opacity-50 cursor-not-allowed" : "hover:scale-[0.98] active:scale-[0.96]"}
+		                            ${!isRegisterAllowed || isLoading ? "opacity-50 cursor-not-allowed" : "hover:scale-[0.98] active:scale-[0.96]"}
 		                        `}
 		                        disabled={isLoading}
 		                    >
