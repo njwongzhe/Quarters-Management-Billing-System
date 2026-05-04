@@ -10,6 +10,11 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const uploadedDocumentTransactionOptions = {
+  maxWait: 30000,
+  timeout: 300000,
+};
+
 type RouteContext = {
   params: Promise<{
     id: string;
@@ -182,10 +187,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           },
         });
       },
-      {
-        maxWait: 10000,
-        timeout: 60000,
-      },
+      uploadedDocumentTransactionOptions,
     );
 
     return NextResponse.json({
@@ -241,10 +243,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
           where: { id },
         });
       },
-      {
-        maxWait: 10000,
-        timeout: 60000,
-      },
+      uploadedDocumentTransactionOptions,
     );
 
     return NextResponse.json({

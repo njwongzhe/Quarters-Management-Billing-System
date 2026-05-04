@@ -40,7 +40,7 @@ export const SHELL_ROUTE_PREFIXES = [ROUTES.muatNaik, ROUTES.kuarters] as const;
 export const SIDEBAR_ROUTES = [
   { href: ROUTES.lamanUtama, label: "Laman Utama", icon: "home" },
   { href: ROUTES.muatNaik, label: "Muat Naik", icon: "upload" },
-  { href: ROUTES.bayaran, label: "Bayaran", icon: "payment" },
+  { href: ROUTES.bayaran, label: "Semakan Bayaran", icon: "payment" },
   { href: ROUTES.tunggakan, label: "Tunggakan", icon: "warning" },
   { href: ROUTES.transaksi, label: "Transaksi", icon: "receipt" },
   { href: ROUTES.penghuni, label: "Pengurusan Penghuni", icon: "group" },

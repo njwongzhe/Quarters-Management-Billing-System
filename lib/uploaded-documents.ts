@@ -90,6 +90,26 @@ export function getBayaranPaymentDate(paymentMonth: string) {
   return new Date(Date.UTC(year, monthIndex, 1));
 }
 
+async function findResidentByIcNumber(
+  tx: Prisma.TransactionClient,
+  icNumber: string,
+) {
+  const residents = await tx.$queryRaw<
+    { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
+  >`
+    SELECT "id", "recordStatus"
+    FROM "Resident"
+    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
+      regexp_replace(${icNumber}, '\\D', '', 'g')
+    ORDER BY
+      CASE WHEN "icNumber" = ${icNumber} THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return residents[0] ?? null;
+}
+
 export async function createPendingBayaranRows(
   tx: Prisma.TransactionClient,
   uploadedDocumentId: string,
@@ -104,11 +124,7 @@ export async function createPendingBayaranRows(
 
   for (const record of extractResult.records) {
     const icNumber = record.noGajiNoKp.trim();
-    const resident = await tx.resident.findUnique({
-      where: {
-        icNumber,
-      },
-    });
+    const resident = await findResidentByIcNumber(tx, icNumber);
     let residentId = resident?.id;
     let residentRecordStatus = resident?.recordStatus;
 
@@ -163,15 +179,7 @@ export async function createPendingTunggakanRows(
 
   for (const record of extractResult.records) {
     const icNumber = record.noKadPengenalan.trim();
-    const existingResident = await tx.resident.findUnique({
-      where: {
-        icNumber,
-      },
-      select: {
-        id: true,
-        recordStatus: true,
-      },
-    });
+    const existingResident = await findResidentByIcNumber(tx, icNumber);
 
     let residentId = existingResident?.id;
     let residentRecordStatus = existingResident?.recordStatus;
@@ -234,15 +242,7 @@ export async function createPendingPenghuniRows(
 
   for (const record of extractResult.records) {
     const icNumber = record.noKadPengenalan.trim();
-    const existingResident = await tx.resident.findUnique({
-      where: {
-        icNumber,
-      },
-      select: {
-        id: true,
-        recordStatus: true,
-      },
-    });
+    const existingResident = await findResidentByIcNumber(tx, icNumber);
 
     let residentId = existingResident?.id;
     let residentRecordStatus = existingResident?.recordStatus;
@@ -262,6 +262,45 @@ export async function createPendingPenghuniRows(
       residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
     }
 
+    const unitId = await findUnitIdForPenghuniRecord(tx, record.kuarters, record.unit);
+
+    if (unitId) {
+      await tx.$executeRaw`
+        UPDATE "UnitOccupancy"
+        SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
+        WHERE "residentId" = ${residentId}::uuid
+          AND "status" = 'CURRENT'::"OccupancyStatus"
+          AND "unitId" <> ${unitId}::uuid
+      `;
+
+      await tx.$executeRaw`
+        INSERT INTO "UnitOccupancy"
+          ("id", "residentId", "unitId", "moveInDate", "status", "description", "createdAt", "updatedAt")
+        SELECT
+          ${randomUUID()}::uuid,
+          ${residentId}::uuid,
+          ${unitId}::uuid,
+          ${parsePenghuniMoveInDate(record.tarikhMasuk ?? "")},
+          'CURRENT'::"OccupancyStatus",
+          ${"Dicipta daripada dokumen penghuni."},
+          NOW(),
+          NOW()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM "UnitOccupancy"
+          WHERE "residentId" = ${residentId}::uuid
+            AND "unitId" = ${unitId}::uuid
+            AND "status" = 'CURRENT'::"OccupancyStatus"
+        )
+      `;
+
+      await tx.$executeRaw`
+        UPDATE "Unit"
+        SET "status" = 'OCCUPIED'::"UnitStatus", "updatedAt" = NOW()
+        WHERE "id" = ${unitId}::uuid
+      `;
+    }
+
     enrichedRecords.push({
       ...record,
       residentId,
@@ -273,6 +312,51 @@ export async function createPendingPenghuniRows(
     ...extractResult,
     records: enrichedRecords,
   };
+}
+
+async function findUnitIdForPenghuniRecord(
+  tx: Prisma.TransactionClient,
+  kuarters: string,
+  unit: string,
+) {
+  const normalizedUnit = unit.trim();
+  const normalizedKuarters = kuarters.trim();
+
+  if (!normalizedUnit) {
+    return "";
+  }
+
+  const units = await tx.$queryRaw<{ id: string }[]>`
+    SELECT u."id"
+    FROM "Unit" u
+    INNER JOIN "QuarterCategory" qc
+      ON qc."id" = u."categoryId"
+    WHERE UPPER(TRIM(u."unitCode")) = UPPER(TRIM(${normalizedUnit}))
+      AND (
+        ${normalizedKuarters} = ''
+        OR UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${normalizedKuarters}))
+        OR UPPER(TRIM(qc."address")) = UPPER(TRIM(${normalizedKuarters}))
+      )
+    ORDER BY
+      CASE
+        WHEN UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${normalizedKuarters})) THEN 0
+        WHEN UPPER(TRIM(qc."address")) = UPPER(TRIM(${normalizedKuarters})) THEN 1
+        ELSE 2
+      END
+    LIMIT 1
+  `;
+
+  return units[0]?.id ?? "";
+}
+
+function parsePenghuniMoveInDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date();
+  }
+
+  return date;
 }
 
 export async function createPendingKuartersRows(

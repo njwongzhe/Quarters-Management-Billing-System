@@ -111,7 +111,7 @@ export default function MuatNaikPage() {
       const apiBaseUrl =
         process.env.NEXT_PUBLIC_AI_SERVICE_URL ?? "http://127.0.0.1:8000";
       const extractKind = reviewRoutes[activeCategory];
-      const response = await fetch(`${apiBaseUrl}/extract/${extractKind}?limit=10`, {
+      const response = await fetch(`${apiBaseUrl}/extract/${extractKind}`, {
         method: "POST",
         body: formData,
       });

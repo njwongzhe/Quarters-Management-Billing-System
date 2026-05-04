@@ -11,6 +11,10 @@ export type ExtractedPenghuniRecord = {
   perhubungan: string;
   pekerjaan: string;
   jabatan: string;
+  tarikhMasuk?: string;
+  tarikhKeluar?: string;
+  sewaBulanan?: string;
+  catatan?: string;
   sourceSheet: string;
   sourceRow: number;
 };

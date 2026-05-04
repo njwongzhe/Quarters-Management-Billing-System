@@ -14,6 +14,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const documentCategories = ["BAYARAN", "TUNGGAKAN", "PENGHUNI", "KUARTERS"] as const;
+const uploadedDocumentTransactionOptions = {
+  maxWait: 30000,
+  timeout: 300000,
+};
 
 export async function GET(request: Request) {
   try {
@@ -137,10 +141,7 @@ export async function POST(request: Request) {
           },
         });
       },
-      {
-        maxWait: 10000,
-        timeout: 60000,
-      },
+      uploadedDocumentTransactionOptions,
     );
 
     return NextResponse.json({
