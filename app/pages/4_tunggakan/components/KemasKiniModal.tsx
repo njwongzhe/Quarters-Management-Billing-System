@@ -49,16 +49,42 @@ export default function KemasKiniModal({ isOpen, onClose, selectedCount }: Kemas
     setState(prev => prev.map(item => (item.id === id ? { ...item, [field]: value } : item)));
   };
 
-  const handleSave = () => {
-    // This is where you would format the data and POST to the /api/tunggakan endpoint
-    console.log("Saving records for", selectedCount, "residents");
-    onClose();
+  const handleSave = async () => {
+    try {
+      const response = await fetch("/api/tunggakan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          residentIds: [], // <-- You will need to pass the actual selectedIds down as a prop to this Modal!
+          cajSenggaraEnabled,
+          cajTambahan,
+          rebat
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.ok) {
+        alert(data.message); // You can replace this with a nice toast notification component later
+        return;
+      }
+
+      alert(data.message); // Success!
+      onClose(); // Close the modal
+      
+      // In a real app, you would now trigger a refresh of the main table data here.
+
+    } catch (error) {
+      alert("Ralat tidak dijangka berlaku. Sila cuba lagi.");
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       {/* Modal Container */}
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* --- MODAL HEADER --- */}
         <div className="bg-dark-blue px-8 py-6 flex justify-between items-start text-white">
@@ -74,7 +100,7 @@ export default function KemasKiniModal({ isOpen, onClose, selectedCount }: Kemas
         </div>
 
         {/* --- MODAL BODY --- */}
-        <div className="p-8 overflow-y-auto flex-1 space-y-10">
+        <div className="p-6 overflow-y-auto flex-1 space-y-10">
           
           {/* Perincian Kewangan */}
           <section>

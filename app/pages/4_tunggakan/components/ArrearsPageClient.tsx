@@ -4,6 +4,7 @@ import { useState } from "react";
 import Icon from "../../../components/Icon";
 import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears";
 import KemasKiniModal from "./KemasKiniModal";
+import ButiranTunggakanModal from "./ButiranTunggakanModal";
 
 // --- MOCK DATA (Matches your Figma Screenshot exactly) ---
 const mockSummary: TunggakanSummary = {
@@ -22,6 +23,7 @@ export default function TunggakanPageClient() {
   // HOOKS MUST BE INSIDE THE COMPONENT
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewResidentId, setViewResidentId] = useState<string | null>(null);
 
   // Helper to format currency accurately to RM
   const formatRM = (value: number) => {
@@ -163,7 +165,10 @@ export default function TunggakanPageClient() {
                     {row.jumlahTunggakan.toFixed(2)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <button className="text-dark-blue hover:bg-blue-50 p-2 rounded-full transition-colors">
+                    <button 
+                      onClick={() => setViewResidentId(row.id)}
+                      className="text-dark-blue hover:bg-blue-50 p-2 rounded-full transition-colors"
+                    >
                       <Icon icon="eye" size={20} />
                     </button>
                   </td>
@@ -206,6 +211,12 @@ export default function TunggakanPageClient() {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         selectedCount={selectedIds.length} 
+      />
+      
+      <ButiranTunggakanModal
+        isOpen={viewResidentId !== null}
+        onClose={() => setViewResidentId(null)}
+        residentId={viewResidentId}
       />
     </div>
   );
