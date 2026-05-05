@@ -94,35 +94,34 @@ type ParseFailure = {
 
 export function mapTunggakanForApi(
   resident: Resident & {
-      // Include UnitOccupancy base fields, plus the nested unit and class
       occupancies: (UnitOccupancy & { unit: Unit & { quarterCategory: QuarterCategory } })[];
       monthlyCharges: (MonthlyCharge & { additionalCharges: AdditionalCharge[], rebates: Rebate[] })[];
   }
 ): TunggakanListItem {
   
-  // Get active unit details (TypeScript now knows 'status' exists!)
   const activeOccupancy = resident.occupancies.find(o => o.status === "CURRENT");
-const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "Tiada";
+  const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "Tiada";
   const unitCode = activeOccupancy?.unit.unitCode || "Tiada";
 
-  // Calculate live sums
   let sewa = 0;
   let senggara = 0;
   let penalti = 0;
   let tambahan = 0;
   let rebat = 0;
+  let bayaran = 0; // <-- 1. ADD THIS VARIABLE TO TRACK PAYMENTS
 
   resident.monthlyCharges.forEach(charge => {
       sewa += Number(charge.rentalAmount);
       senggara += Number(charge.maintenanceAmount);
       penalti += Number(charge.penaltyAmount);
+      bayaran += Number(charge.paymentReceived); // <-- 2. ADD UP ALL PAYMENTS RECEIVED
       
       charge.additionalCharges.forEach(add => { tambahan += Number(add.amount) });
       charge.rebates.forEach(r => { rebat += Number(r.amount) });
   });
 
-  // Calculate total: (Charges + Tambahan) - Rebat
-  const jumlahTunggakan = (sewa + senggara + penalti + tambahan) - rebat;
+  // 3. SUBTRACT PAYMENTS FROM THE FINAL CALCULATION
+  const jumlahTunggakan = (sewa + senggara + penalti + tambahan) - rebat - bayaran;
 
   return {
       id: resident.id,
