@@ -1,31 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "../../../components/Icon";
-import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears";
+import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears"; // Make sure this path is correct!
 import KemasKiniModal from "./KemasKiniModal";
 import ButiranTunggakanModal from "./ButiranTunggakanModal";
 
-// --- MOCK DATA (Matches your Figma Screenshot exactly) ---
-const mockSummary: TunggakanSummary = {
-  jumlahRekod: 24500.0,
-  jumlahTunggakan: 1200.0,
-};
-
-const mockData: TunggakanListItem[] = [
-  { id: "1", fullName: "Ahmad Ali bin Razak", icNumber: "858412-01-5543", quarterClass: "PPR Kempas", unitCode: "Blok B-04-12", sewa: 150.0, senggara: 0.0, penalti: 0.0, tambahan: 0.0, rebat: 0.0, jumlahTunggakan: 0.0 },
-  { id: "2", fullName: "Siti Aminah binti Kassim", icNumber: "920101-01-6622", quarterClass: "Kuarters Desa Bakti", unitCode: "Blok C-10-05", sewa: 150.0, senggara: 0.0, penalti: 0.0, tambahan: 0.0, rebat: 0.0, jumlahTunggakan: 150.0 },
-  { id: "3", fullName: "Tan Ah Kow", icNumber: "780514-01-3311", quarterClass: "Flat Larkin", unitCode: "Blok A-02-01", sewa: 150.0, senggara: 100.0, penalti: 50.0, tambahan: 0.0, rebat: 50.0, jumlahTunggakan: 300.0 },
-  { id: "4", fullName: "Ramasamy a/l Muniandy", icNumber: "661028-01-9987", quarterClass: "Kuarters Uda Utama", unitCode: "Blok D-01-15", sewa: 150.0, senggara: 250.0, penalti: 50.0, tambahan: 50.0, rebat: 0.0, jumlahTunggakan: 450.0 },
-];
-
 export default function TunggakanPageClient() {
-  // HOOKS MUST BE INSIDE THE COMPONENT
+  // --- STATE MANAGEMENT ---
+  const [data, setData] = useState<TunggakanListItem[]>([]);
+  const [summary, setSummary] = useState<TunggakanSummary>({ jumlahRekod: 0, jumlahTunggakan: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isKemasKiniModalOpen, setIsKemasKiniModalOpen] = useState(false);
   const [viewResidentId, setViewResidentId] = useState<string | null>(null);
 
-  // Helper to format currency accurately to RM
+  // --- DATA FETCHING ---
+  const fetchTunggakanData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/arrear");
+      const result = await response.json();
+
+      if (result.ok) {
+        setData(result.data);
+        setSummary(result.summary);
+      } else {
+        console.error("API Error:", result.message);
+        // You could add a toast error notification here later
+      }
+    } catch (error) {
+      console.error("Failed to fetch tunggakan data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Run the fetch function exactly once when the page loads
+  useEffect(() => {
+    fetchTunggakanData();
+  }, []);
+
+  // --- HANDLERS ---
   const formatRM = (value: number) => {
     return new Intl.NumberFormat("en-MY", {
       style: "currency",
@@ -36,7 +53,7 @@ export default function TunggakanPageClient() {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(mockData.map((row) => row.id));
+      setSelectedIds(data.map((row) => row.id));
     } else {
       setSelectedIds([]);
     }
@@ -65,7 +82,7 @@ export default function TunggakanPageClient() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <p className="text-sm text-grey font-medium mb-2">Jumlah Rekod</p>
           <h2 className="text-3xl font-bold text-dark-blue mb-4">
-            {formatRM(mockSummary.jumlahRekod)}
+            {isLoading ? "RM 0.00" : formatRM(summary.jumlahRekod)}
           </h2>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-dark-blue"></span>
@@ -76,7 +93,7 @@ export default function TunggakanPageClient() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <p className="text-sm text-grey font-medium mb-2">Jumlah Tunggakan</p>
           <h2 className="text-3xl font-bold text-dark-blue mb-4">
-            {formatRM(mockSummary.jumlahTunggakan)}
+            {isLoading ? "RM 0.00" : formatRM(summary.jumlahTunggakan)}
           </h2>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-(--color-red)"></span>
@@ -94,10 +111,10 @@ export default function TunggakanPageClient() {
             <p className="text-sm text-grey mt-1">Klik pada ikon kemaskini untuk mengubah maklumat unit.</p>
           </div>
           <div className="flex gap-4">
-            <button className="p-2 hover:bg-gray-200 rounded text-grey">
+            <button className="p-2 hover:bg-gray-200 rounded text-grey transition-colors">
               <Icon icon="download" size={20} />
             </button>
-            <button className="p-2 hover:bg-gray-200 rounded text-grey">
+            <button className="p-2 hover:bg-gray-200 rounded text-grey transition-colors">
               <Icon icon="filter" size={20} />
             </button>
           </div>
@@ -113,7 +130,8 @@ export default function TunggakanPageClient() {
                     type="checkbox"
                     className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
                     onChange={handleSelectAll}
-                    checked={selectedIds.length === mockData.length && mockData.length > 0}
+                    checked={selectedIds.length === data.length && data.length > 0 && !isLoading}
+                    disabled={isLoading || data.length === 0}
                   />
                 </th>
                 <th className="px-6 py-4">PENGHUNI</th>
@@ -128,52 +146,69 @@ export default function TunggakanPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {mockData.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
-                      checked={selectedIds.includes(row.id)}
-                      onChange={() => handleSelectRow(row.id)}
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-dark-grey">{row.fullName}</div>
-                    <div className="text-xs text-light-grey mt-1">{row.icNumber}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-dark-grey">{row.quarterClass}</div>
-                    <div className="text-xs text-light-grey mt-1">{row.unitCode}</div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                    {row.sewa.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                    {row.senggara.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                    {row.penalti.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                    {row.tambahan.toFixed(2)}
-                  </td>
-                  <td className={`px-6 py-4 text-right font-bold ${row.rebat > 0 ? "text-(--color-green)" : "text-dark-grey"}`}>
-                    {row.rebat.toFixed(2)}
-                  </td>
-                  <td className={`px-6 py-4 text-right font-bold ${row.jumlahTunggakan > 0 ? "text-(--color-red)" : "text-dark-grey"}`}>
-                    {row.jumlahTunggakan.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button 
-                      onClick={() => setViewResidentId(row.id)}
-                      className="text-dark-blue hover:bg-blue-50 p-2 rounded-full transition-colors"
-                    >
-                      <Icon icon="eye" size={20} />
-                    </button>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={10} className="px-6 py-12 text-center text-grey">
+                    <div className="flex flex-col items-center gap-2">
+                      <Icon icon="search" size={32} className="animate-pulse text-light-grey" />
+                      <span>Sedang memuatkan maklumat tunggakan...</span>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : data.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-6 py-12 text-center text-grey">
+                    Tiada rekod tunggakan ditemui.
+                  </td>
+                </tr>
+              ) : (
+                data.map((row) => (
+                  <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
+                        checked={selectedIds.includes(row.id)}
+                        onChange={() => handleSelectRow(row.id)}
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-dark-grey">{row.fullName}</div>
+                      <div className="text-xs text-light-grey mt-1">{row.icNumber}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-dark-grey">{row.quarterClass}</div>
+                      <div className="text-xs text-light-grey mt-1">{row.unitCode}</div>
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                      {row.sewa.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                      {row.senggara.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                      {row.penalti.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                      {row.tambahan.toFixed(2)}
+                    </td>
+                    <td className={`px-6 py-4 text-right font-bold ${row.rebat > 0 ? "text-(--color-green)" : "text-dark-grey"}`}>
+                      {row.rebat.toFixed(2)}
+                    </td>
+                    <td className={`px-6 py-4 text-right font-bold ${row.jumlahTunggakan > 0 ? "text-(--color-red)" : "text-dark-grey"}`}>
+                      {row.jumlahTunggakan.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button 
+                        onClick={() => setViewResidentId(row.id)}
+                        className="text-dark-blue hover:bg-blue-50 p-2 rounded-full transition-colors"
+                      >
+                        <Icon icon="eye" size={20} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -190,15 +225,15 @@ export default function TunggakanPageClient() {
             <button className="px-3 py-1 border rounded hover:bg-gray-50">&gt;</button>
           </div>
           <div>
-            Menunjukkan <span className="font-bold">1-10</span> Daripada <span className="font-bold">1,248</span> Rekod
+            Menunjukkan <span className="font-bold">1-{Math.min(10, data.length)}</span> Daripada <span className="font-bold">{data.length}</span> Rekod
           </div>
         </div>
       </div>
 
-      {/* --- FLOATING 'KEMAS KINI' BUTTON (Active when rows are selected) --- */}
-      <div className={`fixed bottom-8 right-8 transition-opacity duration-200 ${selectedIds.length > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      {/* --- FLOATING 'KEMAS KINI' BUTTON --- */}
+      <div className={`fixed bottom-8 right-8 transition-opacity duration-200 ${selectedIds.length > 0 ? 'opacity-100 z-40' : 'opacity-0 pointer-events-none'}`}>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => setIsKemasKiniModalOpen(true)}
           className="flex items-center gap-2 bg-dark-blue text-white px-6 py-3 rounded-lg shadow-lg font-bold hover:bg-opacity-90 transition-all"
         >
           <Icon icon="edit" size={20} />
@@ -208,15 +243,19 @@ export default function TunggakanPageClient() {
 
       {/* --- KEMAS KINI MODAL --- */}
       <KemasKiniModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isKemasKiniModalOpen} 
+        onClose={() => {
+          setIsKemasKiniModalOpen(false);
+          // Optional: You can call fetchTunggakanData() here so the table refreshes after they save!
+        }} 
         selectedCount={selectedIds.length} 
       />
-      
-      <ButiranTunggakanModal
-        isOpen={viewResidentId !== null}
-        onClose={() => setViewResidentId(null)}
-        residentId={viewResidentId}
+
+      {/* --- BUTIRAN TUNGGAKAN MODAL --- */}
+      <ButiranTunggakanModal 
+        isOpen={viewResidentId !== null} 
+        onClose={() => setViewResidentId(null)} 
+        residentId={viewResidentId} 
       />
     </div>
   );
