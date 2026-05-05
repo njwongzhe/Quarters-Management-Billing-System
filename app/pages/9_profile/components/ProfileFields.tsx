@@ -92,7 +92,7 @@ export function ProfileSegmentedField({
                 key={option.value}
                 type="button"
                 className={[
-                  "inline-flex items-center justify-center gap-1.5 rounded-[2px] px-2 text-[11px] font-extrabold transition",
+                  "inline-flex items-center justify-center gap-1.5 rounded-xs px-2 text-[11px] font-extrabold transition",
                   active
                     ? "border border-dark-blue bg-dark-blue text-white shadow-[0_3px_8px_rgba(21,30,102,0.18)]"
                     : "border border-[#E1E6F2] bg-white/45 text-[#667085] hover:bg-white hover:text-dark-blue",
