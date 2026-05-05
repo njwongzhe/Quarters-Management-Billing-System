@@ -73,7 +73,9 @@ export default function AuditLogTablePanel({
                 <AuditHeader className="w-[18%]">Tarikh & Masa</AuditHeader>
                 <AuditHeader className="w-[16%]">Pengendali</AuditHeader>
                 <AuditHeader className="w-[18%]">Modul</AuditHeader>
-                <AuditHeader className="w-[18%]">Jenis Tindakan</AuditHeader>
+                <AuditHeader className="w-[18%] text-center">
+                  Jenis Tindakan
+                </AuditHeader>
                 <AuditHeader className="w-[20%]">Sasaran Data</AuditHeader>
                 <AuditHeader className="w-[10%] text-center">
                   Butiran
@@ -87,7 +89,7 @@ export default function AuditLogTablePanel({
                     <AuditCell>{row.timestampLabel}</AuditCell>
                     <AuditCell strong>{row.actor}</AuditCell>
                     <AuditCell>{row.module}</AuditCell>
-                    <AuditCell>
+                    <AuditCell className="text-center">
                       <AuditActionBadge actionType={row.actionType} />
                     </AuditCell>
                     <AuditCell strong>{row.target}</AuditCell>
