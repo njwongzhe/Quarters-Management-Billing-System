@@ -100,13 +100,20 @@ export default function ButiranTunggakanModal({ isOpen, onClose, residentId }: B
         </div>
 
         {/* Body */}
-        <div className="p-8 overflow-y-auto flex-1 bg-[#F8FAFC] relative">
+        <div className="p-8 overflow-y-auto flex-1 bg-[#F8FAFC] relative min-h-75">
           
           {/* LOADING STATE */}
           {isLoading && (
             <div className="absolute inset-0 z-10 bg-[#F8FAFC]/80 backdrop-blur-sm flex flex-col items-center justify-center text-dark-blue">
-              <Icon icon="search" size={32} className="animate-pulse mb-3" />
-              <p className="text-sm font-bold animate-pulse uppercase tracking-widest">Menarik Rekod Penghuni...</p>
+              <Icon
+                icon="progress_activity"
+                size={48}
+                className="animate-spin text-dark-blue mb-3"
+              />
+                <p className="text-sm font-bold text-dark-blue uppercase tracking-widest animate-pulse">
+                Menarik Rekod Penghuni...
+                </p>
+                <p className="text-xs text-light-grey mt-1">Sila tunggu sebentar</p>
             </div>
           )}
 

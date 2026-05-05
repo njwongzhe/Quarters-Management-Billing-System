@@ -15,6 +15,9 @@ export default function TunggakanPageClient() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isKemasKiniModalOpen, setIsKemasKiniModalOpen] = useState(false);
   const [viewResidentId, setViewResidentId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState("");
+  const ITEMS_PER_PAGE = 5;
 
   // --- DATA FETCHING ---
   const fetchTunggakanData = async () => {
@@ -26,6 +29,7 @@ export default function TunggakanPageClient() {
       if (result.ok) {
         setData(result.data);
         setSummary(result.summary);
+        setCurrentPage(1);
       } else {
         console.error("API Error:", result.message);
         // You could add a toast error notification here later
@@ -49,6 +53,29 @@ export default function TunggakanPageClient() {
       currency: "MYR",
       minimumFractionDigits: 2,
     }).format(value).replace("MYR", "RM");
+  };
+
+  const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
+  const paginatedData = data.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handlePageInputSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const parsed = parseInt(pageInput);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
+        setCurrentPage(parsed);
+      }
+      setPageInput("");
+    }
+  };
+
+  const getPageNumbers = (): (number | "...")[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
+    if (currentPage >= totalPages - 3) return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,9 +176,16 @@ export default function TunggakanPageClient() {
               {isLoading ? (
                 <tr>
                   <td colSpan={10} className="px-6 py-12 text-center text-grey">
-                    <div className="flex flex-col items-center gap-2">
-                      <Icon icon="search" size={32} className="animate-pulse text-light-grey" />
-                      <span>Sedang memuatkan maklumat tunggakan...</span>
+                    <div className="flex flex-col items-center gap-3">
+                      <Icon
+                        icon="progress_activity"
+                        size={40}
+                        className="animate-spin text-dark-blue"
+                      />
+                      <p className="text-sm font-bold text-dark-blue uppercase tracking-widest animate-pulse">
+                        Sedang Memuatkan...
+                      </p>
+                      <p className="text-xs text-light-grey">Menarik senarai tunggakan dari pelayan</p>
                     </div>
                   </td>
                 </tr>
@@ -162,7 +196,7 @@ export default function TunggakanPageClient() {
                   </td>
                 </tr>
               ) : (
-                data.map((row) => (
+                paginatedData.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <input
@@ -214,20 +248,73 @@ export default function TunggakanPageClient() {
         </div>
 
         {/* Pagination Bar */}
-        <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-grey">
-          <div className="flex gap-1">
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">&lt;</button>
-            <button className="px-3 py-1 border rounded bg-dark-blue text-white">1</button>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">2</button>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">3</button>
-            <span className="px-3 py-1">...</span>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">125</button>
-            <button className="px-3 py-1 border rounded hover:bg-gray-50">&gt;</button>
+        {!isLoading && data.length > 0 && (
+          <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-grey">
+            <div className="flex items-center gap-1">
+              {/* Prev */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &lt;
+              </button>
+
+              {/* Page Numbers */}
+              {getPageNumbers().map((page, idx) =>
+                page === "..." ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 py-1 text-grey">...</span>
+                ) : (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page as number)}
+                    className={`px-3 py-1 border rounded transition-colors ${
+                      currentPage === page
+                        ? "bg-dark-blue text-white border-dark-blue"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              )}
+
+              {/* Next */}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &gt;
+              </button>
+
+              {/* Jump to page input — only shown if more than 1 page */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2 ml-3 pl-3 border-l border-gray-200">
+                  <span className="text-xs text-grey">Ke halaman:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={pageInput}
+                    onChange={(e) => setPageInput(e.target.value)}
+                    onKeyDown={handlePageInputSubmit}
+                    placeholder={String(currentPage)}
+                    className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-dark-blue"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              Menunjukkan{" "}
+              <span className="font-bold">
+                {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, data.length)}
+              </span>{" "}
+              Daripada <span className="font-bold">{data.length}</span> Rekod
+            </div>
           </div>
-          <div>
-            Menunjukkan <span className="font-bold">1-{Math.min(10, data.length)}</span> Daripada <span className="font-bold">{data.length}</span> Rekod
-          </div>
-        </div>
+        )}
       </div>
 
       {/* --- FLOATING 'KEMAS KINI' BUTTON --- */}
