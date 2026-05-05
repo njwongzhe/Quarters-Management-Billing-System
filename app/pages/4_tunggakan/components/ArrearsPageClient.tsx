@@ -462,6 +462,7 @@ export default function TunggakanPageClient() {
           // Optional: You can call fetchTunggakanData() here so the table refreshes after they save!
         }} 
         selectedCount={selectedIds.length} 
+        selectedIds={selectedIds}
       />
       {/* --- FILTER PANEL --- */}
       <TunggakanFilterPanel
