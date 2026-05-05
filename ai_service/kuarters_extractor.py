@@ -47,7 +47,13 @@ QUARTER_HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "kadarDenda": ("KADAR DENDA", "DENDA", "PENALTI", "PENALTY"),
 }
 
-QUARTER_REQUIRED_FIELDS = ("kategoriKawasan", "noRumahNoUnit")
+QUARTER_CONTEXT_FIELDS = (
+    "kategoriKawasan",
+    "alamatKuarters",
+    "sewaBulanan",
+    "senggara",
+    "kadarDenda",
+)
 
 
 @dataclass
@@ -111,15 +117,21 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
         current_rental = ""
         current_maintenance = ""
         current_penalty = ""
+        sheet_category_name = _sheet_category_name(sheet["name"])
 
         for row_offset, row in enumerate(
             sheet["rows"][header_index + 1 :],
             start=header_index + 2,
         ):
             kawasan = get_cell(row, header_map, "kategoriKawasan")
+            address = _quarter_address(
+                kawasan,
+                get_cell(row, header_map, "alamatKuarters"),
+                sheet_category_name,
+            )
             unit_code = normalize_unit(get_cell(row, header_map, "noRumahNoUnit"))
 
-            if not kawasan or not unit_code or _is_summary_unit(unit_code):
+            if not unit_code or _is_summary_unit(unit_code):
                 continue
 
             rental = normalize_fee(get_cell(row, header_map, "sewaBulanan"))
@@ -138,9 +150,13 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
                 unit_code,
                 maintenance_options,
             )
-            category_name = _quarter_category_name(kawasan, selected_label)
+            category_name = _quarter_category_name(
+                sheet_category_name or kawasan or address,
+                selected_label,
+            )
             category_id = _category_id(
                 category_name,
+                address,
                 current_rental,
                 selected_maintenance,
                 current_penalty,
@@ -150,7 +166,7 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
                 categories[category_id] = ExtractedQuarterCategory(
                     id=category_id,
                     categoryName=category_name,
-                    kawasan=kawasan,
+                    kawasan=address,
                     typeLabel=selected_label,
                     rentalPrice=current_rental,
                     maintenancePrice=selected_maintenance,
@@ -163,7 +179,7 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
             categories[category_id].units.append(
                 ExtractedQuarterUnit(
                     unitCode=unit_code,
-                    address=get_cell(row, header_map, "alamatKuarters"),
+                    address=get_cell(row, header_map, "alamatKuarters") or kawasan,
                     sourceSheet=sheet["name"],
                     sourceRow=row_offset,
                 )
@@ -181,7 +197,9 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
 def _find_quarter_header_row(rows: list[list[str]]) -> int | None:
     for index, row in enumerate(rows):
         header_map = build_header_map_for(row, QUARTER_HEADER_ALIASES)
-        if all(field in header_map for field in QUARTER_REQUIRED_FIELDS):
+        if "noRumahNoUnit" in header_map and any(
+            field in header_map for field in QUARTER_CONTEXT_FIELDS
+        ):
             return index
     return None
 
@@ -259,13 +277,31 @@ def _quarter_category_name(kawasan: str, type_label: str) -> str:
     return f"{kawasan} - {type_label}"
 
 
+def _sheet_category_name(sheet_name: str) -> str:
+    value = re.sub(r"\s+", " ", sheet_name).strip()
+    if re.fullmatch(r"sheet\s*\d+", value, flags=re.IGNORECASE):
+        return ""
+    return value
+
+
+def _quarter_address(kawasan: str, address: str, category_name: str) -> str:
+    for value in (kawasan, address):
+        normalized_value = re.sub(r"\s+", " ", value).strip()
+        if normalized_value and clean_header(normalized_value) != clean_header(category_name):
+            return normalized_value
+    return ""
+
+
 def _category_id(
     category_name: str,
+    address: str,
     rental_price: str,
     maintenance_price: str,
     penalty_price: str,
 ) -> str:
-    raw_key = "|".join([category_name, rental_price, maintenance_price, penalty_price])
+    raw_key = "|".join(
+        [category_name, address, rental_price, maintenance_price, penalty_price]
+    )
     return re.sub(r"[^a-z0-9]+", "-", raw_key.lower()).strip("-")
 
 

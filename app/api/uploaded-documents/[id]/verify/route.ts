@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  applyVerifiedPenghuniOccupancy,
+  parseExtractResult,
+} from "@/lib/uploaded-documents";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -23,6 +27,24 @@ export async function POST(_request: Request, context: RouteContext) {
 
     await prisma.$transaction(
       async (tx) => {
+        const document = await tx.uploadedDocument.findUnique({
+          where: { id },
+          select: {
+            remark: true,
+            recordStatus: true,
+          },
+        });
+
+        if (!document) {
+          throw new Error("Dokumen tidak ditemui.");
+        }
+
+        if (document.recordStatus !== "PENDING") {
+          throw new Error("Dokumen ini sudah diproses.");
+        }
+
+        const extractResult = parseExtractResult(document.remark);
+
         await tx.$executeRaw`
           UPDATE "Resident"
           SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
@@ -53,6 +75,9 @@ export async function POST(_request: Request, context: RouteContext) {
           WHERE "uploadedDocumentId" = ${id}::uuid
             AND "recordStatus" = 'PENDING'::"RecordStatus"
         `;
+        if (extractResult) {
+          await applyVerifiedPenghuniOccupancy(tx, extractResult);
+        }
         await tx.uploadedDocument.update({
           where: {
             id,

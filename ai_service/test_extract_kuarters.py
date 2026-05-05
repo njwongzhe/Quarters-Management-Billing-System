@@ -111,10 +111,12 @@ def test_extract_kuarters_splits_special_maintenance_types() -> None:
     categories = {record["categoryName"]: record for record in result["records"]}
     assert result["recordCount"] == 4
     assert result["totalUnits"] == 4
-    assert categories["PANGSAPURI PERSIARAN TANJUNG - Type A"]["maintenancePrice"] == "237.5"
-    assert categories["PANGSAPURI PERSIARAN TANJUNG - Type B"]["maintenancePrice"] == "237"
-    assert categories["TAMAN TAMPOI INDAH II - Tingkat 1"]["maintenancePrice"] == "61.6"
-    assert categories["TAMAN TAMPOI INDAH II - Tingkat 2 Type B"]["maintenancePrice"] == "61.6"
+    assert categories["Kuarters Test - Type A"]["kawasan"] == "PANGSAPURI PERSIARAN TANJUNG"
+    assert categories["Kuarters Test - Type A"]["maintenancePrice"] == "237.5"
+    assert categories["Kuarters Test - Type B"]["maintenancePrice"] == "237"
+    assert categories["Kuarters Test - Tingkat 1"]["kawasan"] == "TAMAN TAMPOI INDAH II"
+    assert categories["Kuarters Test - Tingkat 1"]["maintenancePrice"] == "61.6"
+    assert categories["Kuarters Test - Tingkat 2 Type B"]["maintenancePrice"] == "61.6"
 
 
 if __name__ == "__main__":

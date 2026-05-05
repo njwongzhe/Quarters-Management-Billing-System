@@ -262,45 +262,6 @@ export async function createPendingPenghuniRows(
       residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
     }
 
-    const unitId = await findUnitIdForPenghuniRecord(tx, record.kuarters, record.unit);
-
-    if (unitId) {
-      await tx.$executeRaw`
-        UPDATE "UnitOccupancy"
-        SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
-        WHERE "residentId" = ${residentId}::uuid
-          AND "status" = 'CURRENT'::"OccupancyStatus"
-          AND "unitId" <> ${unitId}::uuid
-      `;
-
-      await tx.$executeRaw`
-        INSERT INTO "UnitOccupancy"
-          ("id", "residentId", "unitId", "moveInDate", "status", "description", "createdAt", "updatedAt")
-        SELECT
-          ${randomUUID()}::uuid,
-          ${residentId}::uuid,
-          ${unitId}::uuid,
-          ${parsePenghuniMoveInDate(record.tarikhMasuk ?? "")},
-          'CURRENT'::"OccupancyStatus",
-          ${"Dicipta daripada dokumen penghuni."},
-          NOW(),
-          NOW()
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM "UnitOccupancy"
-          WHERE "residentId" = ${residentId}::uuid
-            AND "unitId" = ${unitId}::uuid
-            AND "status" = 'CURRENT'::"OccupancyStatus"
-        )
-      `;
-
-      await tx.$executeRaw`
-        UPDATE "Unit"
-        SET "status" = 'OCCUPIED'::"UnitStatus", "updatedAt" = NOW()
-        WHERE "id" = ${unitId}::uuid
-      `;
-    }
-
     enrichedRecords.push({
       ...record,
       residentId,
@@ -312,6 +273,129 @@ export async function createPendingPenghuniRows(
     ...extractResult,
     records: enrichedRecords,
   };
+}
+
+export async function applyVerifiedPenghuniOccupancy(
+  tx: Prisma.TransactionClient,
+  extractResult: ExtractResult,
+) {
+  if (extractResult.documentType !== "penghuni") {
+    return;
+  }
+
+  const touchedUnitIds = new Set<string>();
+
+  for (const record of extractResult.records) {
+    const residentId =
+      "residentId" in record && typeof record.residentId === "string"
+        ? record.residentId
+        : "";
+    const icNumber = record.noKadPengenalan.trim();
+    const resolvedResidentId = await findVerifiedResidentIdForPenghuniRecord(
+      tx,
+      residentId,
+      icNumber,
+    );
+
+    if (!resolvedResidentId) {
+      continue;
+    }
+
+    const unitId = await findUnitIdForPenghuniRecord(tx, record.kuarters, record.unit);
+
+    if (!unitId) {
+      continue;
+    }
+
+    touchedUnitIds.add(unitId);
+
+    await tx.$executeRaw`
+      UPDATE "UnitOccupancy"
+      SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
+      WHERE "residentId" = ${resolvedResidentId}::uuid
+        AND "status" = 'CURRENT'::"OccupancyStatus"
+        AND "unitId" <> ${unitId}::uuid
+    `;
+
+    await tx.$executeRaw`
+      UPDATE "UnitOccupancy"
+      SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
+      WHERE "unitId" = ${unitId}::uuid
+        AND "residentId" <> ${resolvedResidentId}::uuid
+        AND "status" = 'CURRENT'::"OccupancyStatus"
+    `;
+
+    await tx.$executeRaw`
+      INSERT INTO "UnitOccupancy"
+        ("id", "residentId", "unitId", "moveInDate", "status", "description", "createdAt", "updatedAt")
+      SELECT
+        ${randomUUID()}::uuid,
+        ${resolvedResidentId}::uuid,
+        ${unitId}::uuid,
+        ${parsePenghuniMoveInDate(record.tarikhMasuk ?? "")},
+        'CURRENT'::"OccupancyStatus",
+        ${"Dicipta selepas pengesahan dokumen penghuni."},
+        NOW(),
+        NOW()
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM "UnitOccupancy"
+        WHERE "residentId" = ${resolvedResidentId}::uuid
+          AND "unitId" = ${unitId}::uuid
+          AND "status" = 'CURRENT'::"OccupancyStatus"
+      )
+    `;
+  }
+
+  for (const unitId of touchedUnitIds) {
+    await tx.$executeRaw`
+      UPDATE "Unit"
+      SET "status" = 'OCCUPIED'::"UnitStatus", "updatedAt" = NOW()
+      WHERE "id" = ${unitId}::uuid
+        AND "recordStatus" = 'VERIFIED'::"RecordStatus"
+    `;
+  }
+}
+
+async function findVerifiedResidentIdForPenghuniRecord(
+  tx: Prisma.TransactionClient,
+  residentId: string,
+  icNumber: string,
+) {
+  if (residentId) {
+    const residents = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id"
+      FROM "Resident"
+      WHERE "id" = ${residentId}::uuid
+        AND "recordStatus" = 'VERIFIED'::"RecordStatus"
+      LIMIT 1
+    `;
+
+    if (residents[0]?.id) {
+      return residents[0].id;
+    }
+  }
+
+  return findVerifiedResidentIdByIcNumber(tx, icNumber);
+}
+
+async function findVerifiedResidentIdByIcNumber(
+  tx: Prisma.TransactionClient,
+  icNumber: string,
+) {
+  const residents = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "Resident"
+    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
+      regexp_replace(${icNumber}, '\\D', '', 'g')
+      AND "recordStatus" = 'VERIFIED'::"RecordStatus"
+    ORDER BY
+      CASE WHEN "icNumber" = ${icNumber} THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return residents[0]?.id ?? "";
 }
 
 async function findUnitIdForPenghuniRecord(
@@ -332,6 +416,8 @@ async function findUnitIdForPenghuniRecord(
     INNER JOIN "QuarterCategory" qc
       ON qc."id" = u."categoryId"
     WHERE UPPER(TRIM(u."unitCode")) = UPPER(TRIM(${normalizedUnit}))
+      AND u."recordStatus" = 'VERIFIED'::"RecordStatus"
+      AND qc."recordStatus" = 'VERIFIED'::"RecordStatus"
       AND (
         ${normalizedKuarters} = ''
         OR UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${normalizedKuarters}))
@@ -372,15 +458,30 @@ export async function createPendingKuartersRows(
 
   for (const record of extractResult.records) {
     const categoryId = randomUUID();
+    const categoryAddress = record.kawasan || null;
     const createdCategories = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO "QuarterCategory"
         ("id", "categoryName", "address", "rentalPrice", "maintenancePrice", "penaltyPrice", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
       VALUES
-        (${categoryId}::uuid, ${record.categoryName}, ${record.kawasan || null}, ${record.rentalPrice || "0"}::numeric, ${record.maintenancePrice || "0"}::numeric, ${record.penaltyPrice || "0"}::numeric, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
+        (${categoryId}::uuid, ${record.categoryName}, ${categoryAddress}, ${record.rentalPrice || "0"}::numeric, ${record.maintenancePrice || "0"}::numeric, ${record.penaltyPrice || "0"}::numeric, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
       ON CONFLICT ("categoryName", "address") DO NOTHING
       RETURNING "id"
     `;
-    const resolvedCategoryId = createdCategories[0]?.id;
+    let resolvedCategoryId = createdCategories[0]?.id;
+
+    if (!resolvedCategoryId) {
+      const existingCategories = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id"
+        FROM "QuarterCategory"
+        WHERE "categoryName" = ${record.categoryName}
+          AND "address" IS NOT DISTINCT FROM ${categoryAddress}
+        ORDER BY
+          CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
+          "createdAt" ASC
+        LIMIT 1
+      `;
+      resolvedCategoryId = existingCategories[0]?.id;
+    }
 
     if (!resolvedCategoryId) {
       enrichedRecords.push(record);
@@ -399,10 +500,25 @@ export async function createPendingKuartersRows(
         ON CONFLICT ("categoryId", "unitCode") DO NOTHING
         RETURNING "id"
       `;
+      let resolvedUnitId = createdUnits[0]?.id;
+
+      if (!resolvedUnitId) {
+        const existingUnits = await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id"
+          FROM "Unit"
+          WHERE "categoryId" = ${resolvedCategoryId}::uuid
+            AND "unitCode" = ${unit.unitCode}
+          ORDER BY
+            CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
+            "createdAt" ASC
+          LIMIT 1
+        `;
+        resolvedUnitId = existingUnits[0]?.id;
+      }
 
       enrichedUnits.push({
         ...unit,
-        unitId: createdUnits[0]?.id ?? "",
+        unitId: resolvedUnitId ?? "",
       });
     }
 
