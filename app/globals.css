@@ -19,6 +19,7 @@ body {
   --font--sans: "Inter", sans-serif; /* Default Font (Inter) */
 
   --color-background: #F8F9FF; /* Light Gray Background of every page. */
+  --color-blur-background: rgba(0, 0, 0, 0.7); /* Blur background color for overlay windows. */
 
   --color-dark-grey: #1E2738;  /* Dark Grey text, sidebar background.*/
   --color-light-grey: #94A3B8; /* Grey text & icon at sidebar. */
@@ -40,6 +41,7 @@ body {
 
   /* Status Bayaran & Penghuni */
   --color-x-lengkap: #9333EA;
+  --color-keluar: #464651;
 
   /* Status Transaksi */
   --color-normal: #CFFAFE;
