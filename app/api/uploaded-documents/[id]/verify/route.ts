@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getCurrentAdmin } from "@/lib/current-admin";
+import {
+  applyVerifiedPenghuniOccupancy,
+  parseExtractResult,
+} from "@/lib/uploaded-documents";
 import type { ExtractResult } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 import type {
   ExtractedBayaranRecord,
