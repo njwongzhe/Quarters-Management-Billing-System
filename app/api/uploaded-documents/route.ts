@@ -8,6 +8,8 @@ import {
   documentCategoryForKind,
   mapUploadedDocumentForQueue,
 } from "@/lib/uploaded-documents";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -73,6 +75,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     const body = await request.json();
     const { kind, fileName, fileType, fileSize, extractResult } = body ?? {};
 
@@ -125,7 +128,7 @@ export async function POST(request: Request) {
           penghuniExtractResult,
         );
 
-        return tx.uploadedDocument.update({
+        const updatedDocument = await tx.uploadedDocument.update({
           where: {
             id: createdDocument.id,
           },
@@ -140,6 +143,16 @@ export async function POST(request: Request) {
             },
           },
         });
+
+        await createAuditLog(tx, {
+          actor: currentAdmin,
+          moduleName: "Muat Naik",
+          targetData: `${documentCategoryForKind(kind)} / ${fileName}`,
+          actionType: "IMPORT_EXTRACT",
+          description: `Muat naik dokumen ${documentCategoryForKind(kind)}: ${fileName}.`,
+        });
+
+        return updatedDocument;
       },
       uploadedDocumentTransactionOptions,
     );

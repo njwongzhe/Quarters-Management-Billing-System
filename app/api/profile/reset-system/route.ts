@@ -58,13 +58,13 @@ export async function POST(request: Request) {
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
         INSERT INTO "AuditLog"
-          ("userId", "userName", "moduleName", "pageName", "actionType", "description")
+          ("userId", "userName", "moduleName", "targetData", "actionType", "description")
         VALUES
           (
             ${currentAdmin.profile.id}::uuid,
             ${currentAdmin.profile.fullName},
             ${"Profil"},
-            ${"Sistem Set Semula"},
+            ${"Data operasi sistem"},
             ${"DELETE"}::"AuditActionType",
             ${"Admin menjalankan set semula sistem."}
           )

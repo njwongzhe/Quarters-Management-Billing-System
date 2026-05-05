@@ -5,6 +5,8 @@ import {
   getBayaranPaymentDate,
   mapUploadedDocumentForQueue,
 } from "@/lib/uploaded-documents";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -62,6 +64,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     const { id } = await context.params;
     const body = await request.json();
     const { extractResult } = body ?? {};
@@ -173,7 +176,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           }
         }
 
-        return tx.uploadedDocument.update({
+        const updatedDocument = await tx.uploadedDocument.update({
           where: { id },
           data: {
             remark: JSON.stringify(extractResult),
@@ -186,6 +189,16 @@ export async function PATCH(request: Request, context: RouteContext) {
             },
           },
         });
+
+        await createAuditLog(tx, {
+          actor: currentAdmin,
+          moduleName: "Muat Naik",
+          targetData: `${updatedDocument.category} / ${updatedDocument.originalName ?? updatedDocument.fileName}`,
+          actionType: "UPDATE",
+          description: `Mengemaskini draf ekstrak dokumen ${updatedDocument.category}: ${updatedDocument.originalName ?? updatedDocument.fileName}.`,
+        });
+
+        return updatedDocument;
       },
       uploadedDocumentTransactionOptions,
     );
@@ -210,10 +223,20 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     const { id } = await context.params;
 
     await prisma.$transaction(
       async (tx) => {
+        const document = await tx.uploadedDocument.findUnique({
+          where: { id },
+          select: {
+            category: true,
+            fileName: true,
+            originalName: true,
+          },
+        });
+
         await tx.$executeRaw`
           DELETE FROM "Payment"
           WHERE "uploadedDocumentId" = ${id}::uuid
@@ -241,6 +264,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
         `;
         await tx.uploadedDocument.delete({
           where: { id },
+        });
+
+        await createAuditLog(tx, {
+          actor: currentAdmin,
+          moduleName: "Muat Naik",
+          targetData: `${document?.category ?? "DOKUMEN"} / ${document?.originalName ?? document?.fileName ?? id}`,
+          actionType: "DELETE",
+          description: `Memadam dokumen belum disahkan ${document?.category ?? "DOKUMEN"}: ${document?.originalName ?? document?.fileName ?? id}.`,
         });
       },
       uploadedDocumentTransactionOptions,

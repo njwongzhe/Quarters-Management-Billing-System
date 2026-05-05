@@ -9,6 +9,8 @@ import {
   mapQuarterCategoryForApi,
   parseQuarterCategoryUpdateBody,
 } from "@/lib/quarter-categories";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -44,6 +46,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   let requestedAddress: string | null = null;
 
   try {
+    const currentAdmin = await getCurrentAdmin();
     let body: unknown; // We declare body here so that we can assign it inside the try-catch block where we attempt to parse the JSON. This allows us to handle JSON parsing errors gracefully and return a proper error response if the JSON is invalid.
 
     try {
@@ -162,16 +165,30 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const updatedQuarterCategory = await prisma.quarterCategory.update({
-      where: { id },
-      data: parsedBody.data,
-      include: {
-        _count: {
-          select: {
-            units: true,
+    const updatedQuarterCategory = await prisma.$transaction(async (tx) => {
+      const quarterCategory = await tx.quarterCategory.update({
+        where: { id },
+        data: parsedBody.data,
+        include: {
+          _count: {
+            select: {
+              units: true,
+            },
           },
         },
-      },
+      });
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Kuarters",
+        targetData: `${quarterCategory.categoryName}${quarterCategory.address ? ` / ${quarterCategory.address}` : ""}`,
+        actionType: "UPDATE",
+        entityType: "QUARTER_CATEGORY",
+        entityId: quarterCategory.id,
+        description: `Mengemaskini kategori kuarters ${quarterCategory.categoryName}. Medan berubah: ${changedFields.join(", ")}.`,
+      });
+
+      return quarterCategory;
     });
 
     revalidatePath("/pages/7_kuarters");
@@ -221,6 +238,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
+    const currentAdmin = await getCurrentAdmin();
     const existingQuarterCategory = await prisma.quarterCategory.findUnique({
       where: { id },
       include: {
@@ -262,8 +280,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    await prisma.quarterCategory.delete({
-      where: { id },
+    await prisma.$transaction(async (tx) => {
+      await tx.quarterCategory.delete({
+        where: { id },
+      });
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Kuarters",
+        targetData: `${existingQuarterCategory.categoryName}${existingQuarterCategory.address ? ` / ${existingQuarterCategory.address}` : ""}`,
+        actionType: "DELETE",
+        entityType: "QUARTER_CATEGORY",
+        entityId: existingQuarterCategory.id,
+        description: `Memadam kategori kuarters ${existingQuarterCategory.categoryName}${existingQuarterCategory.address ? ` di ${existingQuarterCategory.address}` : ""}.`,
+      });
     });
 
     revalidatePath("/pages/7_kuarters");

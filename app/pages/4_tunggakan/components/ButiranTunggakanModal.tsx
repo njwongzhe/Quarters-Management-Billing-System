@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Icon from "../../../components/Icon";
+import ToolbarButton from "@/app/components/ToolbarIconButton";
 
 type ButiranTunggakanModalProps = {
   isOpen: boolean;
@@ -228,8 +229,11 @@ export default function ButiranTunggakanModal({ isOpen, onClose, residentId }: B
                   <h3 className="font-bold text-dark-blue text-xs uppercase tracking-wider">Sejarah Tunggakan</h3>
                 </div>
                 <div className="flex gap-4">
-                  <button className="text-grey hover:text-dark-blue transition-colors"><Icon icon="download" size={20} /></button>
-                  <button className="text-grey hover:text-dark-blue transition-colors"><Icon icon="filter" size={20} /></button>
+                  <ToolbarButton
+                    icon="download"
+                    label="Muat turun sejarah tunggakan"
+                  />
+                  <ToolbarButton icon="filter" label="Tapis sejarah tunggakan" />
                 </div>
               </div>
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -18,6 +20,7 @@ type RouteContext = {
 
 export async function POST(_request: Request, context: RouteContext) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     const { id } = await context.params;
     const verifiedAt = new Date();
 
@@ -53,7 +56,7 @@ export async function POST(_request: Request, context: RouteContext) {
           WHERE "uploadedDocumentId" = ${id}::uuid
             AND "recordStatus" = 'PENDING'::"RecordStatus"
         `;
-        await tx.uploadedDocument.update({
+        const document = await tx.uploadedDocument.update({
           where: {
             id,
           },
@@ -61,6 +64,14 @@ export async function POST(_request: Request, context: RouteContext) {
             recordStatus: "VERIFIED",
             verifiedAt,
           },
+        });
+
+        await createAuditLog(tx, {
+          actor: currentAdmin,
+          moduleName: "Muat Naik",
+          targetData: `${document.category} / ${document.originalName ?? document.fileName}`,
+          actionType: "VERIFY",
+          description: `Mengesahkan dokumen ${document.category}: ${document.originalName ?? document.fileName}.`,
         });
       },
       uploadedDocumentTransactionOptions,

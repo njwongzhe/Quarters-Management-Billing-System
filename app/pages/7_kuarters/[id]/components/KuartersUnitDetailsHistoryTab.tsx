@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon";
+import ToolbarButton from "@/app/components/ToolbarIconButton";
 
 import type {
   QuarterUnitDetails,
@@ -30,35 +31,6 @@ function SectionTitle({ children }: { children: string }) {
       <span className="h-6 w-1.5 rounded-sm bg-dark-blue" aria-hidden="true" />
       {children}
     </h4>
-  );
-}
-
-function HistoryActionButton({
-  icon,
-  label,
-  isActive = false,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-        isActive
-          ? "bg-dark-blue text-white"
-          : "text-grey hover:bg-white hover:text-dark-blue"
-      }`}
-      aria-label={label}
-      aria-pressed={isActive}
-      title={label}
-      onClick={onClick}
-    >
-      <Icon icon={icon} size={22} />
-    </button>
   );
 }
 
@@ -172,7 +144,7 @@ export default function KuartersUnitDetailsHistoryTab({
           <SectionTitle>Sejarah Penghunian</SectionTitle>
 
           <div className="flex items-center gap-5 self-end text-grey">
-            <HistoryActionButton
+            <ToolbarButton
               icon={commonIcons.download}
               label="Muat turun sejarah penghunian"
               onClick={() =>
@@ -180,7 +152,7 @@ export default function KuartersUnitDetailsHistoryTab({
               }
             />
             <div ref={filterMenuRef} className="relative">
-              <HistoryActionButton
+              <ToolbarButton
                 icon={commonIcons.filter}
                 label={`Tapis sejarah penghunian: ${getFilterLabel(
                   statusFilter,

@@ -12,6 +12,8 @@ import {
   QuarterCategoryUnitsDetailInclude,
   quarterUnitCurrentOccupancyInclude,
 } from "@/lib/quarter-units";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -88,6 +90,7 @@ export async function POST(request: Request, context: RouteContext) {
   let requestedUnitCode: string | null = null;
 
   try {
+    const currentAdmin = await getCurrentAdmin();
     let body: unknown;
 
     try {
@@ -238,22 +241,36 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
 
-    const createdUnit = await prisma.unit.create({
-      data: {
-        unitCode: parsedBody.data.unitCode,
-        status: resident ? "OCCUPIED" : "VACANT",
-        categoryId: id,
-        occupancies: resident
-          ? {
-              create: {
-                residentId: resident.id,
-                moveInDate: new Date(),
-                status: "CURRENT",
-              },
-            }
-          : undefined,
-      },
-      include: quarterUnitCurrentOccupancyInclude,
+    const createdUnit = await prisma.$transaction(async (tx) => {
+      const unit = await tx.unit.create({
+        data: {
+          unitCode: parsedBody.data.unitCode,
+          status: resident ? "OCCUPIED" : "VACANT",
+          categoryId: id,
+          occupancies: resident
+            ? {
+                create: {
+                  residentId: resident.id,
+                  moveInDate: new Date(),
+                  status: "CURRENT",
+                },
+              }
+            : undefined,
+        },
+        include: quarterUnitCurrentOccupancyInclude,
+      });
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Kuarters",
+        targetData: `${quarterCategory.categoryName} / Unit ${unit.unitCode}`,
+        actionType: "CREATE",
+        entityType: "UNIT",
+        entityId: unit.id,
+        description: `Menambah unit ${unit.unitCode} dalam kategori ${quarterCategory.categoryName}${resident ? ` dan menetapkan penghuni ${resident.fullName}` : ""}.`,
+      });
+
+      return unit;
     });
 
     revalidatePath("/pages/7_kuarters");

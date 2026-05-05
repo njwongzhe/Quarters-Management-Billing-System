@@ -8,6 +8,8 @@ import {
   mapQuarterCategoryForApi,
   parseQuarterCategoryCreateBody,
 } from "@/lib/quarter-categories";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs"; // This API route uses Prisma which is not compatible with the Edge runtime, so we specify that it should run in a Node.js environment.
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
   let requestedAddress: string | null = null;
 
   try {
+    const currentAdmin = await getCurrentAdmin();
     let body: unknown;
 
     try {
@@ -153,15 +156,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const createdQuarterCategory = await prisma.quarterCategory.create({
-      data: parsedBody.data,
-      include: {
-        _count: {
-          select: {
-            units: true,
+    const createdQuarterCategory = await prisma.$transaction(async (tx) => {
+      const quarterCategory = await tx.quarterCategory.create({
+        data: parsedBody.data,
+        include: {
+          _count: {
+            select: {
+              units: true,
+            },
           },
         },
-      },
+      });
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Kuarters",
+        targetData: `${quarterCategory.categoryName}${quarterCategory.address ? ` / ${quarterCategory.address}` : ""}`,
+        actionType: "CREATE",
+        entityType: "QUARTER_CATEGORY",
+        entityId: quarterCategory.id,
+        description: `Menambah kategori kuarters ${quarterCategory.categoryName}${quarterCategory.address ? ` di ${quarterCategory.address}` : ""}.`,
+      });
+
+      return quarterCategory;
     });
 
     revalidatePath("/pages/7_kuarters");

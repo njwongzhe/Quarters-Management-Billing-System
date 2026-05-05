@@ -3,6 +3,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon";
+import ToolbarButton from "@/app/components/ToolbarIconButton";
 import {
   downloadXlsxFile,
   type XlsxCell,
@@ -103,35 +104,6 @@ function PageButton({
       onClick={() => onClick(item)}
     >
       {item}
-    </button>
-  );
-}
-
-function ToolbarButton({
-  icon,
-  label,
-  onClick,
-  isActive = false,
-}: {
-  icon: string;
-  label: string;
-  onClick: () => void;
-  isActive?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={`inline-flex items-center justify-center rounded-lg border p-2 transition-colors ${
-        isActive
-          ? "border-dark-blue bg-dark-blue text-white"
-          : "border-light-grey/20 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
-      }`}
-      aria-label={label}
-      aria-pressed={isActive}
-      onClick={onClick}
-      title={label}
-    >
-      <Icon icon={icon} size={20} />
     </button>
   );
 }

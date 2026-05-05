@@ -15,6 +15,8 @@ import {
   quarterUnitCurrentOccupancyInclude,
   quarterUnitDetailsInclude,
 } from "@/lib/quarter-units";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -97,6 +99,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id, unitId } = await context.params;
 
   try {
+    const currentAdmin = await getCurrentAdmin();
     let body: unknown;
 
     try {
@@ -334,12 +337,24 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
       }
 
-      return tx.unit.findUniqueOrThrow({
+      const unit = await tx.unit.findUniqueOrThrow({
         where: {
           id: unitId,
         },
         include: quarterUnitCurrentOccupancyInclude,
       });
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Kuarters",
+        targetData: `Unit ${unit.unitCode}`,
+        actionType: "UPDATE",
+        entityType: "UNIT",
+        entityId: unit.id,
+        description: `Mengemaskini unit ${unit.unitCode}. Medan berubah: ${changedFields.join(", ")}.`,
+      });
+
+      return unit;
     });
 
     revalidatePath("/pages/7_kuarters");
@@ -385,6 +400,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id, unitId } = await context.params;
 
   try {
+    const currentAdmin = await getCurrentAdmin();
     const existingUnit = await prisma.unit.findUnique({
       where: {
         id: unitId,
@@ -438,10 +454,22 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    await prisma.unit.delete({
-      where: {
-        id: unitId,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.unit.delete({
+        where: {
+          id: unitId,
+        },
+      });
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Kuarters",
+        targetData: `Unit ${existingUnit.unitCode}`,
+        actionType: "DELETE",
+        entityType: "UNIT",
+        entityId: existingUnit.id,
+        description: `Memadam unit kuarters ${existingUnit.unitCode}.`,
+      });
     });
 
     revalidatePath("/pages/7_kuarters");

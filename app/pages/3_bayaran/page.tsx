@@ -1,4 +1,5 @@
 import Icon from "@/app/components/Icon";
+import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
@@ -300,22 +301,8 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                type="button"
-                className="text-[#8C97AA]"
-                aria-label="Muat turun"
-                suppressHydrationWarning
-              >
-                <Icon icon="download" size={17} weight={500} />
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-10 items-center justify-center gap-2 rounded bg-dark-blue px-4 text-xs font-extrabold text-white shadow-[0_6px_12px_rgba(21,30,102,0.22)]"
-                suppressHydrationWarning
-              >
-                <Icon icon="filter_alt" size={16} weight={600} />
-                Penapis
-              </button>
+              <ToolbarButton icon="download" label="Muat turun rekod bayaran" />
+              <ToolbarButton icon="filter" label="Tapis rekod bayaran" />
             </div>
           </div>
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears";
+import { createAuditLog } from "@/lib/audit-logs";
+import { getCurrentAdmin } from "@/lib/current-admin";
 
 export async function GET() {
   try {
@@ -75,6 +77,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     // 1. Parse and Validate the Input Body
     const body = await request.json();
     const parsedData = parseBulkUpdateBody(body);
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
     // We assume the admin making this change is logged in. 
     // In your actual app, you would get this from your Auth session.
     //todo
-    const adminId = undefined; // REPLACE WITH ACTUAL AUTH SESSION ID
+    const adminId = currentAdmin?.profile.id; // Current admin, when the session is available.
 
     // We use the start of the current month as the charge period for these new additions
     const currentMonth = new Date();
@@ -232,6 +235,14 @@ export async function POST(request: Request) {
             }
         });
       }
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Tunggakan",
+        targetData: `${residentIds.length} penghuni`,
+        actionType: "UPDATE",
+        description: `Mengemaskini caj tunggakan secara pukal untuk ${residentIds.length} penghuni.`,
+      });
     });
 
     // 4. Return Success Response

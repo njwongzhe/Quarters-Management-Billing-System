@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { downloadXlsxFile } from "@/lib/xlsx-export";import TunggakanFilterPanel from "./TunggakanFilterPanel";
 import { defaultFilter, type TunggakanFilter } from "@/lib/arrears";import Icon from "../../../components/Icon";
+import ToolbarButton from "@/app/components/ToolbarIconButton";
 import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears"; // Make sure this path is correct!
 import KemasKiniModal from "./KemasKiniModal";
 import ButiranTunggakanModal from "./ButiranTunggakanModal";
@@ -248,25 +249,23 @@ export default function TunggakanPageClient() {
             <p className="text-sm text-grey mt-1">Klik pada ikon kemaskini untuk mengubah maklumat unit.</p>
           </div>
           <div className="flex gap-4">
-            <button
+            <ToolbarButton
+              icon="download"
+              label={
+                activeFilterCount > 0
+                  ? `Eksport ${filteredData.length} rekod ditapis`
+                  : `Eksport semua ${data.length} rekod`
+              }
               onClick={handleExport}
               disabled={isLoading || data.length === 0}
-              title={activeFilterCount > 0 ? `Eksport ${filteredData.length} rekod ditapis` : `Eksport semua ${data.length} rekod`}
-              className="p-2 hover:bg-gray-200 rounded text-grey transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Icon icon="download" size={20} />
-            </button>
-            <button 
+            />
+            <ToolbarButton
+              icon="filter"
+              label="Tapis rekod tunggakan"
               onClick={() => setIsFilterPanelOpen(true)}
-              className={`relative p-2 rounded transition-colors ${activeFilterCount > 0 ? "bg-dark-blue text-white hover:bg-opacity-90" : "hover:bg-gray-200 text-grey"}`}
-            >
-              <Icon icon="filter" size={20} />
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-(--color-red) text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
+              isActive={activeFilterCount > 0}
+              activeBadge={activeFilterCount}
+            />
           </div>
         </div>
 
