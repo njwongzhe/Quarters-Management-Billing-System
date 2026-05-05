@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { buildDiceBearAvatarUrl } from "@/lib/avatar";
+
 import { PROFILE_ROUTES, SIDEBAR_ROUTES } from "../constants/routes"; 
+
+type SidebarProfile = {
+    fullName: string;
+    gender: string | null;
+    sessionLoginAt: string | null;
+};
 
 function isRouteActive(pathname: string, href: string) {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -10,6 +20,42 @@ function isRouteActive(pathname: string, href: string) {
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const [profile, setProfile] = useState<SidebarProfile | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        async function loadProfile() {
+            try {
+                const response = await fetch("/api/profile", {
+                    cache: "no-store",
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    return;
+                }
+
+                if (isMounted) {
+                    setProfile(result.data.profile as SidebarProfile);
+                }
+            } catch {
+                if (isMounted) {
+                    setProfile(null);
+                }
+            }
+        }
+
+        loadProfile();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const profileName = profile?.fullName || "Admin";
+    const avatarUrl = buildDiceBearAvatarUrl(profileName, profile?.gender);
+    const loginTime = formatLoginTime(profile?.sessionLoginAt ?? null);
 
     return (
         <aside className="h-full bg-dark-grey px-4 pt-6 pb-4">
@@ -70,10 +116,15 @@ export default function Sidebar() {
                                             : "text-light-grey hover:bg-white/10 hover:text-white"
                                     }`}
                                 >
-                                    <span className="material-symbols-outlined bg-[#2D367D] text-white rounded-md p-2" style={{ fontSize: "18px" }}>{route.icon}</span>
+                                    <span
+                                        className="h-9 w-9 shrink-0 rounded-md bg-cover bg-center bg-no-repeat ring-1 ring-white/10"
+                                        style={{ backgroundImage: `url("${avatarUrl}")` }}
+                                        aria-label={`Avatar ${profileName}`}
+                                        role="img"
+                                    />
                                     <div className="flex min-w-0 flex-col">
-                                        <span className="truncate text-xs font-bold text-white">Username</span>
-                                        <span className="text-light-grey/80 font-extralight text-[10px]">Log Masuk: ---</span>
+                                        <span className="truncate text-xs font-bold text-white">{profileName}</span>
+                                        <span className="text-light-grey/80 font-extralight text-[10px]">Log Masuk: {loginTime}</span>
                                     </div>
                                 </Link>
                             );
@@ -83,4 +134,25 @@ export default function Sidebar() {
             </nav>
         </aside>
     );
+}
+
+function formatLoginTime(value: string | null) {
+    if (!value) {
+        return "---";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "---";
+    }
+
+    return new Intl.DateTimeFormat("ms-MY", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).format(date);
 }

@@ -90,6 +90,7 @@ model AdminProfile {
   email       String   @unique
   phoneNumber String?
   department  String?
+  gender      String?
   role        String   @default("admin")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
