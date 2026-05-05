@@ -118,7 +118,7 @@ export default function BayaranReviewTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-[#DCE2F1] bg-white">
-      <table className="min-w-[1280px] table-fixed text-left text-xs">
+      <table className="min-w-7xl table-fixed text-left text-xs">
         <thead className="bg-[#F7F9FF] text-[10px] font-extrabold uppercase text-[#667085]">
           <tr>
             <th className="w-14 px-5 py-4">
@@ -168,7 +168,7 @@ export default function BayaranReviewTable({
               <td className="px-4 py-4 font-semibold leading-5 text-[#172033]">
                 {resident.ptjpkName || "-"}
               </td>
-              <td className="px-4 py-4 break-words">{resident.noRujukan || "-"}</td>
+              <td className="px-4 py-4 wrap-break-word">{resident.noRujukan || "-"}</td>
               <td className="px-4 py-4">
                 {isEditing ? (
                   <input
