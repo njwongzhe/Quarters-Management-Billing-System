@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import {
+  buildQuarterUnitCurrentOccupancyInclude,
   buildQuarterUnitDeleteBlockedMessage,
   buildQuarterUnitDeletedMessage,
   buildQuarterUnitDuplicateMessage,
@@ -12,7 +13,6 @@ import {
   mapQuarterUnitDetailsForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitUpdateBody,
-  quarterUnitCurrentOccupancyInclude,
   quarterUnitDetailsInclude,
 } from "@/lib/quarter-units";
 import { createAuditLog } from "@/lib/audit-logs";
@@ -135,7 +135,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         id: unitId,
       },
       include: {
-        ...quarterUnitCurrentOccupancyInclude,
+        ...buildQuarterUnitCurrentOccupancyInclude(),
         quarterCategory: {
           select: {
             id: true,
@@ -159,8 +159,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     const currentOccupancy = existingUnit.occupancies[0];
     const currentOccupantIcNumber = currentOccupancy?.resident.icNumber ?? null;
     const nextUnitCode = parsedBody.data.updates.unitCode ?? existingUnit.unitCode;
-    const changedFields: Array<"unitCode" | "occupant"> = [];
+    const changedFields: Array<
+      "unitCode" | "occupant" | "moveInDate" | "moveOutDate"
+    > = [];
     const unitUpdateData: Prisma.UnitUpdateInput = {};
+    const occupancyUpdateData: Prisma.UnitOccupancyUpdateInput = {};
 
     if (nextUnitCode !== existingUnit.unitCode) {
       const conflictingUnit = await prisma.unit.findFirst({
@@ -238,48 +241,6 @@ export async function PATCH(request: Request, context: RouteContext) {
             );
           }
 
-          const conflictingOccupancy = await prisma.unitOccupancy.findFirst({
-            where: {
-              residentId: nextResident.id,
-              status: "CURRENT",
-              NOT: {
-                unitId,
-              },
-            },
-            include: {
-              unit: {
-                select: {
-                  unitCode: true,
-                  quarterCategory: {
-                    select: {
-                      categoryName: true,
-                    },
-                  },
-                },
-              },
-            },
-          });
-
-          if (conflictingOccupancy) {
-            return NextResponse.json(
-              {
-                success: false,
-                message: buildQuarterUnitOccupancyConflictMessage(
-                  nextResident.fullName,
-                  nextResident.icNumber,
-                  conflictingOccupancy.unit.unitCode,
-                  conflictingOccupancy.unit.quarterCategory.categoryName,
-                ),
-                data: {
-                  unitCode: conflictingOccupancy.unit.unitCode,
-                },
-              },
-              {
-                status: 409,
-              },
-            );
-          }
-
           changedFields.push("occupant");
           shouldReplaceOccupancy = true;
         } else if (existingUnit.status !== "OCCUPIED") {
@@ -290,6 +251,196 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (existingUnit.status !== nextStatus) {
         unitUpdateData.status = nextStatus;
       }
+    }
+
+    if (parsedBody.data.providedFields.moveInDate) {
+      if (!currentOccupancy && !nextResident) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Tarikh masuk hanya boleh dikemas kini selepas penghuni dipilih.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      const nextMoveInDate = parsedBody.data.updates.moveInDate;
+
+      if (
+        nextMoveInDate &&
+        (!currentOccupancy ||
+          nextMoveInDate.getTime() !== currentOccupancy.moveInDate.getTime())
+      ) {
+        changedFields.push("moveInDate");
+        occupancyUpdateData.moveInDate = nextMoveInDate;
+      }
+    }
+
+    if (parsedBody.data.providedFields.moveOutDate) {
+      if (!currentOccupancy && !nextResident) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Tarikh keluar hanya boleh dikemas kini selepas penghuni dipilih.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      const nextMoveOutDate = parsedBody.data.updates.moveOutDate ?? null;
+      const currentMoveOutTime = currentOccupancy?.moveOutDate?.getTime() ?? null;
+      const nextMoveOutTime = nextMoveOutDate?.getTime() ?? null;
+
+      if (nextMoveOutTime !== currentMoveOutTime) {
+        changedFields.push("moveOutDate");
+        occupancyUpdateData.moveOutDate = nextMoveOutDate;
+      }
+    }
+
+    const nextOccupancyMoveInDate =
+      parsedBody.data.updates.moveInDate ??
+      currentOccupancy?.moveInDate ??
+      (nextResident ? new Date() : null);
+    const nextOccupancyMoveOutDate = parsedBody.data.providedFields.moveOutDate
+      ? (parsedBody.data.updates.moveOutDate ?? null)
+      : (currentOccupancy?.moveOutDate ?? null);
+    const nextOccupancyResidentId =
+      nextResident?.id ?? currentOccupancy?.resident.id ?? null;
+    const shouldEndOccupancy = Boolean(nextOccupancyMoveOutDate);
+    const todayStart = getTodayStartInMalaysia();
+
+    if (
+      nextOccupancyMoveInDate &&
+      nextOccupancyMoveInDate.getTime() > todayStart.getTime()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Tarikh masuk tidak boleh selepas hari ini.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (
+      nextOccupancyMoveOutDate &&
+      nextOccupancyMoveOutDate.getTime() > todayStart.getTime()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Tarikh keluar tidak boleh selepas hari ini.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    if (nextOccupancyMoveInDate && nextOccupancyMoveOutDate) {
+      if (nextOccupancyMoveOutDate.getTime() < nextOccupancyMoveInDate.getTime()) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Tarikh keluar tidak boleh lebih awal daripada tarikh masuk.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
+    if (
+      nextOccupancyResidentId &&
+      nextOccupancyMoveInDate &&
+      (parsedBody.data.providedFields.moveInDate ||
+        parsedBody.data.providedFields.moveOutDate ||
+        nextResident)
+    ) {
+      const overlappingResidentOccupancy =
+        await findOverlappingResidentOccupancy({
+          residentId: nextOccupancyResidentId,
+          excludedOccupancyId: nextResident
+            ? null
+            : (currentOccupancy?.id ?? null),
+          moveInDate: nextOccupancyMoveInDate,
+          moveOutDate: nextOccupancyMoveOutDate,
+        });
+
+      if (overlappingResidentOccupancy) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: buildQuarterUnitOccupancyConflictMessage(
+              overlappingResidentOccupancy.resident.fullName,
+              overlappingResidentOccupancy.resident.icNumber,
+              overlappingResidentOccupancy.unit.unitCode,
+              overlappingResidentOccupancy.unit.quarterCategory.categoryName,
+            ),
+            data: {
+              unitCode: overlappingResidentOccupancy.unit.unitCode,
+            },
+          },
+          {
+            status: 409,
+          },
+        );
+      }
+    }
+
+    if (
+      nextOccupancyMoveInDate &&
+      (parsedBody.data.providedFields.moveInDate ||
+        parsedBody.data.providedFields.moveOutDate ||
+        nextResident)
+    ) {
+      const hasOverlappingOccupancy = await hasOverlappingUnitOccupancy({
+        unitId,
+        excludedOccupancyId: nextResident ? null : (currentOccupancy?.id ?? null),
+        moveInDate: nextOccupancyMoveInDate,
+        moveOutDate: nextOccupancyMoveOutDate,
+      });
+
+      if (hasOverlappingOccupancy) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Julat tarikh penghunian bertindih dengan rekod penghunian sedia ada untuk unit ini.",
+          },
+          {
+            status: 409,
+          },
+        );
+      }
+    }
+
+    if (shouldEndOccupancy) {
+      unitUpdateData.status = "VACANT";
+
+      if (currentOccupancy && !shouldReplaceOccupancy) {
+        occupancyUpdateData.status = "PAST";
+
+        if (!changedFields.includes("occupant")) {
+          changedFields.push("occupant");
+        }
+      }
+    } else if (
+      currentOccupancy &&
+      !shouldReplaceOccupancy &&
+      parsedBody.data.providedFields.moveOutDate
+    ) {
+      occupancyUpdateData.status = "CURRENT";
+      unitUpdateData.status = "OCCUPIED";
     }
 
     if (changedFields.length === 0) {
@@ -322,9 +473,23 @@ export async function PATCH(request: Request, context: RouteContext) {
           data: {
             residentId: nextResident.id,
             unitId,
-            moveInDate: new Date(),
-            status: "CURRENT",
+            moveInDate: parsedBody.data.updates.moveInDate ?? new Date(),
+            moveOutDate: parsedBody.data.updates.moveOutDate ?? null,
+            status: shouldEndOccupancy ? "PAST" : "CURRENT",
           },
+        });
+      }
+
+      if (
+        currentOccupancy &&
+        !shouldReplaceOccupancy &&
+        Object.keys(occupancyUpdateData).length > 0
+      ) {
+        await tx.unitOccupancy.update({
+          where: {
+            id: currentOccupancy.id,
+          },
+          data: occupancyUpdateData,
         });
       }
 
@@ -341,7 +506,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         where: {
           id: unitId,
         },
-        include: quarterUnitCurrentOccupancyInclude,
+        include: buildQuarterUnitCurrentOccupancyInclude(),
       });
 
       await createAuditLog(tx, {
@@ -393,6 +558,119 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     );
   }
+}
+
+async function hasOverlappingUnitOccupancy({
+  unitId,
+  excludedOccupancyId,
+  moveInDate,
+  moveOutDate,
+}: {
+  unitId: string;
+  excludedOccupancyId: string | null;
+  moveInDate: Date;
+  moveOutDate: Date | null;
+}) {
+  const overlappingOccupancy = await prisma.unitOccupancy.findFirst({
+    where: {
+      unitId,
+      ...(excludedOccupancyId
+        ? {
+            NOT: {
+              id: excludedOccupancyId,
+            },
+          }
+        : {}),
+      moveInDate: {
+        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
+      },
+      OR: [
+        {
+          moveOutDate: null,
+        },
+        {
+          moveOutDate: {
+            gte: moveInDate,
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(overlappingOccupancy);
+}
+
+async function findOverlappingResidentOccupancy({
+  residentId,
+  excludedOccupancyId,
+  moveInDate,
+  moveOutDate,
+}: {
+  residentId: string;
+  excludedOccupancyId: string | null;
+  moveInDate: Date;
+  moveOutDate: Date | null;
+}) {
+  return prisma.unitOccupancy.findFirst({
+    where: {
+      residentId,
+      ...(excludedOccupancyId
+        ? {
+            NOT: {
+              id: excludedOccupancyId,
+            },
+          }
+        : {}),
+      moveInDate: {
+        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
+      },
+      OR: [
+        {
+          moveOutDate: null,
+        },
+        {
+          moveOutDate: {
+            gte: moveInDate,
+          },
+        },
+      ],
+    },
+    include: {
+      resident: {
+        select: {
+          fullName: true,
+          icNumber: true,
+        },
+      },
+      unit: {
+        select: {
+          unitCode: true,
+          quarterCategory: {
+            select: {
+              categoryName: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+function getTodayStartInMalaysia() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return new Date(`${year}-${month}-${day}T00:00:00.000+08:00`);
 }
 
 // Used to delete a quarter unit, with validations to prevent deletion if the unit has current occupancies or associated monthly charges, and handling of related business logic such as revalidating relevant pages after deletion.

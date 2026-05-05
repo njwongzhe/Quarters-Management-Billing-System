@@ -49,7 +49,7 @@ export default function KuartersFeedbackBanner({
 
     const timeoutId = window.setTimeout(() => {
       onDismissRef.current();
-    }, 5000);
+    }, 8000);
 
     return () => {
       window.clearTimeout(timeoutId);

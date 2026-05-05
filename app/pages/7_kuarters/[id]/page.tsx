@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import {
+  buildQuarterCategoryUnitsDetailInclude,
   mapQuarterCategoryUnitsDetailForApi,
-  QuarterCategoryUnitsDetailInclude,
   type QuarterCategoryUnitsDetail,
 } from "@/lib/quarter-units";
 
@@ -29,7 +29,7 @@ async function getInitialKuartersCategoryDetailData(id: string): Promise<{
         id,
         recordStatus: "VERIFIED",
       },
-      include: QuarterCategoryUnitsDetailInclude,
+      include: buildQuarterCategoryUnitsDetailInclude(),
     });
 
     if (!QuarterCategory) {

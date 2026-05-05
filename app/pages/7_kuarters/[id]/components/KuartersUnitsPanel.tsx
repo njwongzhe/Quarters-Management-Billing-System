@@ -143,6 +143,152 @@ function InputField({
   );
 }
 
+function DatePickerField({
+  value,
+  disabled = false,
+  required = false,
+  minDate,
+  maxDate,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  required?: boolean;
+  minDate?: string;
+  maxDate?: string;
+  onChange: (value: string) => void;
+}) {
+  const initialDate = parseDateInput(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(
+    initialDate ?? startOfDay(new Date()),
+  );
+  const days = buildCalendarDays(visibleMonth);
+
+  useEffect(() => {
+    const nextDate = parseDateInput(value);
+
+    if (nextDate) {
+      setVisibleMonth(nextDate);
+    }
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        className={`flex min-h-10 w-full items-center gap-2 rounded-2xl border bg-white py-2 pl-3 pr-3 text-left text-sm font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_3px_10px_rgba(15,23,42,0.04)] outline-none transition-colors disabled:cursor-not-allowed disabled:bg-background disabled:text-light-grey ${
+          isOpen
+            ? "border-dark-blue text-dark-blue"
+            : "border-light-grey/25 text-dark-grey hover:border-dark-blue/30"
+        }`}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => setIsOpen((currentState) => !currentState)}
+      >
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-xl bg-light-blue text-dark-blue">
+          <Icon icon="calendar_month" size={16} />
+        </span>
+        <span className={value ? "truncate" : "truncate text-grey"}>
+          {value ? formatDatePickerLabel(value) : "Pilih tarikh"}
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute right-0 top-full z-40 mt-2 w-72 rounded-3xl border border-light-grey/20 bg-white p-3 text-left shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+          role="dialog"
+          aria-label="Pilih tarikh penghunian"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
+              aria-label="Bulan sebelumnya"
+              onClick={() =>
+                setVisibleMonth((currentDate) => addMonths(currentDate, -1))
+              }
+            >
+              <Icon icon="chevron_left" size={20} />
+            </button>
+            <div className="text-sm font-extrabold text-dark-grey">
+              {formatMonthLabel(visibleMonth)}
+            </div>
+            <button
+              type="button"
+              className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
+              aria-label="Bulan seterusnya"
+              onClick={() =>
+                setVisibleMonth((currentDate) => addMonths(currentDate, 1))
+              }
+            >
+              <Icon icon="chevron_right" size={20} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-grey">
+            {["A", "I", "S", "R", "K", "J", "S"].map((dayLabel, index) => (
+              <div key={`${dayLabel}-${index}`} className="py-1.5">
+                {dayLabel}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {days.map((day) => {
+              const dateValue = formatDateInput(day.date);
+              const isSelected = dateValue === value;
+              const isVisibleMonth =
+                day.date.getMonth() === visibleMonth.getMonth();
+              const isDisabled = Boolean(
+                (minDate && dateValue < minDate) ||
+                  (maxDate && dateValue > maxDate),
+              );
+
+              return (
+                <button
+                  key={dateValue}
+                  type="button"
+                  disabled={isDisabled}
+                  className={`grid h-9 place-items-center rounded-xl text-sm font-bold transition-colors ${
+                    isDisabled
+                      ? "cursor-not-allowed text-light-grey/60"
+                      : isSelected
+                      ? "bg-dark-blue text-white"
+                      : isVisibleMonth
+                        ? "text-dark-grey hover:bg-light-blue hover:text-dark-blue"
+                        : "text-light-grey hover:bg-light-blue"
+                  }`}
+                  onClick={() => {
+                    onChange(dateValue);
+                    setIsOpen(false);
+                  }}
+                >
+                  {day.date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+
+          {value && !required ? (
+            <button
+              type="button"
+              className="mt-3 w-full rounded-xl border border-light-grey/25 px-3 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue"
+              onClick={() => {
+                onChange("");
+                setIsOpen(false);
+              }}
+            >
+              Kosongkan tarikh
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PickerField({
   value,
   placeholder,
@@ -410,12 +556,16 @@ export default function KuartersUnitsPanel({
       { value: "ID Unit", style: "header" },
       { value: "No. Kad Pengenalan Penghuni", style: "header" },
       { value: "Nama Penghuni", style: "header" },
+      { value: "Tarikh Masuk", style: "header", align: "center" },
+      { value: "Tarikh Keluar", style: "header", align: "center" },
       { value: "Status", style: "header", align: "center" },
     ];
     const rows: XlsxSheet["rows"] = exportUnits.map((unit) => [
       unit.unitCode,
-      unit.occupantIcNumber ?? "N/A",
+      unit.occupantIcNumber ? formatIcNumber(unit.occupantIcNumber) : "N/A",
       unit.occupantName ?? "N/A",
+      { value: formatDisplayDate(unit.moveInDate), align: "center" },
+      { value: formatDisplayDate(unit.moveOutDate), align: "center" },
       {
         value: getStatusFilterLabel(unit.status),
         align: "center",
@@ -431,6 +581,8 @@ export default function KuartersUnitsPanel({
             { width: 18 },
             { width: 30 },
             { width: 38 },
+            { width: 16 },
+            { width: 16 },
             { width: 16 },
           ],
           rows: [headers, ...rows],
@@ -479,11 +631,11 @@ export default function KuartersUnitsPanel({
 
             {isFilterMenuOpen ? (
               <div
-                className="absolute right-0 top-full z-20 mt-2 w-56 rounded-2xl border border-lightGrey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
-                role="menu"
+                className="absolute right-0 top-full z-20 mt-2 w-56 rounded-2xl border border-light-grey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+                role="listbox"
                 aria-label="Tapisan status unit"
               >
-                <div className="border-b border-lightGrey/20 px-3 pb-3 pt-2">
+                <div className="border-b border-light-grey/20 px-3 pb-3 pt-2">
                   <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                     Status Unit
                   </p>
@@ -500,22 +652,20 @@ export default function KuartersUnitsPanel({
                       <button
                         key={option}
                         type="button"
-                        role="menuitemradio"
-                        aria-checked={isSelected}
-                        className={`flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`flex min-h-10 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors ${
                           isSelected
-                            ? "bg-lightBlue/15 text-darkblue"
-                            : "text-darkGrey hover:bg-background"
+                            ? "bg-dark-blue text-white"
+                            : "text-dark-grey hover:bg-light-blue"
                         }`}
                         onClick={() => handleSelectStatusFilter(option)}
                       >
-                        <span>{getStatusFilterLabel(option)}</span>
+                        <span className="truncate">
+                          {getStatusFilterLabel(option)}
+                        </span>
                         {isSelected ? (
-                          <Icon
-                            icon="done"
-                            size={16}
-                            className="text-darkblue"
-                          />
+                          <Icon icon="done" size={16} />
                         ) : null}
                       </button>
                     );
@@ -572,19 +722,25 @@ export default function KuartersUnitsPanel({
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-200 table-fixed border-collapse">
+          <table className="w-full min-w-260 table-fixed border-collapse">
             <thead className="bg-background">
               <tr>
-                <th className="w-[22%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[15%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   ID Unit
                 </th>
-                <th className="w-[28%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[23%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   No. Kad Pengenalan Penghuni
                 </th>
-                <th className="w-[40%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[28%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Nama Penghuni
                 </th>
-                <th className="w-[10%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                <th className="w-[12%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                  Tarikh Masuk
+                </th>
+                <th className="w-[12%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+                  Tarikh Keluar
+                </th>
+                <th className="w-[10%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
                   Tindakan
                 </th>
               </tr>
@@ -611,8 +767,8 @@ export default function KuartersUnitsPanel({
                   </td>
                   <td className="px-6 py-4 align-middle">
                     <PickerField
-                      value={editor.draft.occupantIcNumber}
-                      placeholder="Klik untuk pilih penghuni"
+                      value={formatIcNumber(editor.draft.occupantIcNumber)}
+                      placeholder="Pilih penghuni"
                       disabled={pendingUnitId === EMPTY_QUARTER_UNIT_ID}
                       onClick={onOpenResidentPicker}
                     />
@@ -624,14 +780,24 @@ export default function KuartersUnitsPanel({
                         : "N/A"}
                     </p>
                   </td>
-                  <td className="px-6 py-4 align-middle">{renderCreateActionCell()}</td>
+                  <td className="px-6 py-4 text-center align-middle text-sm font-semibold text-grey">
+                    N/A
+                  </td>
+                  <td className="px-6 py-4 text-center align-middle text-sm font-semibold text-grey">
+                    N/A
+                  </td>
+                  <td className="px-6 py-4 align-middle">
+                    <div className="flex justify-center">
+                      {renderCreateActionCell()}
+                    </div>
+                  </td>
                 </tr>
               ) : null}
 
               {units.length === 0 && !isCreateRowVisible ? (
                 <tr className="border-t border-light-grey/20">
                   <td
-                    colSpan={4}
+                    colSpan={6}
                     className="px-6 py-10 text-center text-sm font-medium text-grey"
                   >
                     {hasActiveFilters
@@ -644,9 +810,9 @@ export default function KuartersUnitsPanel({
               {units.map((unit) => {
                 const isEditing = editor?.mode === "edit" && editor.rowId === unit.id;
                 const isCurrentRowPending = pendingUnitId === unit.id;
-                const occupantIcNumber = formatQuarterUnitValue(
-                  unit.occupantIcNumber,
-                );
+                const occupantIcNumber = unit.occupantIcNumber
+                  ? formatIcNumber(unit.occupantIcNumber)
+                  : formatQuarterUnitValue(unit.occupantIcNumber);
                 const occupantName = formatQuarterUnitValue(unit.occupantName);
                 const isVacant = unit.occupantIcNumber === null;
                 const draftOccupantIcNumber = isEditing
@@ -691,8 +857,8 @@ export default function KuartersUnitsPanel({
                     <td className="px-6 py-4 align-middle text-sm font-semibold text-dark-grey">
                       {isEditing ? (
                         <PickerField
-                          value={editor.draft.occupantIcNumber}
-                          placeholder="Klik untuk pilih penghuni"
+                          value={formatIcNumber(editor.draft.occupantIcNumber)}
+                          placeholder="Pilih penghuni"
                           disabled={isCurrentRowPending}
                           onClick={onOpenResidentPicker}
                         />
@@ -725,8 +891,50 @@ export default function KuartersUnitsPanel({
                         </span>
                       )}
                     </td>
+                    <td className="px-6 py-4 text-center align-middle text-sm font-semibold">
+                      {isEditing && hasOccupantDraft ? (
+                        <DatePickerField
+                          value={editor.draft.moveInDate}
+                          disabled={isCurrentRowPending}
+                          required
+                          maxDate={
+                            editor.draft.moveOutDate || getTodayDateInputValue()
+                          }
+                          onChange={(value) => onDraftChange("moveInDate", value)}
+                        />
+                      ) : (
+                        <span
+                          className={
+                            unit.moveInDate ? "text-dark-grey" : "text-grey"
+                          }
+                        >
+                          {formatDisplayDate(unit.moveInDate)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-center align-middle text-sm font-semibold">
+                      {isEditing && hasOccupantDraft ? (
+                        <DatePickerField
+                          value={editor.draft.moveOutDate}
+                          disabled={isCurrentRowPending}
+                          minDate={editor.draft.moveInDate}
+                          maxDate={getTodayDateInputValue()}
+                          onChange={(value) => onDraftChange("moveOutDate", value)}
+                        />
+                      ) : (
+                        <span
+                          className={
+                            unit.moveOutDate ? "text-dark-grey" : "text-grey"
+                          }
+                        >
+                          {formatDisplayDate(unit.moveOutDate)}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 align-middle">
-                      {renderActionCell(unit, isEditing)}
+                      <div className="flex justify-center">
+                        {renderActionCell(unit, isEditing)}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -802,4 +1010,102 @@ function sanitizeFilenamePart(value: string) {
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function formatDisplayDate(value: string | null) {
+  if (!value) {
+    return "N/A";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "N/A";
+  }
+
+  return new Intl.DateTimeFormat("ms-MY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatIcNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length !== 12) {
+    return value;
+  }
+
+  return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8)}`;
+}
+
+function parseDateInput(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function buildCalendarDays(monthDate: Date) {
+  const firstDayOfMonth = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth(),
+    1,
+  );
+  const firstCalendarDate = new Date(firstDayOfMonth);
+  firstCalendarDate.setDate(
+    firstCalendarDate.getDate() - firstCalendarDate.getDay(),
+  );
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(firstCalendarDate);
+    date.setDate(firstCalendarDate.getDate() + index);
+
+    return { date };
+  });
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDatePickerLabel(value: string) {
+  const date = parseDateInput(value);
+
+  if (!date) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ms-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat("ms-MY", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function getTodayDateInputValue() {
+  return formatDateInput(new Date());
 }

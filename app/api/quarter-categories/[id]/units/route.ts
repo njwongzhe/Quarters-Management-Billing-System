@@ -2,6 +2,8 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import {
+  buildQuarterCategoryUnitsDetailInclude,
+  buildQuarterUnitCurrentOccupancyInclude,
   buildQuarterUnitCreatedMessage,
   buildQuarterUnitDuplicateMessage,
   buildQuarterUnitOccupancyConflictMessage,
@@ -9,8 +11,6 @@ import {
   mapQuarterCategoryUnitsDetailForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitCreateBody,
-  QuarterCategoryUnitsDetailInclude,
-  quarterUnitCurrentOccupancyInclude,
 } from "@/lib/quarter-units";
 import { createAuditLog } from "@/lib/audit-logs";
 import { getCurrentAdmin } from "@/lib/current-admin";
@@ -43,7 +43,7 @@ export async function GET(_request: Request, context: RouteContext) {
         id,
         recordStatus: "VERIFIED",
       },
-      include: QuarterCategoryUnitsDetailInclude,
+      include: buildQuarterCategoryUnitsDetailInclude(),
     });
 
     if (!quarterCategory) {
@@ -257,7 +257,7 @@ export async function POST(request: Request, context: RouteContext) {
               }
             : undefined,
         },
-        include: quarterUnitCurrentOccupancyInclude,
+        include: buildQuarterUnitCurrentOccupancyInclude(),
       });
 
       await createAuditLog(tx, {

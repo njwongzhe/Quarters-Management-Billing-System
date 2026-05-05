@@ -35,7 +35,7 @@ function TabButton({
   return (
     <button
       type="button"
-      className={`min-h-13 min-w-40 border-b-2 px-7 text-xs font-extrabold uppercase tracking-[0.14em] transition-colors ${
+      className={`min-h-12 min-w-36 border-b-2 px-6 text-xs font-extrabold uppercase tracking-[0.14em] transition-colors ${
         isActive
           ? "border-dark-blue text-dark-blue"
           : "border-transparent text-grey hover:text-dark-blue"
@@ -129,21 +129,21 @@ export default function KuartersUnitDetailsOverlay({
       onClick={onClose}
     >
       <section
-        className="max-h-[calc(100vh-4rem)] w-full max-w-336 overflow-hidden rounded-2xl bg-light-blue shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
+        className="max-h-[calc(100vh-4rem)] w-full max-w-300 overflow-hidden rounded-2xl bg-light-blue shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="unit-details-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex min-h-23 items-center justify-between gap-4 bg-dark-blue px-6 text-white sm:px-8">
+        <header className="flex min-h-20 items-center justify-between gap-4 bg-dark-blue px-6 text-white sm:px-7">
           <div className="min-w-0 space-y-1">
             <h3
               id="unit-details-title"
-              className="truncate text-[21px] font-extrabold uppercase tracking-[-0.02em]"
+              className="truncate text-[19px] font-extrabold uppercase tracking-[-0.02em]"
             >
               Maklumat Penghunian Unit
             </h3>
-            <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-white/70">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-white/70">
               Rekod Penghunian Unit
             </p>
           </div>
@@ -158,7 +158,7 @@ export default function KuartersUnitDetailsOverlay({
         </header>
 
         <nav
-          className="flex min-h-13 items-stretch justify-center overflow-x-auto border-b border-[#C6C5D2]/25 bg-white"
+          className="flex min-h-12 items-stretch justify-center overflow-x-auto border-b border-[#C6C5D2]/25 bg-white"
           aria-label="Unit occupancy tabs"
         >
           <TabButton

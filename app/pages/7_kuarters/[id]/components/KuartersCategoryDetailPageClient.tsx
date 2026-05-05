@@ -319,6 +319,8 @@ export default function KuartersCategoryDetailPageClient({
           ...currentEditor.draft,
           occupantIcNumber: resident.icNumber,
           occupantName: resident.fullName,
+          moveInDate: currentEditor.draft.moveInDate || getTodayDateInputValue(),
+          moveOutDate: "",
         },
       };
     });
@@ -337,6 +339,8 @@ export default function KuartersCategoryDetailPageClient({
           ...currentEditor.draft,
           occupantIcNumber: "",
           occupantName: "",
+          moveInDate: "",
+          moveOutDate: "",
         },
       };
     });
@@ -365,10 +369,22 @@ export default function KuartersCategoryDetailPageClient({
       return;
     }
 
-    const payload = {
+    const payload: {
+      unitCode: string;
+      occupantIcNumber: string;
+      moveInDate?: string;
+      moveOutDate?: string;
+    } = {
       unitCode: editor.draft.unitCode.trim(),
       occupantIcNumber: editor.draft.occupantIcNumber.trim(),
     };
+    const shouldSendOccupancyDates =
+      editor.mode === "edit" && editor.draft.occupantIcNumber.trim().length > 0;
+
+    if (shouldSendOccupancyDates) {
+      payload.moveInDate = editor.draft.moveInDate;
+      payload.moveOutDate = editor.draft.moveOutDate;
+    }
 
     try {
       setPendingUnitId(editor.rowId);
@@ -588,12 +604,20 @@ export default function KuartersCategoryDetailPageClient({
         residents={residentPicker.residents}
         searchQuery={residentPicker.searchQuery}
         selectedResidentIcNumber={editor?.draft.occupantIcNumber ?? ""}
-        onAssignResident={handleAssignResident}
-        onClearSelection={handleClearAssignedResident}
+        onChooseResident={handleAssignResident}
         onClose={closeResidentPicker}
         onDismissError={handleDismissResidentPickerError}
         onSearchQueryChange={handleResidentPickerSearchQueryChange}
       />
     </div>
   );
+}
+
+function getTodayDateInputValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }

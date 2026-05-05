@@ -1,4 +1,4 @@
-import type { Prisma, UnitStatus } from "@prisma/client";
+import type { Prisma, ResidentStatus, UnitStatus } from "@prisma/client";
 
 import { buildQuarterCategorySummary, type QuarterCategorySummary } from "./quarter-categories";
 
@@ -12,7 +12,11 @@ type ParseFailure = {
   message: string;
 };
 
-type QuarterUnitUpdatableField = "unitCode" | "occupant";
+type QuarterUnitUpdatableField =
+  | "unitCode"
+  | "occupant"
+  | "moveInDate"
+  | "moveOutDate";
 
 export type QuarterUnitListItem = {
   id: string;
@@ -20,6 +24,8 @@ export type QuarterUnitListItem = {
   status: UnitStatus;
   occupantIcNumber: string | null;
   occupantName: string | null;
+  moveInDate: string | null;
+  moveOutDate: string | null;
 };
 
 export type QuarterUnitOccupancyDetails = {
@@ -27,6 +33,7 @@ export type QuarterUnitOccupancyDetails = {
   occupantName: string;
   occupantIcNumber: string;
   occupantAge: number | null;
+  occupantStatus: ResidentStatus;
   moveInDate: string;
   moveOutDate: string | null;
   status: "CURRENT" | "PAST";
@@ -71,6 +78,8 @@ export type QuarterUnitCreateInput = {
 export type QuarterUnitUpdateInput = {
   unitCode?: string;
   occupantIcNumber?: string | null;
+  moveInDate?: Date;
+  moveOutDate?: Date | null;
 };
 
 export type QuarterUnitUpdateBody = {
@@ -78,10 +87,12 @@ export type QuarterUnitUpdateBody = {
   providedFields: {
     unitCode: boolean;
     occupantIcNumber: boolean;
+    moveInDate: boolean;
+    moveOutDate: boolean;
   };
 };
 
-// Used to fetch the list of quarter units for a specific quarter category, including their current occupancy status, for display in the units panel of the quarter category detail page.
+// Used for validating and parsing request bodies for both create and update operations, where all fields are optional in the input but unitCode is required if provided.
 export const quarterUnitDetailsInclude = {
   quarterCategory: true,
   occupancies: {
@@ -98,44 +109,78 @@ export const quarterUnitDetailsInclude = {
         select: {
           fullName: true,
           icNumber: true,
+          status: true,
         },
       },
     },
   },
 } satisfies Prisma.UnitInclude;
 
-export const quarterUnitCurrentOccupancyInclude = {
-  occupancies: {
-    where: {
-      status: "CURRENT",
-    },
-    orderBy: {
-      moveInDate: "desc",
-    },
-    take: 1,
-    include: {
-      resident: {
-        select: {
-          id: true,
-          fullName: true,
-          icNumber: true,
+export function buildQuarterUnitCurrentOccupancyInclude(
+  referenceDate = new Date(),
+) {
+  return {
+    occupancies: {
+      where: {
+        OR: [
+          {
+            status: "CURRENT",
+          },
+          {
+            moveInDate: {
+              lte: referenceDate,
+            },
+            OR: [
+              {
+                moveOutDate: null,
+              },
+              {
+                moveOutDate: {
+                  gte: referenceDate,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      orderBy: {
+        moveInDate: "desc",
+      },
+      take: 1,
+      include: {
+        resident: {
+          select: {
+            id: true,
+            fullName: true,
+            icNumber: true,
+          },
         },
       },
     },
-  },
-} satisfies Prisma.UnitInclude;
+  } satisfies Prisma.UnitInclude;
+}
 
-export const QuarterCategoryUnitsDetailInclude = {
-  units: {
-    orderBy: {
-      unitCode: "asc",
+export const quarterUnitCurrentOccupancyInclude =
+  buildQuarterUnitCurrentOccupancyInclude();
+
+export function buildQuarterCategoryUnitsDetailInclude(
+  referenceDate = new Date(),
+) {
+  return {
+    units: {
+      orderBy: {
+        unitCode: "asc",
+      },
+      include: buildQuarterUnitCurrentOccupancyInclude(referenceDate),
     },
-    include: quarterUnitCurrentOccupancyInclude,
-  },
-} satisfies Prisma.QuarterCategoryInclude;
+  } satisfies Prisma.QuarterCategoryInclude;
+}
+
+export const QuarterCategoryUnitsDetailInclude =
+  buildQuarterCategoryUnitsDetailInclude();
 
 export type UnitWithCurrentOccupancy = Prisma.UnitGetPayload<{
-  include: typeof quarterUnitCurrentOccupancyInclude;
+  include: ReturnType<typeof buildQuarterUnitCurrentOccupancyInclude>;
 }>;
 
 export type UnitWithDetails = Prisma.UnitGetPayload<{
@@ -143,7 +188,7 @@ export type UnitWithDetails = Prisma.UnitGetPayload<{
 }>;
 
 export type QuarterCategoryWithUnits = Prisma.QuarterCategoryGetPayload<{
-  include: typeof QuarterCategoryUnitsDetailInclude;
+  include: ReturnType<typeof buildQuarterCategoryUnitsDetailInclude>;
 }>;
 
 export function mapQuarterUnitForApi(
@@ -154,9 +199,11 @@ export function mapQuarterUnitForApi(
   return {
     id: unit.id,
     unitCode: unit.unitCode,
-    status: unit.status,
+    status: currentOccupancy ? "OCCUPIED" : "VACANT",
     occupantIcNumber: currentOccupancy?.resident.icNumber ?? null,
     occupantName: currentOccupancy?.resident.fullName ?? null,
+    moveInDate: currentOccupancy?.moveInDate.toISOString() ?? null,
+    moveOutDate: currentOccupancy?.moveOutDate?.toISOString() ?? null,
   };
 }
 
@@ -168,6 +215,7 @@ export function mapQuarterUnitDetailsForApi(
     occupantName: occupancy.resident.fullName,
     occupantIcNumber: occupancy.resident.icNumber,
     occupantAge: calculateAgeFromIcNumber(occupancy.resident.icNumber),
+    occupantStatus: occupancy.resident.status,
     moveInDate: occupancy.moveInDate.toISOString(),
     moveOutDate: occupancy.moveOutDate?.toISOString() ?? null,
     status: occupancy.status,
@@ -275,12 +323,19 @@ export function parseQuarterUnitUpdateBody(
     hasOwn(payload, "occupantIcNumber") ||
     hasOwn(payload, "noKadPengenalanPenghuni") ||
     hasOwn(payload, "icNumber");
+  const hasMoveInDateField = hasOwn(payload, "moveInDate");
+  const hasMoveOutDateField = hasOwn(payload, "moveOutDate");
 
-  if (!hasUnitCodeField && !hasOccupantIcNumberField) {
+  if (
+    !hasUnitCodeField &&
+    !hasOccupantIcNumberField &&
+    !hasMoveInDateField &&
+    !hasMoveOutDateField
+  ) {
     return {
       ok: false,
       message:
-        "Sila berikan sekurang-kurangnya satu nilai untuk kod unit atau nombor kad pengenalan penghuni.",
+        "Sila berikan sekurang-kurangnya satu nilai untuk kod unit, penghuni atau tarikh penghunian.",
     };
   }
 
@@ -312,6 +367,34 @@ export function parseQuarterUnitUpdateBody(
     updates.occupantIcNumber = parsedOccupantIcNumber.data;
   }
 
+  if (hasMoveInDateField) {
+    const parsedMoveInDate = parseOccupancyDate(payload.moveInDate, {
+      required: true,
+      label: "Tarikh masuk",
+    });
+
+    if (!parsedMoveInDate.ok) {
+      return parsedMoveInDate;
+    }
+
+    if (parsedMoveInDate.data) {
+      updates.moveInDate = parsedMoveInDate.data;
+    }
+  }
+
+  if (hasMoveOutDateField) {
+    const parsedMoveOutDate = parseOccupancyDate(payload.moveOutDate, {
+      required: false,
+      label: "Tarikh keluar",
+    });
+
+    if (!parsedMoveOutDate.ok) {
+      return parsedMoveOutDate;
+    }
+
+    updates.moveOutDate = parsedMoveOutDate.data;
+  }
+
   return {
     ok: true,
     data: {
@@ -319,6 +402,8 @@ export function parseQuarterUnitUpdateBody(
       providedFields: {
         unitCode: hasUnitCodeField,
         occupantIcNumber: hasOccupantIcNumberField,
+        moveInDate: hasMoveInDateField,
+        moveOutDate: hasMoveOutDateField,
       },
     },
   };
@@ -340,7 +425,13 @@ export function buildQuarterUnitUpdatedMessage(
   }
 
   const labels = changedFields.map((field) =>
-    field === "unitCode" ? "kod unit" : "penghuni",
+    field === "unitCode"
+      ? "kod unit"
+      : field === "occupant"
+        ? "penghuni"
+        : field === "moveInDate"
+          ? "tarikh masuk"
+          : "tarikh keluar",
   );
 
   return `Maklumat ${joinMalayList(labels)} bagi unit ${unitCode} berjaya dikemas kini.`;
@@ -470,6 +561,49 @@ function parseOccupantIcNumber(
   return {
     ok: true,
     data: normalizedValue,
+  };
+}
+
+function parseOccupancyDate(
+  value: unknown,
+  options: {
+    required: boolean;
+    label: string;
+  },
+): ParseSuccess<Date | null> | ParseFailure {
+  if (value === undefined || value === null || value === "") {
+    if (options.required) {
+      return {
+        ok: false,
+        message: `${options.label} tidak boleh kosong.`,
+      };
+    }
+
+    return {
+      ok: true,
+      data: null,
+    };
+  }
+
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return {
+      ok: false,
+      message: `${options.label} mesti dalam format tarikh yang sah.`,
+    };
+  }
+
+  const date = new Date(`${value}T00:00:00.000+08:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return {
+      ok: false,
+      message: `${options.label} mesti dalam format tarikh yang sah.`,
+    };
+  }
+
+  return {
+    ok: true,
+    data: date,
   };
 }
 

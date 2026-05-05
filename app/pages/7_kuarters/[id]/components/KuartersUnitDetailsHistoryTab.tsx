@@ -138,7 +138,7 @@ export default function KuartersUnitDetailsHistoryTab({
   }, [isFilterMenuOpen]);
 
   return (
-    <div className="max-h-[calc(100vh-12rem)] overflow-auto px-5 py-7 sm:px-8 sm:py-8">
+    <div className="max-h-[calc(100vh-10rem)] overflow-auto px-5 py-7 sm:px-8 sm:py-8">
       <section>
         <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <SectionTitle>Sejarah Penghunian</SectionTitle>
@@ -165,8 +165,8 @@ export default function KuartersUnitDetailsHistoryTab({
 
               {isFilterMenuOpen ? (
                 <div
-                  className="absolute right-0 top-full z-20 mt-2 w-44 rounded-xl border border-light-grey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
-                  role="menu"
+                  className="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-light-grey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+                  role="listbox"
                   aria-label="Tapisan sejarah penghunian"
                 >
                   {(["ALL", "CURRENT", "PAST"] as const).map((option) => {
@@ -176,19 +176,20 @@ export default function KuartersUnitDetailsHistoryTab({
                       <button
                         key={option}
                         type="button"
-                        role="menuitemradio"
-                        aria-checked={isSelected}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`flex min-h-10 w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors ${
                           isSelected
                             ? "bg-dark-blue text-white"
-                            : "text-dark-grey hover:bg-background"
+                            : "text-dark-grey hover:bg-light-blue"
                         }`}
                         onClick={() => {
                           setStatusFilter(option);
                           setIsFilterMenuOpen(false);
                         }}
                       >
-                        {getFilterLabel(option)}
+                        <span className="truncate">{getFilterLabel(option)}</span>
+                        {isSelected ? <Icon icon="done" size={16} /> : null}
                       </button>
                     );
                   })}
@@ -242,15 +243,15 @@ export default function KuartersUnitDetailsHistoryTab({
                       value={occupancy.occupantName}
                     />
                     <HistoryCell
-                      value={occupancy.occupantIcNumber}
+                      value={formatIcNumber(occupancy.occupantIcNumber)}
                       className="text-center tracking-wide text-dark-grey"
                     />
                     <td className="px-6 py-5 text-center align-middle">
                       <span
                         className={`inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-extrabold uppercase ${
                           occupancy.status === "CURRENT"
-                            ? "border-[#C6F5D5] bg-[#E8FFF0] text-[#107327]"
-                            : "border-[#EEF1F6] bg-[#F8FAFC] text-grey"
+                            ? "border-aktif/20 bg-aktif/10 text-aktif"
+                            : "border-x-layak/20 bg-x-layak/10 text-x-layak"
                         }`}
                       >
                         {occupancy.status === "CURRENT" ? "Aktif" : "Keluar"}
@@ -410,7 +411,7 @@ function downloadHistoryExcel(
     formatHistoryDate(occupancy.moveInDate),
     formatHistoryDate(occupancy.moveOutDate),
     occupancy.occupantName,
-    { value: occupancy.occupantIcNumber, align: "center" },
+    { value: formatIcNumber(occupancy.occupantIcNumber), align: "center" },
     {
       value: occupancy.status === "CURRENT" ? "Aktif" : "Keluar",
       align: "center",
@@ -439,6 +440,16 @@ function buildHistoryExportFilename(unitCode: string) {
   return ["sejarah-penghunian", sanitizeFilenamePart(unitCode)]
     .filter(Boolean)
     .join("-");
+}
+
+function formatIcNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length !== 12) {
+    return value;
+  }
+
+  return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8)}`;
 }
 
 function sanitizeFilenamePart(value: string) {

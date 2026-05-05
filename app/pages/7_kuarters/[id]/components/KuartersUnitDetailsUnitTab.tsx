@@ -58,7 +58,9 @@ export default function KuartersUnitDetailsUnitTab({
 }: KuartersUnitDetailsUnitTabProps) {
   const currentOccupancy = unitDetails.currentOccupancy;
   const isOccupied = unitDetails.status === "OCCUPIED";
-  const statusLabel = isOccupied ? "AKTIF" : "KOSONG";
+  const statusLabel = currentOccupancy
+    ? formatResidentStatus(currentOccupancy.occupantStatus)
+    : "N/A";
   const occupancyLabel = isOccupied ? "Berpenghuni" : "Kosong";
   const occupancyClass = isOccupied
     ? "bg-[#D4F0DB] text-[#157437] before:bg-[#157437]"
@@ -72,7 +74,7 @@ export default function KuartersUnitDetailsUnitTab({
   }
 
   return (
-    <div className="max-h-[calc(100vh-12rem)] overflow-auto px-5 py-7 sm:px-8 sm:py-8">
+    <div className="max-h-[calc(100vh-10rem)] overflow-auto px-5 py-7 sm:px-8 sm:py-8">
       <section className="mb-9">
         <div className="mb-6 flex items-center justify-between gap-4">
           <SectionTitle>Maklumat Penghuni</SectionTitle>
@@ -101,7 +103,11 @@ export default function KuartersUnitDetailsUnitTab({
           />
           <ModalField
             label="No. Kad Pengenalan"
-            value={currentOccupancy?.occupantIcNumber ?? "N/A"}
+            value={
+              currentOccupancy?.occupantIcNumber
+                ? formatIcNumber(currentOccupancy.occupantIcNumber)
+                : "N/A"
+            }
             tone={currentOccupancy ? "default" : "muted"}
             className="md:col-span-2"
           />
@@ -139,7 +145,13 @@ export default function KuartersUnitDetailsUnitTab({
           <ModalField
             label="Status"
             value={statusLabel}
-            tone={isOccupied ? "success" : "muted"}
+            tone={
+              currentOccupancy?.occupantStatus === "AKTIF"
+                ? "success"
+                : currentOccupancy
+                  ? "default"
+                  : "muted"
+            }
             className="md:col-span-4"
           />
         </div>
@@ -173,7 +185,7 @@ export default function KuartersUnitDetailsUnitTab({
           />
         </div>
 
-        <div className="mt-6 grid items-start gap-x-5 gap-y-6 md:grid-cols-12">
+        <div className="mb-6 mt-6 grid items-start gap-x-5 gap-y-6 md:grid-cols-12">
           <ModalField
             label="Sewa (RM)"
             value={formatRate(unitDetails.category.rates.rentalPrice)}
@@ -196,6 +208,20 @@ export default function KuartersUnitDetailsUnitTab({
       </section>
     </div>
   );
+}
+
+function formatResidentStatus(value: string) {
+  return value.replace(/_/g, " ");
+}
+
+function formatIcNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length !== 12) {
+    return value;
+  }
+
+  return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8)}`;
 }
 
 function formatDisplayDate(value: string | null) {
