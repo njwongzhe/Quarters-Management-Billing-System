@@ -127,20 +127,22 @@ export async function reverseTransaction(
     });
 
     // 3. Create the Balancing Reversal Record
+    const newTransactionNo = await generateTransactionNo(tx); // Generate ID
+
     const pembalikan = await tx.transaction.create({
       data: {
+        transactionNo: newTransactionNo, // Add it here
         residentId: original.residentId,
         transactionDate: new Date(), 
-        category: original.category,
+        category: "LAIN_LAIN", // Strictly set to LAIN_LAIN
         status: "PEMBALIKAN",
-        debitAmount: original.creditAmount, // Swap amounts
+        debitAmount: original.creditAmount, 
         creditAmount: original.debitAmount,
         description: remarks,
         relatedTransactionId: original.id, 
         createdById: adminId,
       },
     });
-
     return pembalikan;
   });
 }
@@ -172,11 +174,14 @@ export async function adjustTransaction(
     });
 
     // Create the Adjustment Record
+    const newTransactionNo = await generateTransactionNo(tx); // Generate ID
+
     const pelarasan = await tx.transaction.create({
       data: {
+        transactionNo: newTransactionNo, // Add it here
         residentId: original.residentId,
         transactionDate: new Date(),
-        category: original.category,
+        category: "LAIN_LAIN", // Strictly set to LAIN_LAIN
         status: "PELARASAN",
         debitAmount: isCredit ? 0 : deltaAmount,
         creditAmount: isCredit ? deltaAmount : 0,
