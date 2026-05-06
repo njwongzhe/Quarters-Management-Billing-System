@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adjustTransaction } from "@/lib/transactions";
+import { getCurrentAdmin } from "@/lib/current-admin";
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. SECURITY CHECK: Verify the admin is actually logged in
+    const authData = await getCurrentAdmin();
+    if (!authData || !authData.profile) {
+      return NextResponse.json(
+        { ok: false, message: "Sesi tamat. Sila log masuk semula." },
+        { status: 401 }
+      );
+    }
+    const adminId = authData.profile.id;
+
+    // 2. PARSE REQUEST
     const body = await request.json();
     const { originalTxId, newAmount, remarks } = body;
 
@@ -20,10 +32,8 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // TODO: Replace with actual auth user ID
-    const MOCK_ADMIN_ID = "00000000-0000-0000-0000-000000000000";
-
-    const pelarasan = await adjustTransaction(originalTxId, MOCK_ADMIN_ID, Number(newAmount), remarks);
+    // 3. EXECUTE ADJUSTMENT (Now using the REAL admin ID!)
+    const pelarasan = await adjustTransaction(originalTxId, adminId, Number(newAmount), remarks);
 
     return NextResponse.json({
       ok: true,

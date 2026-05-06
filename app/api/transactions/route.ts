@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTransactionsList, getTransactionsSummary, TransactionFilterParams } from "@/lib/transactions";
 import { TransactionCategory, TransactionStatus } from "@prisma/client";
+import { getCurrentAdmin } from "@/lib/current-admin";
 
 export async function GET(request: NextRequest) {
   try {
+    // 1. SECURITY CHECK: Ensure only logged-in admins can view the ledger
+    const authData = await getCurrentAdmin();
+    if (!authData || !authData.profile) {
+      return NextResponse.json(
+        { ok: false, message: "Akses Ditolak. Sesi tamat atau anda tidak dibenarkan." },
+        { status: 401 }
+      );
+    }
+
+    // 2. PARSE QUERY PARAMETERS (Filters from the frontend)
     const searchParams = request.nextUrl.searchParams;
 
-    // Parse the query parameters sent from the frontend filter panel
     const search = searchParams.get("search") || undefined;
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
@@ -30,12 +40,13 @@ export async function GET(request: NextRequest) {
       limit,
     };
 
-    // Run both queries simultaneously for performance
+    // 3. FETCH DATA (Run both queries simultaneously for performance)
     const [listResult, summaryResult] = await Promise.all([
       getTransactionsList(params),
-      getTransactionsSummary() // We fetch the summary KPIs at the same time!
+      getTransactionsSummary() 
     ]);
 
+    // 4. RETURN RESPONSE
     return NextResponse.json({
       ok: true,
       data: listResult.data,

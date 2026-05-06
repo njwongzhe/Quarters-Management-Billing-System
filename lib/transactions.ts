@@ -118,12 +118,12 @@ export async function reverseTransaction(
     // 1. Find the original
     const original = await tx.transaction.findUnique({ where: { id: originalTxId } });
     if (!original) throw new Error("Transaksi asal tidak dijumpai.");
-    if (original.status !== "NORMAL") throw new Error("Hanya transaksi NORMAL boleh dibatalkan.");
+    if (original.status !== "NORMAL") throw new Error("Hanya transaksi NORMAL boleh dibalikan."); // <-- Update text
 
-    // 2. Update original status to DIBATALKAN
+    // 2. Update original status to DIBALIKAN
     await tx.transaction.update({
       where: { id: originalTxId },
-      data: { status: "DIBATALKAN" },
+      data: { status: "DIBALIKAN" }, // <-- Update status enum
     });
 
     // 3. Create the Balancing Reversal Record
