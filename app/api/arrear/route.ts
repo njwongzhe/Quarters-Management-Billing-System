@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears";
 import { createAuditLog } from "@/lib/audit-logs";
 import { getCurrentAdmin } from "@/lib/current-admin";
+import { generateTransactionNo } from "@/lib/transactions"; 
 
 export async function GET() {
   try {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
 
     // We assume the admin making this change is logged in. 
     // In your actual app, you would get this from your Auth session.
-    //todo
+   
     const adminId = currentAdmin?.profile.id; // Current admin, when the session is available.
 
     // We use the start of the current month as the charge period for these new additions
@@ -143,8 +144,11 @@ export async function POST(request: Request) {
                 senggaraChargeToAdd = maintenanceRate;
                 
                 // Log Transaction for Senggara
+                const txNoSenggara = await generateTransactionNo(tx); // 1. ADD THIS
+
                 await tx.transaction.create({
                     data: {
+                        transactionNo: txNoSenggara, // 2. ADD THIS
                         residentId: resident.id,
                         transactionDate: new Date(),
                         category: "CAJ_PENYELENGGARAAN",
@@ -170,8 +174,11 @@ export async function POST(request: Request) {
             });
 
             // 2. Log Transaction (Debit)
+            const txNoTambahan = await generateTransactionNo(tx); // 1. ADD THIS
+
             await tx.transaction.create({
                 data: {
+                    transactionNo: txNoTambahan, // 2. ADD THIS
                     residentId: resident.id,
                     transactionDate: new Date(item.tarikh),
                     category: "CAJ_TAMBAHAN",
@@ -197,8 +204,11 @@ export async function POST(request: Request) {
             });
 
             // 2. Log Transaction (Credit)
+            const txNoRebat = await generateTransactionNo(tx); // 1. ADD THIS
+
             await tx.transaction.create({
                 data: {
+                    transactionNo: txNoRebat, // 2. ADD THIS
                     residentId: resident.id,
                     transactionDate: new Date(item.tarikh),
                     category: "REBAT",
@@ -243,7 +253,11 @@ export async function POST(request: Request) {
         actionType: "UPDATE",
         description: `Mengemaskini caj tunggakan secara pukal untuk ${residentIds.length} penghuni.`,
       });
-    });
+    },
+      {
+        maxWait: 5000,
+        timeout: 20000 
+      });
 
     // 4. Return Success Response
     return NextResponse.json({

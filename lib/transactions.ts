@@ -1,5 +1,5 @@
 import { Prisma, TransactionStatus, TransactionCategory } from "@prisma/client";
-import {prisma} from "./prisma";
+import { prisma } from "./prisma";
 
 // ==========================================
 // 1. TYPES & INTERFACES
@@ -65,9 +65,9 @@ export async function getTransactionsList(params: TransactionFilterParams) {
     andConditions.push({
       OR: [
         { description: { contains: search, mode: "insensitive" } },
-        { receiptNo: { contains: search, mode: "insensitive" } }, // Added receipt search
-        { resident: { fullName: { contains: search, mode: "insensitive" } } }, // Fixed to fullName
-        { resident: { icNumber: { contains: search, mode: "insensitive" } } }, // Fixed to icNumber
+        { receiptNo: { contains: search, mode: "insensitive" } }, 
+        { resident: { fullName: { contains: search, mode: "insensitive" } } }, 
+        { resident: { icNumber: { contains: search, mode: "insensitive" } } }, 
       ],
     });
   }
@@ -81,9 +81,9 @@ export async function getTransactionsList(params: TransactionFilterParams) {
       include: {
         resident: {
           select: {
-            fullName: true, // Fixed to fullName
-            icNumber: true, // Fixed to icNumber
-            occupancies: {  // Fixed from unitOccupancies to occupancies (based on your schema)
+            fullName: true, 
+            icNumber: true, 
+            occupancies: {  
               where: { status: "CURRENT" },
               include: { unit: { include: { quarterCategory: true } } }
             }
@@ -118,7 +118,11 @@ export async function reverseTransaction(
     // 1. Find the original
     const original = await tx.transaction.findUnique({ where: { id: originalTxId } });
     if (!original) throw new Error("Transaksi asal tidak dijumpai.");
-    if (original.status !== "NORMAL") throw new Error("Hanya transaksi NORMAL boleh dibalikan."); // <-- Update text
+    
+    // Allow both NORMAL and DILARASKAN to be reversed based on your business rules
+    if (original.status !== "NORMAL" && original.status !== "DILARASKAN") {
+        throw new Error("Hanya transaksi NORMAL atau DILARASKAN boleh dibalikan.");
+    }
 
     // 2. Update original status to DIBALIKAN
     await tx.transaction.update({
@@ -131,7 +135,7 @@ export async function reverseTransaction(
 
     const pembalikan = await tx.transaction.create({
       data: {
-        transactionNo: newTransactionNo, // Add it here
+        transactionNo: newTransactionNo, 
         residentId: original.residentId,
         transactionDate: new Date(), 
         category: "LAIN_LAIN", // Strictly set to LAIN_LAIN
@@ -157,34 +161,69 @@ export async function adjustTransaction(
   remarks: string
 ) {
   return prisma.$transaction(async (tx) => {
-    const original = await tx.transaction.findUnique({ where: { id: originalTxId } });
-    if (!original) throw new Error("Transaksi asal tidak dijumpai.");
-    if (original.status !== "NORMAL") throw new Error("Hanya transaksi NORMAL boleh dilaraskan.");
-
-    const isCredit = Number(original.creditAmount) > 0;
-    const oldAmount = isCredit ? Number(original.creditAmount) : Number(original.debitAmount);
+    // 1. Dapatkan rekod asal berserta sejarah pelarasan sebelumnya (include childTransactions!)
+    const original = await tx.transaction.findUnique({ 
+        where: { id: originalTxId },
+        include: { childTransactions: true }
+    });
     
-    const deltaAmount = newAmount - oldAmount;
-    if (deltaAmount === 0) throw new Error("Tiada perubahan pada amaun.");
+    if (!original) throw new Error("Transaksi asal tidak dijumpai.");
+    if (original.status !== "NORMAL" && original.status !== "DILARASKAN") {
+        throw new Error("Hanya transaksi NORMAL dan DILARASKAN boleh dilaraskan.");
+    }
 
-    // Update original status to DILARASKAN
+    // 2. Kira baki semasa sama seperti logik Frontend (Pratonton)
+    const isDebitOriginal = Number(original.debitAmount) > 0;
+    const originalAmount = isDebitOriginal ? Number(original.debitAmount) : Number(original.creditAmount);
+    
+    const pastPelarasans = original.childTransactions.filter((c: any) => c.status === "PELARASAN");
+    const totalPastDebit = pastPelarasans.reduce((sum: number, c: any) => sum + Number(c.debitAmount), 0);
+    const totalPastCredit = pastPelarasans.reduce((sum: number, c: any) => sum + Number(c.creditAmount), 0);
+    
+    let currentNet = originalAmount;
+    if (isDebitOriginal) {
+        currentNet = currentNet + totalPastDebit - totalPastCredit;
+    } else {
+        currentNet = currentNet + totalPastCredit - totalPastDebit;
+    }
+
+    // 3. Kira perbezaan (Delta) yang sebenar
+    const deltaAmount = newAmount - currentNet;
+    
+    if (deltaAmount === 0) {
+        throw new Error("Tiada perubahan jumlah dikesan.");
+    }
+
+    // 4. Tentukan Debit atau Kredit untuk rekod PELARASAN baru
+    let newDebit = 0;
+    let newCredit = 0;
+    
+    if (isDebitOriginal) {
+        if (deltaAmount > 0) newDebit = deltaAmount;
+        if (deltaAmount < 0) newCredit = Math.abs(deltaAmount);
+    } else {
+        if (deltaAmount > 0) newCredit = deltaAmount;
+        if (deltaAmount < 0) newDebit = Math.abs(deltaAmount);
+    }
+
+    // 5. Kemaskini status rekod asal ke DILARASKAN
     await tx.transaction.update({
       where: { id: originalTxId },
       data: { status: "DILARASKAN" },
     });
 
-    // Create the Adjustment Record
-    const newTransactionNo = await generateTransactionNo(tx); // Generate ID
+    // 6. Cipta Rekod PELARASAN dengan amaun yang dikira dengan tepat
+    const newTransactionNo = await generateTransactionNo(tx); 
 
     const pelarasan = await tx.transaction.create({
       data: {
-        transactionNo: newTransactionNo, // Add it here
+        transactionNo: newTransactionNo, 
         residentId: original.residentId,
         transactionDate: new Date(),
-        category: "LAIN_LAIN", // Strictly set to LAIN_LAIN
+        category: "LAIN_LAIN", 
         status: "PELARASAN",
-        debitAmount: isCredit ? 0 : deltaAmount,
-        creditAmount: isCredit ? deltaAmount : 0,
+        debitAmount: newDebit,
+        creditAmount: newCredit,
         description: remarks,
         relatedTransactionId: original.id, 
         createdById: adminId,
