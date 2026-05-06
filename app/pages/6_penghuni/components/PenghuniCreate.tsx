@@ -2,7 +2,7 @@
 
 import Icon from "@/app/components/Icon";
 import { useState } from "react";
-import { InputField, InputFieldFormat, InputBox, DropdownField } from "./InputField";
+import { InputField, InputFieldFormat, InputBox, DropdownField, Topic } from "./InputField";
 import { handleCreate, handleFieldChange } from "./DatabaseControl";
 
 type PenghuniCreateProps = {
@@ -14,12 +14,6 @@ type NotificationState = {
     type: "success" | "error" | null;
     message: string;
 };
-
-function Topic({ content, className }: { content: string, className?: string }) {
-    return (
-        <span className={`border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest ${className || ""}`}>{content}</span>
-    );
-}
 
 export default function PenghuniCreate(props?: PenghuniCreateProps) {
     // Dropdown options for service level and status fields.
@@ -79,8 +73,8 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
                 </div>
             )}
 
-            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm overflow-auto p-12 flex items-start justify-center">
-                <div className="relative w-full rounded-lg shadow-2xl overflow-hidden">
+            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
+                <div className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full">
                     {/* Header */}
                     <div className="bg-dark-blue p-6 flex items-center justify-between">
                         {/* Title & Subtitle */}
@@ -100,7 +94,7 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
                     </div>
 
                     {/* Content */}
-                    <div className="p-6 bg-light-blue">
+                    <div className="p-6 bg-light-blue overflow-y-auto">
                         <div className="flex flex-col gap-8">
                             {/* Section for Personal Information */}
                             <section className="flex flex-col gap-4">

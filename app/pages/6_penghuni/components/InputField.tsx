@@ -16,6 +16,13 @@ type BaseFieldStyleProps = {
     inactiveBackgroundClass?: string;
 };
 
+// Topic section header component for grouping related form fields.
+export function Topic({ content, className }: { content: string, className?: string }) {
+    return (
+        <span className={`border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest ${className || ""}`}>{content}</span>
+    );
+}
+
 // Reusable input field component with customizable styling and state management.
 export function InputField({
     label,

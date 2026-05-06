@@ -4,15 +4,10 @@ import Icon from "@/app/components/Icon";
 import { useState } from "react";
 import { calculateAgeByIc } from "@/app/utils/resident";
 import type { ResidentRecord } from "../page";
-import { InputField, InputFieldFormat, InputBox, DropdownField, type DropdownOption } from "./InputField";
+import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "./InputField";
 import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave } from "./DatabaseControl";
+import PenghuniDetailHistory from "./PenghuniDetailHistory";
 
-
-function Topic({ content, className }: { content: string, className?: string }) {
-    return (
-        <span className={`border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest ${className || ""}`}>{content}</span>
-    );
-}
 
 type PenghuniDetailWithCloseProps = ResidentRecord & {
     onClose?: () => void;
@@ -162,8 +157,8 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
             )}
 
             {/* Overlay Window */}
-            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm overflow-auto p-12 flex items-start justify-center">
-                <div className="relative w-full rounded-lg shadow-2xl overflow-hidden">
+            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
+                <div className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full">
                     {/* Header */}
                     <div className="bg-dark-blue p-6 flex items-center justify-between">
                         {/* Title & Subtitle */}
@@ -199,7 +194,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                     </nav>
 
                     {/* Content */}
-                    <div className="p-6 bg-light-blue">
+                    <div className="p-6 bg-light-blue overflow-y-auto">
                         {tab === "info" ? (
                             <div className="flex flex-col gap-8">
                                 {/* Section for Personal Information */}
@@ -312,8 +307,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                 )}
                             </div>
                         ) : (
-                            // Placeholder content for History tab. (To be implemented in the future.)
-                            <div className="text-sm text-gray-600">Sejarah transaksi belum ada (placeholder).</div>
+                            <PenghuniDetailHistory residentId={residentId} />
                         )}
                     </div>
                 </div>
