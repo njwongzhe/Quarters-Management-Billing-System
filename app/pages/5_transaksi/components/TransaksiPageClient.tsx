@@ -50,6 +50,9 @@ export default function TransaksiPageClient() {
       if (filtersToApply.statuses.length > 0) {
         queryParams.append("statuses", filtersToApply.statuses.join(","));
       }
+      if (filtersToApply.categories && filtersToApply.categories.length > 0) {
+        queryParams.append("categories", filtersToApply.categories.join(","));
+      }
       
       // Tell the backend which page we want
       queryParams.append("page", page.toString());

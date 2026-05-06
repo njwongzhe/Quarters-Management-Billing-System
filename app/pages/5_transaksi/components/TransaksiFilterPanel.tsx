@@ -25,7 +25,7 @@ const STATUS_OPTIONS = [
 ];
 
 const CATEGORY_OPTIONS = [
-  "BAYARAN", "CAJ_SEWA", "CAJ_PENYELENGGARAAN", "CAJ_PENALTI", "CAJ_TAMBAHAN", "REBAT"
+  "BAYARAN", "CAJ_SEWA", "CAJ_PENYELENGGARAAN", "CAJ_PENALTI", "CAJ_TAMBAHAN", "REBAT", "LAIN_LAIN"
 ];
 
 export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiFilterPanelProps) {
@@ -45,6 +45,15 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
       statuses: prev.statuses.includes(status)
         ? prev.statuses.filter(s => s !== status)
         : [...prev.statuses, status]
+    }));
+  };
+
+  const handleCategoryToggle = (category: string) => {
+    setFilters(prev => ({
+      ...prev,
+      categories: prev.categories.includes(category)
+        ? prev.categories.filter(c => c !== category)
+        : [...prev.categories, category]
     }));
   };
 
@@ -108,44 +117,71 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
             </div>
           </div>
 
-          {/* Row 2: Status Checkboxes & Category Dropdown */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-2">
+          {/* Row 2: Status & Category Checkboxes */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             
-            <div className="flex flex-wrap gap-3">
-              {STATUS_OPTIONS.map(opt => {
-                const isSelected = filters.statuses.includes(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => handleStatusToggle(opt.value)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-400 opacity-50'}`}
-                  >
-                    <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
-                      {isSelected && <Icon icon="check" size={10} className="text-current" />}
-                    </div>
-                    {opt.label}
-                  </button>
-                )
-              })}
+            {/* Status Filter */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Status Transaksi</label>
+              <div className="flex flex-wrap gap-3">
+                {STATUS_OPTIONS.map(opt => {
+                  const isSelected = filters.statuses.includes(opt.value);
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleStatusToggle(opt.value)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    >
+                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                        {isSelected && <Icon icon="check" size={10} className="text-current" />}
+                      </div>
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-              <button 
-                onClick={handleReset}
-                disabled={isLoading}
-                className="text-sm font-semibold text-gray-500 hover:text-dark-blue transition-colors px-2"
-              >
-                Set Semula
-              </button>
-              <button 
-                onClick={() => onSearch(filters)}
-                disabled={isLoading}
-                className="flex items-center gap-2 bg-dark-blue hover:bg-blue-900 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors disabled:opacity-50"
-              >
-                <Icon icon="search" size={18} />
-                {isLoading ? "Mencari..." : "Cari"}
-              </button>
+            {/* Category Filter */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Kategori Transaksi</label>
+              <div className="flex flex-wrap gap-3">
+                {CATEGORY_OPTIONS.map(opt => {
+                  const isSelected = filters.categories.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => handleCategoryToggle(opt)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? 'bg-dark-blue text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    >
+                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                        {isSelected && <Icon icon="check" size={10} className="text-current" />}
+                      </div>
+                      {opt.replace(/_/g, ' ')}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-100 w-full">
+            <button 
+              onClick={handleReset}
+              disabled={isLoading}
+              className="text-sm font-semibold text-gray-500 hover:text-dark-blue transition-colors px-2"
+            >
+              Set Semula
+            </button>
+            <button 
+              onClick={() => onSearch(filters)}
+              disabled={isLoading}
+              className="flex items-center gap-2 bg-dark-blue hover:bg-blue-900 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors disabled:opacity-50"
+            >
+              <Icon icon="search" size={18} />
+              {isLoading ? "Mencari..." : "Cari"}
+            </button>
 
           </div>
         </div>

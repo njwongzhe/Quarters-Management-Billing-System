@@ -92,7 +92,10 @@ export async function getTransactionsList(params: TransactionFilterParams) {
         relatedTransaction: true, // Parent related transaction
         childTransactions: true,  // Child related transactions (Reversals/Adjustments)
       },
-      orderBy: { transactionDate: "desc" },
+      orderBy: [
+        { createdAt: "desc" },    // Susun mengikut waktu sebenar rekod dicipta (Paling baru di atas)
+        { transactionNo: "desc" } // Fallback ID sekiranya masa ciptaan tepat sama
+      ],
       skip,
       take: limit,
     }),

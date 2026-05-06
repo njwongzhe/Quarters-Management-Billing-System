@@ -45,6 +45,13 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
       seenPelarasan.add(tx.relatedTransactionId);
     }
     return true; // Kekalkan yang lain
+  }).sort((a, b) => {
+    // Susun mengikut waktu dicipta (Terkini sentiasa di atas)
+    const timeA = new Date(a.createdAt || a.transactionDate).getTime();
+    const timeB = new Date(b.createdAt || b.transactionDate).getTime();
+    if (timeB !== timeA) return timeB - timeA;
+    // Jika masa sama, susun mengikut ID (descending)
+    return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
   });
 
   if (displayTransactions.length === 0) {

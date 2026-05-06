@@ -97,10 +97,10 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#EFF4FF] rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header (Dark Blue) */}
-        <div className="bg-[#1E293B] p-4 flex justify-between items-center text-white">
+        <div className="bg-[#151E66] p-4 flex justify-between items-center text-white">
           <div>
             <h2 className="font-bold text-lg uppercase tracking-wide">Pelarasan Transaksi</h2>
             <p className="text-xs text-gray-300">SILA KEMASKINI BUTIRAN PELARASAN DI BAWAH</p>
@@ -114,7 +114,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
           
           {/* Section 1: Maklumat Transaksi */}
           <div className="space-y-4">
-            <h3 className="border-l-4 border-[#1E293B] pl-2 font-bold text-sm uppercase text-gray-700">Maklumat Transaksi</h3>
+            <h3 className="border-l-4 border-[#151E66] pl-2 font-bold text-sm uppercase text-[#151E66]">Maklumat Transaksi</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -154,7 +154,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
 
           {/* Section 2: Pratonton (Preview) */}
           <div className="space-y-4">
-            <h3 className="border-l-4 border-[#1E293B] pl-2 font-bold text-sm uppercase text-gray-700">Pratonton Transaksi Berkaitan</h3>
+            <h3 className="border-l-4 border-[#151E66] pl-2 font-bold text-sm uppercase text-[#151E66]">Pratonton Transaksi Berkaitan</h3>
             
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <table className="w-full text-xs text-left">
@@ -212,7 +212,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
                   </tr>
                 </tbody>
               </table>
-              <div className="bg-[#1E293B] text-white p-3 flex justify-between items-center font-bold text-sm uppercase">
+              <div className="bg-[#151E66] text-white p-3 flex justify-between items-center font-bold text-sm uppercase">
                 <span>Amaun Bersih</span>
                 <span>RM {formatRM(targetAmount)}</span>
               </div>
