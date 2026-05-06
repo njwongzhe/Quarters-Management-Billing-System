@@ -77,6 +77,10 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Ensure initial status is only AKTIF or TIDAK_LAYAK
+        const desiredStatus = normalizeResidentStatus(status);
+        const initialStatus: ResidentStatus = (desiredStatus === "AKTIF" || desiredStatus === "TIDAK_LAYAK") ? desiredStatus : "AKTIF";
+
         const newResident = await prisma.resident.create({
             data: {
                 fullName: String(fullName).trim(),
@@ -86,7 +90,7 @@ export async function POST(req: NextRequest) {
                 position: position || null,
                 department: department || null,
                 serviceLevel: serviceLevel || null,
-                status: normalizeResidentStatus(status),
+                status: initialStatus,
                 description: description || null,
             },
             include: {

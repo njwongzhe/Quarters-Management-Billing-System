@@ -35,10 +35,17 @@ export function handleResidentStatusFieldChange(
     setFormData: Dispatch<SetStateAction<any>>,
     value: string,
 ) {
+    const mapping: Record<string, string> = {
+        "Aktif": "AKTIF",
+        "Tidak Layak": "TIDAK_LAYAK",
+        "Pencen Mendatang": "PENCEN_MENDATANG",
+        "Data Tidak Lengkap": "DATA_TIDAK_LENGKAP",
+    };
+
     handleFieldChange(
         setFormData,
         "status",
-        value === "Aktif" ? "AKTIF" : "TIDAK_LAYAK",
+        mapping[value] ?? value,
     );
 }
 
@@ -213,7 +220,7 @@ export async function handleCreate(params: {
                 position: formData.position || null,
                 department: formData.department || null,
                 serviceLevel: formData.serviceLevel || null,
-                status: formData.status === "Aktif" ? "AKTIF" : "TIDAK_LAYAK",
+                status: formData.status,
                 description: formData.description || null,
             }),
         });
@@ -282,7 +289,7 @@ export async function handleSave(params: {
                 position: formData.position,
                 department: formData.department,
                 serviceLevel: formData.serviceLevel,
-                status: formData.status === "Aktif" ? "AKTIF" : "TIDAK_LAYAK",
+                status: formData.status,
                 description: formData.description,
             }),
         });

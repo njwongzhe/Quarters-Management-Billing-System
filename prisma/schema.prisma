@@ -363,7 +363,8 @@ model Payment {
 
 model Transaction {
   id                   String             @id @default(uuid()) @db.Uuid
-  residentId           String?            @db.Uuid
+  transactionNo        String?            @unique 
+  residentId           String?            @db.Uuid  
   paymentId            String?            @unique @db.Uuid
 
   transactionDate      DateTime
@@ -398,6 +399,7 @@ model Transaction {
   @@index([status])
   @@index([relatedTransactionId])
   @@index([receiptNo])
+  @@index([transactionNo]) // <-- 2. ADD THIS INDEX FOR FAST SEARCHING
 }
 
 model UploadedDocument {
@@ -455,4 +457,14 @@ model AuditLog {
   @@index([moduleName])
   @@index([actionType])
   @@index([entityType, entityId])
+}
+
+model BillingCycle {
+  id            String   @id @default(uuid()) @db.Uuid
+  billingMonth  DateTime @unique /// e.g., 2026-05-01
+  runDate       DateTime @default(now())
+  success       Boolean  @default(true)
+  recordsBilled Int      @default(0) /// Tracks how many residents were charged
+
+  @@index([billingMonth])
 }

@@ -10,6 +10,10 @@ import type { ResidentRecord, PenghuniTableProps } from "../page";
 import { PenghuniFilter, type PenghuniFilterState } from "./PenghuniFilter";
 import { handleFilterReset, handleFilterSearch, handleResidentDelete, handleResidentUpdate } from "./DatabaseControl";
 
+// Text size constants for table display
+const mainTextSize = "text-[12px]";
+const subTextSize = "text-[11px]";
+
 // Helper function to format currency values in Malaysian Ringgit format.
 function formatCurrency(value: number) {
     return value.toLocaleString("ms-MY", {
@@ -170,33 +174,33 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                                 <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20`}>
                                     {/* Penghuni */}
                                     <td className="px-3 py-2 text-left">
-                                        <div className="font-bold text-[12px]">{resident.fullName}</div>
-                                        <div className="font-extralight text-[11px] text-grey">
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.fullName}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey`}>
                                             <PatternFormat value={resident.icNumber} format="######-##-####" disabled />
                                         </div>
                                     </td>
 
                                     {/* Kuarters */}
                                     <td className="px-3 py-2 text-left">
-                                        <div className="font-bold text-[12px]">{resident.quarters?.quarterName ?? "N/A"}</div>
-                                        <div className="font-extralight text-[11px] text-grey">{resident.quarters?.unitCode ?? "N/A"}</div>
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.quarters?.quarterName ?? "N/A"}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.quarters?.unitCode ?? "N/A"}</div>
                                     </td>
 
                                     {/* Perhubungan */}
                                     <td className="px-3 py-2 text-left">
-                                        <div className="font-bold text-[12px]">
+                                        <div className={`font-bold ${mainTextSize}`}>
                                             {resident.phone ? (
                                                 <PatternFormat value={resident.phone} format="###-#### ####" disabled />
                                             ) : (
                                                 "N/A"
                                             )}
                                         </div>
-                                        <div className="font-extralight text-[11px] text-grey">{resident.email ?? "N/A"}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.email ?? "N/A"}</div>
                                     </td>
                                     
                                     {/* Tunggakan */}
                                     <td className="px-3 py-2 text-right">
-                                        <div className={`font-bold text-[12px] ${getArrearsTextClass(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}`}>
+                                        <div className={`font-bold ${mainTextSize} ${getArrearsTextClass(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}`}>
                                             {formatCurrency(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}
                                         </div>
                                     </td>
