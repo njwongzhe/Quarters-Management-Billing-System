@@ -18,11 +18,10 @@ type NotificationState = {
 export default function PenghuniCreate(props?: PenghuniCreateProps) {
     // Dropdown options for service level and status fields.
     const tarafPerkhidmatanOptions = ["Persekutuan", "Negeri"];
+    // Only allow setting initial status to Aktif or Tidak Layak during creation
     const statusOptions = [
         { label: "Aktif", color: "text-aktif" },
         { label: "Tidak Layak", color: "text-x-layak" },
-        { label: "Pencen Mendatang", color: "text-pencen-datang" },
-        { label: "Data Tidak Lengkap", color: "text-x-lengkap" },
     ];
 
     // State for form data, loading status and notifications.

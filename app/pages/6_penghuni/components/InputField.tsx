@@ -88,21 +88,32 @@ export function InputFieldFormat({
     return (
         <div className={`flex flex-col gap-2 tracking-widest ${className || ""}`}>
             <label className="font-bold text-gray-500 pl-1" style={{ fontSize: labelFontSize }}>{label}</label>
-            <PatternFormat
-                format={format}
-                value={value}
-                disabled={state === "inactive"}
-                onValueChange={(values) => onChange && onChange(values.value)}
-                placeholder={placeholder}
-                className={`
-                    rounded-md border border-light-grey/40 p-3 text-sm min-h-12 
-                    ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
-                }`}
-                style={{
-                    fontSize: inputFontSize,
-                    minHeight: inputMinHeight,
-                }}
-            />
+            {state === "inactive" && typeof value === "string" && /[^0-9]/.test(value) ? (
+                <input
+                    type="text"
+                    value={value}
+                    disabled
+                    placeholder={placeholder}
+                    className={`rounded-md border border-light-grey/40 p-3 text-sm min-h-12 ${inactiveBackgroundClass}`}
+                    style={{ fontSize: inputFontSize, minHeight: inputMinHeight }}
+                />
+            ) : (
+                <PatternFormat
+                    format={format}
+                    value={value}
+                    disabled={state === "inactive"}
+                    onValueChange={(values) => onChange && onChange(values.value)}
+                    placeholder={placeholder}
+                    className={`
+                        rounded-md border border-light-grey/40 p-3 text-sm min-h-12 
+                        ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
+                    }`}
+                    style={{
+                        fontSize: inputFontSize,
+                        minHeight: inputMinHeight,
+                    }}
+                />
+            )}
         </div>
     );
 }

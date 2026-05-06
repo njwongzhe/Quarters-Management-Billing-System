@@ -121,6 +121,26 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         onClose,
     });
 
+    // Validate status transition rules before saving
+    const validateAndSave = () => {
+        const original = originalData.status as string;
+        const newStatus = formData.status as string;
+
+        const allowed = (() => {
+            if (original === "DATA_TIDAK_LENGKAP") return [original];
+            if (original === "AKTIF" || original === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"];
+            if (original === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"];
+            return ["AKTIF", "TIDAK_LAYAK", "PENCEN_MENDATANG", "DATA_TIDAK_LENGKAP"];
+        })();
+
+        if (!allowed.includes(newStatus)) {
+            showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
+            return;
+        }
+
+        void handleSaveResident();
+    };
+
     // Handler for Delete operation.
     const handleDeleteResident = handleDelete.bind(null, {
         residentId: residentId ?? "",
@@ -181,13 +201,13 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                     <nav className="flex items-center justify-center gap-6 bg-white">
                         <button
                             onClick={() => setTab("info")}
-                            className={`py-4 text-sm font-medium -mb-px ${tab === "info" ? "border-b-2 border-dark-blue text-dark-blue" : "text-gray-500"}`}
+                            className={`py-4 text-sm font-medium -mb-px ${tab === "info" ? "border-b-4 border-dark-blue text-dark-blue" : "text-gray-500"}`}
                         >
                             <span className="font-bold">MAKLUMAT PENGHUNI</span>
                         </button>
                         <button
                             onClick={() => setTab("history")}
-                            className={`py-4 text-sm font-medium -mb-px ${tab === "history" ? "border-b-2 border-dark-blue text-dark-blue font-bold" : "text-gray-500"}`}
+                            className={`py-4 text-sm font-medium -mb-px ${tab === "history" ? "border-b-4 border-dark-blue text-dark-blue font-bold" : "text-gray-500"}`}
                         >
                             <span className="font-bold">SEJARAH TRANSAKSI</span>
                         </button>
@@ -220,7 +240,72 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                         <InputField label="JAWATAN" value={displayValue(formData.position)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "position")} className="col-span-1" />
                                         <InputField label="JABATAN" value={displayValue(formData.department)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "department")} className="col-span-1" />
                                         <DropdownField label="TARAF PERKHIDMATAN" options={tarafPerkhidmatanOptions} value={displayValue(formData.serviceLevel as string)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "serviceLevel")} className="col-span-1" />
-                                        <DropdownField label="STATUS" options={statusOptions} value={formData.status === "AKTIF" ? "Aktif" : "Tidak Layak"} state={inputState} onChange={handleResidentStatusFieldChange.bind(null, setFormData)} className="col-span-1" />
+                                        {/* Status Selection With Restricted Transitions */}
+                                        <DropdownField
+                                            label="STATUS"
+                                            options={(() => {
+                                                const current = originalData.status as string;
+                                                // If DATA_TIDAK_LENGKAP, do not allow changing.
+                                                if (current === "DATA_TIDAK_LENGKAP") return [{ label: "Data Tidak Lengkap", color: "text-x-lengkap" }];
+
+                                                // From AKTIF or PENCEN_MENDATANG: can remain or change to TIDAK_LAYAK.
+                                                if (current === "AKTIF" || current === "PENCEN_MENDATANG") {
+                                                    return [
+                                                        { label: "Aktif", color: "text-aktif" },
+                                                        { label: "Tidak Layak", color: "text-x-layak" },
+                                                    ];
+                                                }
+
+                                                // From TIDAK_LAYAK: can remain or change back to AKTIF.
+                                                if (current === "TIDAK_LAYAK") {
+                                                    return [
+                                                        { label: "Aktif", color: "text-aktif" },
+                                                        { label: "Tidak Layak", color: "text-x-layak" },
+                                                    ];
+                                                }
+
+                                                // Fallback: Show full set.
+                                                return statusOptions;
+                                            })()}
+                                            value={(function() {
+                                                switch (formData.status) {
+                                                    case "AKTIF": return "Aktif";
+                                                    case "TIDAK_LAYAK": return "Tidak Layak";
+                                                    case "PENCEN_MENDATANG": return "Pencen Mendatang";
+                                                    case "DATA_TIDAK_LENGKAP": return "Data Tidak Lengkap";
+                                                    default: return formData.status as string;
+                                                }
+                                            })()}
+                                            state={inputState}
+                                            onChange={(val: string) => {
+                                                // If original is DATA_TIDAK_LENGKAP, prevent changes
+                                                const original = originalData.status as string;
+                                                const mapping: Record<string, string> = {
+                                                    "Aktif": "AKTIF",
+                                                    "Tidak Layak": "TIDAK_LAYAK",
+                                                    "Pencen Mendatang": "PENCEN_MENDATANG",
+                                                    "Data Tidak Lengkap": "DATA_TIDAK_LENGKAP",
+                                                };
+
+                                                const newStatus = mapping[val] ?? val;
+
+                                                // Validate allowed transitions.
+                                                const allowed = (() => {
+                                                    if (original === "DATA_TIDAK_LENGKAP") return [original];
+                                                    if (original === "AKTIF" || original === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"];
+                                                    if (original === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"];
+                                                    return ["AKTIF", "TIDAK_LAYAK", "PENCEN_MENDATANG", "DATA_TIDAK_LENGKAP"];
+                                                })();
+
+                                                if (!allowed.includes(newStatus)) {
+                                                    showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
+                                                    return;
+                                                }
+
+                                                handleResidentStatusFieldChange(setFormData, val);
+                                            }}
+                                            className="col-span-1"
+                                            />
                                     </div>
                                 </section>
 
@@ -296,7 +381,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                             <button 
                                                 className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 type="button"
-                                                onClick={handleSaveResident}
+                                                onClick={validateAndSave}
                                                 disabled={isSaving}
                                             >
                                                 <Icon icon="save" size={16} />

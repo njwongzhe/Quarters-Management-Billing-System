@@ -80,7 +80,7 @@ export async function PATCH(
 
     const resident = await prisma.resident.findUnique({
       where: { id },
-      select: { id: true, icNumber: true },
+      select: { id: true, icNumber: true, status: true },
     });
 
     if (!resident) {
@@ -105,6 +105,26 @@ export async function PATCH(
       );
     }
 
+    // Server-side: enforce allowed status transitions
+    const originalStatus = resident.status as ResidentStatus | undefined;
+    const requestedStatus = normalizeResidentStatus(status);
+
+    const allowedTransition = (() => {
+      if (!originalStatus) return true;
+      if (originalStatus === "DATA_TIDAK_LENGKAP") return requestedStatus === originalStatus;
+      if (originalStatus === "AKTIF" || originalStatus === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"].includes(requestedStatus);
+      if (originalStatus === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"].includes(requestedStatus);
+      return true;
+    })();
+
+    if (!allowedTransition) {
+      return createResidentErrorResponse(
+        "Perubahan status tidak dibenarkan untuk rekod ini.",
+        400,
+        "INVALID_STATUS_TRANSITION",
+      );
+    }
+
     const updatedResident = await prisma.resident.update({
       where: { id },
       data: {
@@ -115,7 +135,7 @@ export async function PATCH(
         position: position || null,
         department: department || null,
         serviceLevel: serviceLevel || null,
-        status: normalizeResidentStatus(status),
+        status: requestedStatus,
         description: description || null,
       },
     });

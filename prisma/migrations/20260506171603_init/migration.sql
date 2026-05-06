@@ -1,8 +1,8 @@
 -- CreateEnum
-CREATE TYPE "RecordStatus" AS ENUM ('PENDING', 'VERIFIED');
+CREATE TYPE "RecordStatus" AS ENUM ('PENDING', 'VERIFIED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "ResidentStatus" AS ENUM ('AKTIF', 'TIDAK_LAYAK', 'PENCEN_MENDATANG', 'DATA_TIDAK_LENGKAP', 'KELUAR');
+CREATE TYPE "ResidentStatus" AS ENUM ('AKTIF', 'TIDAK_LAYAK', 'PENCEN_MENDATANG', 'DATA_TIDAK_LENGKAP');
 
 -- CreateEnum
 CREATE TYPE "UnitStatus" AS ENUM ('OCCUPIED', 'VACANT');
@@ -14,13 +14,16 @@ CREATE TYPE "OccupancyStatus" AS ENUM ('CURRENT', 'PAST');
 CREATE TYPE "TransactionCategory" AS ENUM ('BAYARAN', 'CAJ_SEWA', 'CAJ_PENYELENGGARAAN', 'CAJ_PENALTI', 'CAJ_TAMBAHAN', 'REBAT', 'BAKI_AWAL', 'LAIN_LAIN');
 
 -- CreateEnum
-CREATE TYPE "TransactionStatus" AS ENUM ('NORMAL', 'DIBATALKAN', 'DILARASKAN', 'PEMBALIKAN', 'PELARASAN');
+CREATE TYPE "TransactionStatus" AS ENUM ('NORMAL', 'DIBALIKAN', 'DILARASKAN', 'PEMBALIKAN', 'PELARASAN');
 
 -- CreateEnum
 CREATE TYPE "AuditActionType" AS ENUM ('CREATE', 'UPDATE', 'DELETE', 'VERIFY', 'LOGIN', 'LOGOUT', 'EXPORT', 'REVERSAL', 'ADJUSTMENT', 'IMPORT_EXTRACT');
 
 -- CreateEnum
-CREATE TYPE "EntityType" AS ENUM ('ADMIN_PROFILE', 'RESIDENT', 'QUARTER_CLASS', 'UNIT', 'UNIT_OCCUPANCY', 'MONTHLY_CHARGE', 'ADDITIONAL_CHARGE', 'REBATE', 'PAYMENT', 'TRANSACTION', 'ARREARS_SUMMARY');
+CREATE TYPE "DocumentCategory" AS ENUM ('BAYARAN', 'TUNGGAKAN', 'PENGHUNI', 'KUARTERS');
+
+-- CreateEnum
+CREATE TYPE "EntityType" AS ENUM ('ADMIN_PROFILE', 'RESIDENT', 'QUARTER_CATEGORY', 'UNIT', 'UNIT_OCCUPANCY', 'MONTHLY_CHARGE', 'ADDITIONAL_CHARGE', 'REBATE', 'PAYMENT', 'TRANSACTION', 'ARREARS_SUMMARY');
 
 -- CreateTable
 CREATE TABLE "AdminProfile" (
@@ -29,6 +32,7 @@ CREATE TABLE "AdminProfile" (
     "email" TEXT NOT NULL,
     "phoneNumber" TEXT,
     "department" TEXT,
+    "gender" TEXT,
     "role" TEXT NOT NULL DEFAULT 'admin',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,6 +54,7 @@ CREATE TABLE "Resident" (
     "status" "ResidentStatus" NOT NULL DEFAULT 'AKTIF',
     "description" TEXT,
     "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
+    "uploadedDocumentId" UUID,
     "createdById" UUID,
     "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -60,20 +65,22 @@ CREATE TABLE "Resident" (
 );
 
 -- CreateTable
-CREATE TABLE "QuarterClass" (
+CREATE TABLE "QuarterCategory" (
     "id" UUID NOT NULL,
-    "className" TEXT NOT NULL,
+    "categoryName" TEXT NOT NULL,
+    "address" TEXT,
     "rentalPrice" DECIMAL(12,2) NOT NULL,
     "maintenancePrice" DECIMAL(12,2) NOT NULL,
     "penaltyPrice" DECIMAL(12,2) NOT NULL,
     "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
+    "uploadedDocumentId" UUID,
     "createdById" UUID,
     "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "verifiedAt" TIMESTAMP(3),
 
-    CONSTRAINT "QuarterClass_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "QuarterCategory_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -82,7 +89,8 @@ CREATE TABLE "Unit" (
     "unitCode" TEXT NOT NULL,
     "status" "UnitStatus" NOT NULL DEFAULT 'VACANT',
     "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "classId" UUID NOT NULL,
+    "uploadedDocumentId" UUID,
+    "categoryId" UUID NOT NULL,
     "createdById" UUID,
     "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -100,7 +108,7 @@ CREATE TABLE "UnitOccupancy" (
     "moveInDate" TIMESTAMP(3) NOT NULL,
     "moveOutDate" TIMESTAMP(3),
     "status" "OccupancyStatus" NOT NULL DEFAULT 'CURRENT',
-    "notes" TEXT,
+    "description" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -115,6 +123,7 @@ CREATE TABLE "ArrearsSummary" (
     "lastUpdatedMonth" TIMESTAMP(3),
     "description" TEXT,
     "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
+    "uploadedDocumentId" UUID,
     "createdById" UUID,
     "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -138,7 +147,7 @@ CREATE TABLE "MonthlyCharge" (
     "totalMonthlyCharge" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "paymentReceived" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "balanceForMonth" DECIMAL(12,2) NOT NULL DEFAULT 0,
-    "notes" TEXT,
+    "description" TEXT,
     "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
     "createdById" UUID,
     "verifiedById" UUID,
@@ -184,8 +193,9 @@ CREATE TABLE "Payment" (
     "paymentDate" TIMESTAMP(3) NOT NULL,
     "receiptNo" TEXT,
     "amount" DECIMAL(12,2) NOT NULL,
-    "notes" TEXT,
+    "description" TEXT,
     "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
+    "uploadedDocumentId" UUID,
     "createdById" UUID,
     "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -198,6 +208,7 @@ CREATE TABLE "Payment" (
 -- CreateTable
 CREATE TABLE "Transaction" (
     "id" UUID NOT NULL,
+    "transactionNo" TEXT,
     "residentId" UUID,
     "paymentId" UUID,
     "transactionDate" TIMESTAMP(3) NOT NULL,
@@ -207,7 +218,7 @@ CREATE TABLE "Transaction" (
     "debitAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "creditAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "receiptNo" TEXT,
-    "notes" TEXT,
+    "description" TEXT,
     "runningBalance" DECIMAL(12,2),
     "createdById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -217,19 +228,50 @@ CREATE TABLE "Transaction" (
 );
 
 -- CreateTable
+CREATE TABLE "UploadedDocument" (
+    "id" UUID NOT NULL,
+    "fileName" TEXT NOT NULL,
+    "originalName" TEXT,
+    "fileType" TEXT NOT NULL,
+    "fileSize" INTEGER NOT NULL,
+    "category" "DocumentCategory" NOT NULL,
+    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'PENDING',
+    "uploadedById" UUID,
+    "verifiedById" UUID,
+    "uploadedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "verifiedAt" TIMESTAMP(3),
+    "description" TEXT,
+    "remark" TEXT,
+
+    CONSTRAINT "UploadedDocument_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "AuditLog" (
     "id" UUID NOT NULL,
     "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" UUID,
     "userName" TEXT NOT NULL,
     "moduleName" TEXT NOT NULL,
-    "pageName" TEXT,
+    "targetData" TEXT,
     "actionType" "AuditActionType" NOT NULL,
     "description" TEXT NOT NULL,
     "entityType" "EntityType",
     "entityId" UUID,
 
     CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "BillingCycle" (
+    "id" UUID NOT NULL,
+    "billingMonth" TIMESTAMP(3) NOT NULL,
+    "runDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "success" BOOLEAN NOT NULL DEFAULT true,
+    "recordsBilled" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "BillingCycle_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -248,22 +290,31 @@ CREATE INDEX "Resident_status_idx" ON "Resident"("status");
 CREATE INDEX "Resident_recordStatus_idx" ON "Resident"("recordStatus");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "QuarterClass_className_key" ON "QuarterClass"("className");
+CREATE INDEX "Resident_uploadedDocumentId_idx" ON "Resident"("uploadedDocumentId");
 
 -- CreateIndex
-CREATE INDEX "QuarterClass_recordStatus_idx" ON "QuarterClass"("recordStatus");
+CREATE INDEX "QuarterCategory_recordStatus_idx" ON "QuarterCategory"("recordStatus");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Unit_unitCode_key" ON "Unit"("unitCode");
+CREATE INDEX "QuarterCategory_uploadedDocumentId_idx" ON "QuarterCategory"("uploadedDocumentId");
 
 -- CreateIndex
-CREATE INDEX "Unit_classId_idx" ON "Unit"("classId");
+CREATE UNIQUE INDEX "QuarterCategory_categoryName_address_key" ON "QuarterCategory"("categoryName", "address");
+
+-- CreateIndex
+CREATE INDEX "Unit_categoryId_idx" ON "Unit"("categoryId");
 
 -- CreateIndex
 CREATE INDEX "Unit_status_idx" ON "Unit"("status");
 
 -- CreateIndex
 CREATE INDEX "Unit_recordStatus_idx" ON "Unit"("recordStatus");
+
+-- CreateIndex
+CREATE INDEX "Unit_uploadedDocumentId_idx" ON "Unit"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Unit_categoryId_unitCode_key" ON "Unit"("categoryId", "unitCode");
 
 -- CreateIndex
 CREATE INDEX "UnitOccupancy_residentId_idx" ON "UnitOccupancy"("residentId");
@@ -282,6 +333,9 @@ CREATE UNIQUE INDEX "ArrearsSummary_residentId_key" ON "ArrearsSummary"("residen
 
 -- CreateIndex
 CREATE INDEX "ArrearsSummary_recordStatus_idx" ON "ArrearsSummary"("recordStatus");
+
+-- CreateIndex
+CREATE INDEX "ArrearsSummary_uploadedDocumentId_idx" ON "ArrearsSummary"("uploadedDocumentId");
 
 -- CreateIndex
 CREATE INDEX "ArrearsSummary_lastUpdatedMonth_idx" ON "ArrearsSummary"("lastUpdatedMonth");
@@ -332,6 +386,12 @@ CREATE INDEX "Payment_receiptNo_idx" ON "Payment"("receiptNo");
 CREATE INDEX "Payment_recordStatus_idx" ON "Payment"("recordStatus");
 
 -- CreateIndex
+CREATE INDEX "Payment_uploadedDocumentId_idx" ON "Payment"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Transaction_transactionNo_key" ON "Transaction"("transactionNo");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Transaction_paymentId_key" ON "Transaction"("paymentId");
 
 -- CreateIndex
@@ -356,6 +416,21 @@ CREATE INDEX "Transaction_relatedTransactionId_idx" ON "Transaction"("relatedTra
 CREATE INDEX "Transaction_receiptNo_idx" ON "Transaction"("receiptNo");
 
 -- CreateIndex
+CREATE INDEX "Transaction_transactionNo_idx" ON "Transaction"("transactionNo");
+
+-- CreateIndex
+CREATE INDEX "UploadedDocument_category_idx" ON "UploadedDocument"("category");
+
+-- CreateIndex
+CREATE INDEX "UploadedDocument_recordStatus_idx" ON "UploadedDocument"("recordStatus");
+
+-- CreateIndex
+CREATE INDEX "UploadedDocument_uploadedAt_idx" ON "UploadedDocument"("uploadedAt");
+
+-- CreateIndex
+CREATE INDEX "UploadedDocument_uploadedById_idx" ON "UploadedDocument"("uploadedById");
+
+-- CreateIndex
 CREATE INDEX "AuditLog_timestamp_idx" ON "AuditLog"("timestamp");
 
 -- CreateIndex
@@ -370,6 +445,12 @@ CREATE INDEX "AuditLog_actionType_idx" ON "AuditLog"("actionType");
 -- CreateIndex
 CREATE INDEX "AuditLog_entityType_entityId_idx" ON "AuditLog"("entityType", "entityId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "BillingCycle_billingMonth_key" ON "BillingCycle"("billingMonth");
+
+-- CreateIndex
+CREATE INDEX "BillingCycle_billingMonth_idx" ON "BillingCycle"("billingMonth");
+
 -- AddForeignKey
 ALTER TABLE "Resident" ADD CONSTRAINT "Resident_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -377,13 +458,22 @@ ALTER TABLE "Resident" ADD CONSTRAINT "Resident_createdById_fkey" FOREIGN KEY ("
 ALTER TABLE "Resident" ADD CONSTRAINT "Resident_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "QuarterClass" ADD CONSTRAINT "QuarterClass_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Resident" ADD CONSTRAINT "Resident_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "QuarterClass" ADD CONSTRAINT "QuarterClass_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "QuarterCategory" ADD CONSTRAINT "QuarterCategory_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Unit" ADD CONSTRAINT "Unit_classId_fkey" FOREIGN KEY ("classId") REFERENCES "QuarterClass"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "QuarterCategory" ADD CONSTRAINT "QuarterCategory_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuarterCategory" ADD CONSTRAINT "QuarterCategory_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Unit" ADD CONSTRAINT "Unit_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "QuarterCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Unit" ADD CONSTRAINT "Unit_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Unit" ADD CONSTRAINT "Unit_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -399,6 +489,9 @@ ALTER TABLE "UnitOccupancy" ADD CONSTRAINT "UnitOccupancy_unitId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -428,6 +521,9 @@ ALTER TABLE "Rebate" ADD CONSTRAINT "Rebate_monthlyChargeId_fkey" FOREIGN KEY ("
 ALTER TABLE "Payment" ADD CONSTRAINT "Payment_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Payment" ADD CONSTRAINT "Payment_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Payment" ADD CONSTRAINT "Payment_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -444,6 +540,12 @@ ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_relatedTransactionId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UploadedDocument" ADD CONSTRAINT "UploadedDocument_uploadedById_fkey" FOREIGN KEY ("uploadedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UploadedDocument" ADD CONSTRAINT "UploadedDocument_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
