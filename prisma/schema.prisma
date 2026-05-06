@@ -442,7 +442,7 @@ model AuditLog {
   userId      String?         @db.Uuid
   userName    String
   moduleName  String
-  pageName    String?
+  targetData  String?
   actionType  AuditActionType
   description String
 
