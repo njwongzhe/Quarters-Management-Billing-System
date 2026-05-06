@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Icon from "../../../components/Icon";
 import {
   type ExtractedBayaranRecord,
@@ -12,16 +12,24 @@ export default function BayaranReviewTable({
   records,
   onTotalAmountChange,
   onRecordsChange,
+  selectedKeys = [],
+  onSelectedKeysChange,
 }: {
   records: ExtractedBayaranRecord[];
   onTotalAmountChange?: (totalAmount: string) => void;
   onRecordsChange?: (records: ExtractedBayaranRecord[], totalAmount: string) => void;
+  selectedKeys?: string[];
+  onSelectedKeysChange?: (keys: string[]) => void;
 }) {
-  const initialRows = records.map((record, index) => ({
-    ...record,
-    catatan: record.catatan || "bayaran",
-    id: `${record.page}-${record.bil}-${record.noGajiNoKp}-${index}`,
-  }));
+  const initialRows = useMemo(
+    () =>
+      records.map((record, index) => ({
+        ...record,
+        catatan: record.catatan || "bayaran",
+        id: `${record.page}-${record.bil}-${record.noGajiNoKp}-${index}`,
+      })),
+    [records],
+  );
   const [savedRows, setSavedRows] = useState(initialRows);
   const [draftRows, setDraftRows] = useState(initialRows);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -35,6 +43,7 @@ export default function BayaranReviewTable({
   const displayEnd = pageStartIndex + pageRows.length;
   const pendingDeleteRow =
     savedRows.find((row) => row.id === pendingDeleteId) ?? null;
+  const selectedKeySet = new Set(selectedKeys);
 
   const calculateTotalAmount = (rows: typeof draftRows) =>
     rows.reduce((total, row) => total + (Number(row.amaunRm) || 0), 0).toFixed(2);
@@ -116,6 +125,18 @@ export default function BayaranReviewTable({
     setEditingId(id);
   };
 
+  const toggleSelectedRow = (key: string, checked: boolean) => {
+    const nextKeys = new Set(selectedKeys);
+
+    if (checked) {
+      nextKeys.add(key);
+    } else {
+      nextKeys.delete(key);
+    }
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
   return (
     <div className="overflow-x-auto rounded-lg border border-[#DCE2F1] bg-white">
       <table className="min-w-7xl table-fixed text-left text-xs">
@@ -127,6 +148,7 @@ export default function BayaranReviewTable({
             <th className="w-56 px-4 py-4">Penghuni</th>
             <th className="w-40 px-4 py-4 whitespace-nowrap">PTJPK / Jabatan</th>
             <th className="w-72 px-4 py-4">Nama PTJPK</th>
+            <th className="w-72 px-4 py-4">Nama Jabatan</th>
             <th className="w-48 px-4 py-4 whitespace-nowrap">No. Rujukan</th>
             <th className="w-56 px-4 py-4">Catatan</th>
             <th className="w-44 px-4 py-4 text-right whitespace-nowrap">
@@ -136,16 +158,20 @@ export default function BayaranReviewTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-[#EEF1F7]">
-          {pageRows.map((resident, index) => {
+          {pageRows.map((resident) => {
             const isEditing = editingId === resident.id;
             const draft = draftRows.find((row) => row.id === resident.id) ?? resident;
+            const selectionKey = getBayaranRecordKey(resident);
 
             return (
             <tr key={resident.id}>
               <td className="px-5 py-4">
                 <input
                   type="checkbox"
-                  defaultChecked={pageStartIndex + index === 0}
+                  checked={selectedKeySet.has(selectionKey)}
+                  onChange={(event) =>
+                    toggleSelectedRow(selectionKey, event.target.checked)
+                  }
                   className="h-4 w-4 accent-dark-blue"
                 />
               </td>
@@ -167,6 +193,9 @@ export default function BayaranReviewTable({
               </td>
               <td className="px-4 py-4 font-semibold leading-5 text-[#172033]">
                 {resident.ptjpkName || "-"}
+              </td>
+              <td className="px-4 py-4 font-semibold leading-5 text-[#172033]">
+                {resident.jabatanName || "-"}
               </td>
               <td className="px-4 py-4 wrap-break-word">{resident.noRujukan || "-"}</td>
               <td className="px-4 py-4">
@@ -288,5 +317,12 @@ export default function BayaranReviewTable({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function getBayaranRecordKey(record: ExtractedBayaranRecord) {
+  return (
+    record.paymentId ??
+    `${record.page}-${record.bil}-${record.noGajiNoKp}-${record.noRujukan}`
   );
 }

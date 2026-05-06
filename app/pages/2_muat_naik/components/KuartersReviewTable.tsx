@@ -11,34 +11,14 @@ import {
 
 export default function KuartersReviewTable({
   records,
+  selectedKeys = [],
+  onSelectedKeysChange,
 }: {
   records: ExtractedQuarterRecord[];
+  selectedKeys?: string[];
+  onSelectedKeysChange?: (keys: string[]) => void;
 }) {
-  const fallbackRecords: ExtractedQuarterRecord[] = [
-    {
-      id: "c",
-      categoryName: "C",
-      kawasan: "C",
-      typeLabel: "",
-      rentalPrice: "450.00",
-      maintenancePrice: "50.00",
-      penaltyPrice: "0.00",
-      unitCount: 4,
-      sourceSheet: "Contoh",
-      sourceRow: 1,
-      units: ["JB-K01-A-04", "JH-K01-A-05", "JB-K01-B-02", "JB-K01-B-03"].map(
-        (unitCode, index) => ({
-          unitCode,
-          address: "",
-          sourceSheet: "Contoh",
-          sourceRow: index + 1,
-        }),
-      ),
-    },
-  ];
-  const [categories, setCategories] = useState<ExtractedQuarterRecord[]>(
-    records.length > 0 ? records : fallbackRecords,
-  );
+  const [categories, setCategories] = useState<ExtractedQuarterRecord[]>(records);
   const [categoryDrafts, setCategoryDrafts] = useState<
     Record<
       string,
@@ -49,15 +29,13 @@ export default function KuartersReviewTable({
     >
   >({});
   const [unitDrafts, setUnitDrafts] = useState<Record<string, string>>({});
-  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id ?? "");
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
-    categories[0]?.id ?? null,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingUnitKey, setEditingUnitKey] = useState<string | null>(null);
   const [categoryPage, setCategoryPage] = useState(1);
   const [unitPage, setUnitPage] = useState(1);
   const selectedCategory =
-    categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
+    categories.find((category) => category.id === selectedCategoryId) ?? null;
   const totalCategoryPages = Math.max(
     1,
     Math.ceil(categories.length / QUARTER_CATEGORIES_PER_PAGE),
@@ -80,11 +58,24 @@ export default function KuartersReviewTable({
   );
   const unitDisplayStart = units.length === 0 ? 0 : unitStartIndex + 1;
   const unitDisplayEnd = unitStartIndex + pageUnits.length;
+  const selectedKeySet = new Set(selectedKeys);
 
   const selectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
     setUnitPage(1);
     setEditingUnitKey(null);
+  };
+
+  const toggleSelectedCategory = (categoryKey: string, checked: boolean) => {
+    const nextKeys = new Set(selectedKeys);
+
+    if (checked) {
+      nextKeys.add(categoryKey);
+    } else {
+      nextKeys.delete(categoryKey);
+    }
+
+    onSelectedKeysChange?.([...nextKeys]);
   };
 
   const startCategoryEdit = (category: ExtractedQuarterRecord) => {
@@ -181,9 +172,19 @@ export default function KuartersReviewTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF1F7]">
-            {pageCategories.map((category, index) => {
+            {pageCategories.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
+                >
+                  Tiada kategori atau unit kuarters baharu ditemui.
+                </td>
+              </tr>
+            ) : (
+              pageCategories.map((category) => {
               const isSelected = category.id === selectedCategory?.id;
-              const rowIndex = categoryStartIndex + index;
+              const selectionKey = getKuartersRecordKey(category);
 
               return (
                 <tr
@@ -194,8 +195,12 @@ export default function KuartersReviewTable({
                   <td className="px-5 py-4">
                     <input
                       type="checkbox"
-                      defaultChecked={rowIndex === 0}
+                      checked={selectedKeySet.has(selectionKey)}
                       className="h-4 w-4 accent-dark-blue"
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) =>
+                        toggleSelectedCategory(selectionKey, event.target.checked)
+                      }
                     />
                   </td>
                   <td className="px-4 py-4 font-extrabold text-[#172033]">
@@ -334,7 +339,7 @@ export default function KuartersReviewTable({
                   </td>
                 </tr>
               );
-            })}
+            }))}
           </tbody>
         </table>
         <Pagination
@@ -354,7 +359,12 @@ export default function KuartersReviewTable({
           <span>ID Unit</span>
           <span className="text-center">Tindakan</span>
         </div>
-        {pageUnits.map((unit) => {
+        {pageUnits.length === 0 ? (
+          <div className="px-5 py-10 text-center text-xs font-semibold text-[#667085]">
+            Tiada unit baharu.
+          </div>
+        ) : (
+          pageUnits.map((unit) => {
           const unitKey = `${unit.sourceSheet}-${unit.sourceRow}-${unit.unitCode}`;
           const isEditing = editingUnitKey === unitKey;
 
@@ -417,7 +427,7 @@ export default function KuartersReviewTable({
               </span>
             </div>
           );
-        })}
+        }))}
         <Pagination
           currentPage={safeUnitPage}
           totalPages={totalUnitPages}
@@ -428,4 +438,8 @@ export default function KuartersReviewTable({
       </div>
     </div>
   );
+}
+
+function getKuartersRecordKey(record: ExtractedQuarterRecord) {
+  return record.categoryId ?? record.id;
 }

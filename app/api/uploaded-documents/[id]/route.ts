@@ -131,6 +131,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         if (extractResult.documentType === "tunggakan") {
           const nextArrearsSummaryIds = new Set(
             extractResult.records
+              .filter(
+                (record: { importStatus?: string }) =>
+                  record.importStatus !== "IGNORED",
+              )
               .map((record: { arrearsSummaryId?: string }) => record.arrearsSummaryId)
               .filter(Boolean),
           );
@@ -159,7 +163,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           }
 
           for (const record of extractResult.records) {
-            if (!record.arrearsSummaryId) {
+            if (!record.arrearsSummaryId || record.importStatus === "IGNORED") {
               continue;
             }
 

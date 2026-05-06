@@ -164,7 +164,21 @@ function StatCards({ stats }: { stats: StatCard[] }) {
   );
 }
 
-const subscribeToSessionStorage = () => () => {};
+const SESSION_STORAGE_CHANGE_EVENT = "extract-review-storage";
+
+const subscribeToSessionStorage = (onStoreChange: () => void) => {
+  window.addEventListener(SESSION_STORAGE_CHANGE_EVENT, onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+
+  return () => {
+    window.removeEventListener(SESSION_STORAGE_CHANGE_EVENT, onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+};
+
+const notifySessionStorageChange = () => {
+  window.dispatchEvent(new Event(SESSION_STORAGE_CHANGE_EVENT));
+};
 
 function ReviewTable({
   kind,
@@ -175,6 +189,8 @@ function ReviewTable({
   kuartersRecords,
   tunggakanRecords,
   onTunggakanRecordsChange,
+  selectedKeys,
+  onSelectedKeysChange,
 }: {
   kind: ReviewKind;
   bayaranRecords: ExtractedBayaranRecord[];
@@ -190,13 +206,20 @@ function ReviewTable({
     records: ExtractedTunggakanRecord[],
     totalAmount: string,
   ) => void;
+  selectedKeys: string[];
+  onSelectedKeysChange: (keys: string[]) => void;
 }) {
   if (kind === "bayaran") {
     return (
       <BayaranReviewTable
+        key={bayaranRecords
+          .map((record) => record.paymentId ?? `${record.page}-${record.bil}-${record.noGajiNoKp}`)
+          .join("|")}
         records={bayaranRecords}
         onTotalAmountChange={onBayaranTotalAmountChange}
         onRecordsChange={onBayaranRecordsChange}
+        selectedKeys={selectedKeys}
+        onSelectedKeysChange={onSelectedKeysChange}
       />
     );
   }
@@ -209,15 +232,32 @@ function ReviewTable({
           .join("|")}
         records={tunggakanRecords}
         onRecordsChange={onTunggakanRecordsChange}
+        selectedKeys={selectedKeys}
+        onSelectedKeysChange={onSelectedKeysChange}
       />
     );
   }
 
   if (kind === "penghuni") {
-    return <PenghuniReviewTable records={penghuniRecords} />;
+    return (
+      <PenghuniReviewTable
+        records={penghuniRecords}
+        selectedKeys={selectedKeys}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />
+    );
   }
 
-  return <KuartersReviewTable records={kuartersRecords} />;
+  return (
+    <KuartersReviewTable
+      key={kuartersRecords
+        .map((record) => record.categoryId ?? record.id)
+        .join("|")}
+      records={kuartersRecords}
+      selectedKeys={selectedKeys}
+      onSelectedKeysChange={onSelectedKeysChange}
+    />
+  );
 }
 
 export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
@@ -226,19 +266,21 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
     string | null
   >(null);
   const [verificationMessage, setVerificationMessage] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyingMode, setVerifyingMode] = useState<"selected" | "all" | null>(
+    null,
+  );
+  const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
   const storedExtract = useSyncExternalStore(
     subscribeToSessionStorage,
-    () =>
-      window.sessionStorage.getItem(`${kind}ExtractResult`) ?? "",
+    () => window.sessionStorage.getItem(`${kind}ExtractResult`) ?? "",
     () => "",
   );
   const uploadedFileName = useSyncExternalStore(
     subscribeToSessionStorage,
-    () =>
-      window.sessionStorage.getItem(`${kind}ExtractFileName`) ?? "",
+    () => window.sessionStorage.getItem(`${kind}ExtractFileName`) ?? "",
     () => "",
   );
+
   const extractResult = useMemo(() => {
     if (!storedExtract) {
       return null;
@@ -278,6 +320,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
     );
 
     window.sessionStorage.setItem("bayaranExtractResult", JSON.stringify(nextExtract));
+    notifySessionStorageChange();
 
     if (!draftId) {
       return;
@@ -316,6 +359,7 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
       "tunggakanExtractResult",
       JSON.stringify(nextExtract),
     );
+    notifySessionStorageChange();
 
     if (!draftId) {
       return;
@@ -336,7 +380,11 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
     router.push(ROUTES.muatNaik);
   };
 
-  const handleVerifyData = async () => {
+  const handleVerifyData = async (mode: "selected" | "all") => {
+    if (verifyingMode) {
+      return;
+    }
+
     const draftId = window.sessionStorage.getItem(
       CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY,
     );
@@ -346,12 +394,24 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
       return;
     }
 
-    setIsVerifying(true);
+    if (mode === "selected" && selectedRecordKeys.length === 0) {
+      setVerificationMessage("Sila pilih sekurang-kurangnya satu rekod untuk disahkan.");
+      return;
+    }
+
+    setVerifyingMode(mode);
     setVerificationMessage("");
 
     try {
       const response = await fetch(`/api/uploaded-documents/${draftId}/verify`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body:
+          mode === "selected"
+            ? JSON.stringify({ selectedKeys: selectedRecordKeys })
+            : undefined,
       });
       const result = await response.json().catch(() => null);
 
@@ -359,16 +419,27 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
         throw new Error(result?.message ?? "Gagal mengesahkan data.");
       }
 
-      window.sessionStorage.removeItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY);
-      window.sessionStorage.removeItem(`${kind}ExtractResult`);
-      window.sessionStorage.removeItem(`${kind}ExtractFileName`);
-      router.push(ROUTES.muatNaik);
+      if (result?.data?.remainingExtractResult) {
+        window.sessionStorage.setItem(
+          `${kind}ExtractResult`,
+          JSON.stringify(result.data.remainingExtractResult),
+        );
+        notifySessionStorageChange();
+        setSelectedRecordKeys([]);
+        setVerificationMessage("Rekod dipilih berjaya disahkan.");
+      } else {
+        window.sessionStorage.removeItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY);
+        window.sessionStorage.removeItem(`${kind}ExtractResult`);
+        window.sessionStorage.removeItem(`${kind}ExtractFileName`);
+        notifySessionStorageChange();
+        router.push(ROUTES.muatNaik);
+      }
     } catch (error) {
       setVerificationMessage(
         error instanceof Error ? error.message : "Gagal mengesahkan data.",
       );
     } finally {
-      setIsVerifying(false);
+      setVerifyingMode(null);
     }
   };
 
@@ -551,6 +622,8 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
               kuartersRecords={kuartersExtract?.records ?? []}
               tunggakanRecords={tunggakanExtract?.records ?? []}
               onTunggakanRecordsChange={updateCurrentTunggakanDraft}
+              selectedKeys={selectedRecordKeys}
+              onSelectedKeysChange={setSelectedRecordKeys}
             />
           </div>
         </div>
@@ -565,20 +638,20 @@ export default function ExtractReviewPage({ kind }: { kind: ReviewKind }) {
             <button
               type="button"
               className="inline-flex h-11 items-center justify-center gap-2 rounded bg-dark-blue px-7 text-xs font-extrabold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-[#6B7280]"
-              onClick={handleVerifyData}
-              disabled={isVerifying}
+              onClick={() => handleVerifyData("selected")}
+              disabled={verifyingMode === "selected"}
             >
               <Icon icon="settings_backup_restore" size={15} weight={700} />
-              {isVerifying ? "Mengesahkan..." : "Sahkan Data"}
+              {verifyingMode === "selected" ? "Mengesahkan..." : "Sahkan Data"}
             </button>
             <button
               type="button"
               className="inline-flex h-11 items-center justify-center gap-2 rounded bg-green px-7 text-xs font-extrabold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-[#6B7280]"
-              onClick={handleVerifyData}
-              disabled={isVerifying}
+              onClick={() => handleVerifyData("all")}
+              disabled={verifyingMode === "all"}
             >
               <Icon icon="done_all" size={15} weight={700} />
-              {isVerifying ? "Mengesahkan..." : "Sahkan Semua Data"}
+              {verifyingMode === "all" ? "Mengesahkan..." : "Sahkan Semua Data"}
             </button>
           </div>
         </div>

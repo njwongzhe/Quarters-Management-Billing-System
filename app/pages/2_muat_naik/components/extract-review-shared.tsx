@@ -3,6 +3,8 @@
 import Icon from "../../../components/Icon";
 
 export type ExtractedPenghuniRecord = {
+  residentId?: string;
+  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
   nama: string;
   noKadPengenalan: string;
   kuarters: string;
@@ -26,6 +28,7 @@ export type PenghuniExtractResult = {
 };
 
 export type ExtractedQuarterUnit = {
+  unitId?: string;
   unitCode: string;
   address: string;
   sourceSheet: string;
@@ -34,6 +37,7 @@ export type ExtractedQuarterUnit = {
 
 export type ExtractedQuarterRecord = {
   id: string;
+  categoryId?: string;
   categoryName: string;
   kawasan: string;
   typeLabel: string;
@@ -84,6 +88,8 @@ export type ExtractedTunggakanRecord = {
   arrearsSummaryId?: string;
   residentId?: string;
   residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  importStatus?: "PENDING" | "IGNORED";
+  importMessage?: string;
   nama: string;
   noKadPengenalan: string;
   jumlahTunggakan: string;

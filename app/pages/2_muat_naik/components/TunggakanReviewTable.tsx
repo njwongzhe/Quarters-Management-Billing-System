@@ -14,16 +14,21 @@ type TunggakanReviewTableProps = {
     records: ExtractedTunggakanRecord[],
     totalAmount: string,
   ) => void;
+  selectedKeys?: string[];
+  onSelectedKeysChange?: (keys: string[]) => void;
 };
 
 export default function TunggakanReviewTable({
   records,
   onRecordsChange,
+  selectedKeys = [],
+  onSelectedKeysChange,
 }: TunggakanReviewTableProps) {
   const [savedRows, setSavedRows] = useState(records);
   const [draftRows, setDraftRows] = useState(records);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const selectedKeySet = new Set(selectedKeys);
 
   const totalPages = Math.max(1, Math.ceil(savedRows.length / RESIDENTS_PER_PAGE));
   const paginatedRows = useMemo(
@@ -45,6 +50,7 @@ export default function TunggakanReviewTable({
 
   const persistRows = (rows: ExtractedTunggakanRecord[]) => {
     const totalAmount = rows
+      .filter((row) => row.importStatus !== "IGNORED")
       .reduce((total, row) => total + Number(row.jumlahTunggakan || 0), 0)
       .toFixed(2);
 
@@ -91,6 +97,18 @@ export default function TunggakanReviewTable({
     setEditingKey(key);
   };
 
+  const toggleSelectedRow = (key: string, checked: boolean) => {
+    const nextKeys = new Set(selectedKeys);
+
+    if (checked) {
+      nextKeys.add(key);
+    } else {
+      nextKeys.delete(key);
+    }
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
   return (
     <div className="overflow-hidden rounded-lg border border-[#DCE2F1] bg-white">
       <table className="w-full table-fixed text-left text-xs">
@@ -123,13 +141,33 @@ export default function TunggakanReviewTable({
               return (
                 <tr key={key}>
                   <td className="px-5 py-4">
-                    <input type="checkbox" className="h-4 w-4 accent-dark-blue" />
+                    <input
+                      type="checkbox"
+                      checked={selectedKeySet.has(key)}
+                      disabled={resident.importStatus === "IGNORED"}
+                      className="h-4 w-4 accent-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                      onChange={(event) =>
+                        toggleSelectedRow(key, event.target.checked)
+                      }
+                    />
                   </td>
                   <td className="px-4 py-4">
-                    <p className="font-extrabold text-[#172033]">{resident.nama}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-extrabold text-[#172033]">{resident.nama}</p>
+                      {resident.importStatus === "IGNORED" ? (
+                        <span className="rounded-full bg-[#FFF4E5] px-2 py-0.5 text-[9px] font-extrabold uppercase text-[#B54708]">
+                          Diabaikan
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-[10px] font-semibold text-[#667085]">
                       {resident.noKadPengenalan}
                     </p>
+                    {resident.importMessage ? (
+                      <p className="mt-1 text-[10px] font-semibold text-[#B54708]">
+                        {resident.importMessage}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-4 text-right">
                     {isEditing ? (
@@ -154,7 +192,14 @@ export default function TunggakanReviewTable({
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-center gap-4">
-                      {isEditing ? (
+                      {resident.importStatus === "IGNORED" ? (
+                        <Icon
+                          icon="block"
+                          size={16}
+                          weight={700}
+                          className="text-[#B54708]"
+                        />
+                      ) : isEditing ? (
                         <>
                           <button
                             type="button"

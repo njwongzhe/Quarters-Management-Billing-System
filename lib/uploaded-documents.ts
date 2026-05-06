@@ -112,6 +112,95 @@ async function findResidentByIcNumber(
   return residents[0] ?? null;
 }
 
+async function findResidentByIcNumberAndName(
+  tx: Prisma.TransactionClient,
+  icNumber: string,
+  fullName: string,
+) {
+  const residents = await tx.$queryRaw<
+    { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
+  >`
+    SELECT "id", "recordStatus"
+    FROM "Resident"
+    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
+      regexp_replace(${icNumber}, '\\D', '', 'g')
+      AND UPPER(TRIM(regexp_replace("fullName", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(${fullName}, '\\s+', ' ', 'g')))
+    ORDER BY
+      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return residents[0] ?? null;
+}
+
+async function findArrearsSummaryByResidentId(
+  tx: Prisma.TransactionClient,
+  residentId: string,
+) {
+  const arrearsSummaries = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "ArrearsSummary"
+    WHERE "residentId" = ${residentId}::uuid
+    ORDER BY
+      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return arrearsSummaries[0]?.id ?? "";
+}
+
+function tunggakanIdentityKey(name: string, icNumber: string) {
+  return [normalizeExtractText(name), icNumber.replace(/\D/g, "")].join("|");
+}
+
+function normalizeExtractText(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+async function findQuarterCategoryByNameAddress(
+  tx: Prisma.TransactionClient,
+  categoryName: string,
+  address: string | null,
+) {
+  const categories = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "QuarterCategory"
+    WHERE UPPER(TRIM(regexp_replace("categoryName", '\\s+', ' ', 'g'))) =
+      UPPER(TRIM(regexp_replace(${categoryName}, '\\s+', ' ', 'g')))
+      AND UPPER(TRIM(regexp_replace(COALESCE("address", ''), '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(COALESCE(${address}::text, ''), '\\s+', ' ', 'g')))
+    ORDER BY
+      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return categories[0]?.id ?? "";
+}
+
+async function findUnitByCategoryIdAndCode(
+  tx: Prisma.TransactionClient,
+  categoryId: string,
+  unitCode: string,
+) {
+  const units = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "Unit"
+    WHERE "categoryId" = ${categoryId}::uuid
+      AND UPPER(TRIM(regexp_replace("unitCode", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(${unitCode}, '\\s+', ' ', 'g')))
+    ORDER BY
+      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return units[0]?.id ?? "";
+}
+
 export async function createPendingBayaranRows(
   tx: Prisma.TransactionClient,
   uploadedDocumentId: string,
@@ -178,13 +267,66 @@ export async function createPendingTunggakanRows(
   }
 
   const enrichedRecords = [];
+  const acceptedTunggakanKeys = new Set<string>();
 
   for (const record of extractResult.records) {
     const icNumber = record.noKadPengenalan.trim();
-    const existingResident = await findResidentByIcNumber(tx, icNumber);
+    const identityKey = tunggakanIdentityKey(record.nama, icNumber);
+    const existingResident = await findResidentByIcNumberAndName(
+      tx,
+      icNumber,
+      record.nama,
+    );
+    const residentWithSameIc = existingResident
+      ? null
+      : await findResidentByIcNumber(tx, icNumber);
 
     let residentId = existingResident?.id;
     let residentRecordStatus = existingResident?.recordStatus;
+
+    if (acceptedTunggakanKeys.has(identityKey)) {
+      enrichedRecords.push({
+        ...record,
+        residentId,
+        residentRecordStatus,
+        importStatus: "IGNORED" as const,
+        importMessage:
+          "Rekod tunggakan pendua dalam fail ini telah diabaikan. Rekod pertama dikekalkan.",
+      });
+      continue;
+    }
+
+    if (residentId) {
+      const existingArrearsSummaryId = await findArrearsSummaryByResidentId(
+        tx,
+        residentId,
+      );
+
+      if (existingArrearsSummaryId) {
+        enrichedRecords.push({
+          ...record,
+          arrearsSummaryId: existingArrearsSummaryId,
+          residentId,
+          residentRecordStatus,
+          importStatus: "IGNORED" as const,
+          importMessage:
+            "Rekod tunggakan pertama telah wujud untuk nama dan IC ini. Amaun baharu diabaikan.",
+        });
+        continue;
+      }
+    }
+
+    if (!residentId && residentWithSameIc) {
+      enrichedRecords.push({
+        ...record,
+        residentId: residentWithSameIc.id,
+        residentRecordStatus: residentWithSameIc.recordStatus,
+        importStatus: "IGNORED" as const,
+        importMessage:
+          "IC telah wujud tetapi nama tidak sepadan. Semak nama dan IC sebelum import.",
+      });
+      continue;
+    }
 
     if (!residentId) {
       const nextResidentId = randomUUID();
@@ -201,32 +343,45 @@ export async function createPendingTunggakanRows(
       residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
     }
 
+    acceptedTunggakanKeys.add(identityKey);
+
     const arrearsSummaryId = randomUUID();
     const arrearsSummaries = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO "ArrearsSummary"
         ("id", "residentId", "totalArrearsAmount", "description", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
       VALUES
         (${arrearsSummaryId}::uuid, ${residentId}::uuid, ${record.jumlahTunggakan || "0"}::numeric, ${"tunggakan"}, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
-      ON CONFLICT ("residentId") DO UPDATE
-      SET
-        "totalArrearsAmount" = EXCLUDED."totalArrearsAmount",
-        "description" = EXCLUDED."description",
-        "recordStatus" = 'PENDING'::"RecordStatus",
-        "uploadedDocumentId" = EXCLUDED."uploadedDocumentId",
-        "updatedAt" = NOW()
+      ON CONFLICT ("residentId") DO NOTHING
       RETURNING "id"
     `;
 
+    const resolvedArrearsSummaryId =
+      arrearsSummaries[0]?.id ??
+      (await findArrearsSummaryByResidentId(tx, residentId));
+
     enrichedRecords.push({
       ...record,
-      arrearsSummaryId: arrearsSummaries[0]?.id ?? arrearsSummaryId,
+      arrearsSummaryId: resolvedArrearsSummaryId || arrearsSummaryId,
       residentId,
       residentRecordStatus,
+      importStatus: arrearsSummaries[0]?.id ? ("PENDING" as const) : ("IGNORED" as const),
+      importMessage: arrearsSummaries[0]?.id
+        ? undefined
+        : "Rekod tunggakan sedia ada ditemui. Amaun baharu diabaikan.",
     });
   }
 
+  const acceptedRecords = enrichedRecords.filter(
+    (record) => record.importStatus !== "IGNORED",
+  );
+  const totalAmount = acceptedRecords
+    .reduce((total, record) => total + Number(record.jumlahTunggakan || 0), 0)
+    .toFixed(2);
+
   return {
     ...extractResult,
+    recordCount: acceptedRecords.length,
+    totalAmount,
     records: enrichedRecords,
   };
 }
@@ -241,13 +396,19 @@ export async function createPendingPenghuniRows(
   }
 
   const enrichedRecords = [];
+  const acceptedPenghuniIcNumbers = new Set<string>();
 
   for (const record of extractResult.records) {
     const icNumber = record.noKadPengenalan.trim();
+    const icKey = icNumber.replace(/\D/g, "");
     const existingResident = await findResidentByIcNumber(tx, icNumber);
 
     let residentId = existingResident?.id;
     let residentRecordStatus = existingResident?.recordStatus;
+
+    if (acceptedPenghuniIcNumbers.has(icKey) || residentId) {
+      continue;
+    }
 
     if (!residentId) {
       const nextResidentId = randomUUID();
@@ -264,44 +425,7 @@ export async function createPendingPenghuniRows(
       residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
     }
 
-    const unitId = await findUnitIdForPenghuniRecord(tx, record.kuarters, record.unit);
-
-    if (unitId) {
-      await tx.$executeRaw`
-        UPDATE "UnitOccupancy"
-        SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
-        WHERE "residentId" = ${residentId}::uuid
-          AND "status" = 'CURRENT'::"OccupancyStatus"
-          AND "unitId" <> ${unitId}::uuid
-      `;
-
-      await tx.$executeRaw`
-        INSERT INTO "UnitOccupancy"
-          ("id", "residentId", "unitId", "moveInDate", "status", "description", "createdAt", "updatedAt")
-        SELECT
-          ${randomUUID()}::uuid,
-          ${residentId}::uuid,
-          ${unitId}::uuid,
-          ${parsePenghuniMoveInDate(record.tarikhMasuk ?? "")},
-          'CURRENT'::"OccupancyStatus",
-          ${"Dicipta daripada dokumen penghuni."},
-          NOW(),
-          NOW()
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM "UnitOccupancy"
-          WHERE "residentId" = ${residentId}::uuid
-            AND "unitId" = ${unitId}::uuid
-            AND "status" = 'CURRENT'::"OccupancyStatus"
-        )
-      `;
-
-      await tx.$executeRaw`
-        UPDATE "Unit"
-        SET "status" = 'OCCUPIED'::"UnitStatus", "updatedAt" = NOW()
-        WHERE "id" = ${unitId}::uuid
-      `;
-    }
+    acceptedPenghuniIcNumbers.add(icKey);
 
     enrichedRecords.push({
       ...record,
@@ -312,8 +436,132 @@ export async function createPendingPenghuniRows(
 
   return {
     ...extractResult,
+    recordCount: enrichedRecords.length,
     records: enrichedRecords,
   };
+}
+
+export async function applyVerifiedPenghuniOccupancy(
+  tx: Prisma.TransactionClient,
+  extractResult: ExtractResult,
+) {
+  if (extractResult.documentType !== "penghuni") {
+    return;
+  }
+
+  const touchedUnitIds = new Set<string>();
+
+  for (const record of extractResult.records) {
+    const residentId =
+      "residentId" in record && typeof record.residentId === "string"
+        ? record.residentId
+        : "";
+    const icNumber = record.noKadPengenalan.trim();
+    const resolvedResidentId = await findVerifiedResidentIdForPenghuniRecord(
+      tx,
+      residentId,
+      icNumber,
+    );
+
+    if (!resolvedResidentId) {
+      continue;
+    }
+
+    const unitId = await findUnitIdForPenghuniRecord(tx, record.kuarters, record.unit);
+
+    if (!unitId) {
+      continue;
+    }
+
+    touchedUnitIds.add(unitId);
+
+    await tx.$executeRaw`
+      UPDATE "UnitOccupancy"
+      SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
+      WHERE "residentId" = ${resolvedResidentId}::uuid
+        AND "status" = 'CURRENT'::"OccupancyStatus"
+        AND "unitId" <> ${unitId}::uuid
+    `;
+
+    await tx.$executeRaw`
+      UPDATE "UnitOccupancy"
+      SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
+      WHERE "unitId" = ${unitId}::uuid
+        AND "residentId" <> ${resolvedResidentId}::uuid
+        AND "status" = 'CURRENT'::"OccupancyStatus"
+    `;
+
+    await tx.$executeRaw`
+      INSERT INTO "UnitOccupancy"
+        ("id", "residentId", "unitId", "moveInDate", "status", "description", "createdAt", "updatedAt")
+      SELECT
+        ${randomUUID()}::uuid,
+        ${resolvedResidentId}::uuid,
+        ${unitId}::uuid,
+        ${parsePenghuniMoveInDate(record.tarikhMasuk ?? "")},
+        'CURRENT'::"OccupancyStatus",
+        ${"Dicipta selepas pengesahan dokumen penghuni."},
+        NOW(),
+        NOW()
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM "UnitOccupancy"
+        WHERE "residentId" = ${resolvedResidentId}::uuid
+          AND "unitId" = ${unitId}::uuid
+          AND "status" = 'CURRENT'::"OccupancyStatus"
+      )
+    `;
+  }
+
+  for (const unitId of touchedUnitIds) {
+    await tx.$executeRaw`
+      UPDATE "Unit"
+      SET "status" = 'OCCUPIED'::"UnitStatus", "updatedAt" = NOW()
+      WHERE "id" = ${unitId}::uuid
+        AND "recordStatus" = 'VERIFIED'::"RecordStatus"
+    `;
+  }
+}
+
+async function findVerifiedResidentIdForPenghuniRecord(
+  tx: Prisma.TransactionClient,
+  residentId: string,
+  icNumber: string,
+) {
+  if (residentId) {
+    const residents = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id"
+      FROM "Resident"
+      WHERE "id" = ${residentId}::uuid
+        AND "recordStatus" = 'VERIFIED'::"RecordStatus"
+      LIMIT 1
+    `;
+
+    if (residents[0]?.id) {
+      return residents[0].id;
+    }
+  }
+
+  return findVerifiedResidentIdByIcNumber(tx, icNumber);
+}
+
+async function findVerifiedResidentIdByIcNumber(
+  tx: Prisma.TransactionClient,
+  icNumber: string,
+) {
+  const residents = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "Resident"
+    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
+      regexp_replace(${icNumber}, '\\D', '', 'g')
+      AND "recordStatus" = 'VERIFIED'::"RecordStatus"
+    ORDER BY
+      CASE WHEN "icNumber" = ${icNumber} THEN 0 ELSE 1 END,
+      "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return residents[0]?.id ?? "";
 }
 
 async function findUnitIdForPenghuniRecord(
@@ -334,6 +582,8 @@ async function findUnitIdForPenghuniRecord(
     INNER JOIN "QuarterCategory" qc
       ON qc."id" = u."categoryId"
     WHERE UPPER(TRIM(u."unitCode")) = UPPER(TRIM(${normalizedUnit}))
+      AND u."recordStatus" = 'VERIFIED'::"RecordStatus"
+      AND qc."recordStatus" = 'VERIFIED'::"RecordStatus"
       AND (
         ${normalizedKuarters} = ''
         OR UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${normalizedKuarters}))
@@ -373,25 +623,54 @@ export async function createPendingKuartersRows(
   const enrichedRecords = [];
 
   for (const record of extractResult.records) {
-    const categoryId = randomUUID();
-    const createdCategories = await tx.$queryRaw<{ id: string }[]>`
-      INSERT INTO "QuarterCategory"
-        ("id", "categoryName", "address", "rentalPrice", "maintenancePrice", "penaltyPrice", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
-      VALUES
-        (${categoryId}::uuid, ${record.categoryName}, ${record.kawasan || null}, ${record.rentalPrice || "0"}::numeric, ${record.maintenancePrice || "0"}::numeric, ${record.penaltyPrice || "0"}::numeric, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
-      ON CONFLICT ("categoryName", "address") DO NOTHING
-      RETURNING "id"
-    `;
-    const resolvedCategoryId = createdCategories[0]?.id;
+    const categoryAddress = record.kawasan || null;
+    let resolvedCategoryId = await findQuarterCategoryByNameAddress(
+      tx,
+      record.categoryName,
+      categoryAddress,
+    );
+    const isExistingCategory = Boolean(resolvedCategoryId);
 
     if (!resolvedCategoryId) {
-      enrichedRecords.push(record);
+      if (record.units.length === 0) {
+        continue;
+      }
+
+      const categoryId = randomUUID();
+      const createdCategories = await tx.$queryRaw<{ id: string }[]>`
+        INSERT INTO "QuarterCategory"
+          ("id", "categoryName", "address", "rentalPrice", "maintenancePrice", "penaltyPrice", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
+        VALUES
+          (${categoryId}::uuid, ${record.categoryName}, ${categoryAddress}, ${record.rentalPrice || "0"}::numeric, ${record.maintenancePrice || "0"}::numeric, ${record.penaltyPrice || "0"}::numeric, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
+        ON CONFLICT ("categoryName", "address") DO NOTHING
+        RETURNING "id"
+      `;
+      resolvedCategoryId =
+        createdCategories[0]?.id ??
+        (await findQuarterCategoryByNameAddress(
+          tx,
+          record.categoryName,
+          categoryAddress,
+        ));
+    }
+
+    if (!resolvedCategoryId) {
       continue;
     }
 
     const enrichedUnits = [];
 
     for (const unit of record.units) {
+      const existingUnitId = await findUnitByCategoryIdAndCode(
+        tx,
+        resolvedCategoryId,
+        unit.unitCode,
+      );
+
+      if (existingUnitId) {
+        continue;
+      }
+
       const unitId = randomUUID();
       const createdUnits = await tx.$queryRaw<{ id: string }[]>`
         INSERT INTO "Unit"
@@ -401,22 +680,42 @@ export async function createPendingKuartersRows(
         ON CONFLICT ("categoryId", "unitCode") DO NOTHING
         RETURNING "id"
       `;
+      let resolvedUnitId = createdUnits[0]?.id;
+
+      if (!resolvedUnitId) {
+        resolvedUnitId = await findUnitByCategoryIdAndCode(
+          tx,
+          resolvedCategoryId,
+          unit.unitCode,
+        );
+      }
 
       enrichedUnits.push({
         ...unit,
-        unitId: createdUnits[0]?.id ?? "",
+        unitId: resolvedUnitId ?? "",
       });
+    }
+
+    if (enrichedUnits.length === 0) {
+      continue;
     }
 
     enrichedRecords.push({
       ...record,
       categoryId: resolvedCategoryId,
+      recordStatus: isExistingCategory ? "VERIFIED" : "PENDING",
+      unitCount: enrichedUnits.length,
       units: enrichedUnits,
     });
   }
 
   return {
     ...extractResult,
+    recordCount: enrichedRecords.length,
+    totalUnits: enrichedRecords.reduce(
+      (total, record) => total + record.units.length,
+      0,
+    ),
     records: enrichedRecords,
   };
 }

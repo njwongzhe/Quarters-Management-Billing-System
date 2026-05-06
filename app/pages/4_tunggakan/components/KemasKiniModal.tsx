@@ -14,12 +14,15 @@ type KemasKiniModalProps = {
   isOpen: boolean;
   onClose: () => void;
   selectedCount: number;
+  selectedIds: string[];
 };
 
-export default function KemasKiniModal({ isOpen, onClose, selectedCount }: KemasKiniModalProps) {
+export default function KemasKiniModal({ isOpen, onClose, selectedCount, selectedIds }: KemasKiniModalProps) {
   const [cajSenggaraEnabled, setCajSenggaraEnabled] = useState(false);
   const [cajTambahan, setCajTambahan] = useState<RowItem[]>([]);
   const [rebat, setRebat] = useState<RowItem[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   if (!isOpen) return null;
 
@@ -50,34 +53,37 @@ export default function KemasKiniModal({ isOpen, onClose, selectedCount }: Kemas
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
+    setFeedback(null);
+
     try {
-      const response = await fetch("/api/tunggakan", {
+      const response = await fetch("/api/arrear", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          residentIds: [], // <-- You will need to pass the actual selectedIds down as a prop to this Modal!
+          residentIds: selectedIds,
           cajSenggaraEnabled,
           cajTambahan,
-          rebat
+          rebat,
         }),
       });
 
       const data = await response.json();
 
       if (!data.ok) {
-        alert(data.message); // You can replace this with a nice toast notification component later
+        setFeedback({ type: "error", message: data.message });
         return;
       }
 
-      alert(data.message); // Success!
-      onClose(); // Close the modal
-      
-      // In a real app, you would now trigger a refresh of the main table data here.
+      setFeedback({ type: "success", message: data.message });
+      setTimeout(() => {
+        onClose();
+      }, 1800);
 
     } catch (error) {
-      alert("Ralat tidak dijangka berlaku. Sila cuba lagi.");
+      setFeedback({ type: "error", message: "Ralat tidak dijangka berlaku. Sila cuba lagi." });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -100,7 +106,23 @@ export default function KemasKiniModal({ isOpen, onClose, selectedCount }: Kemas
         </div>
 
         {/* --- MODAL BODY --- */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-10">
+       <div className="p-6 overflow-y-auto flex-1 space-y-10">
+
+          {/* Feedback Banner */}
+          {feedback && (
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-lg border text-sm font-medium ${
+              feedback.type === "success"
+                ? "bg-green-50 border-green-200 text-green-800"
+                : "bg-red-50 border-red-200 text-red-800"
+            }`}>
+              <Icon
+                icon={feedback.type === "success" ? "save" : "close"}
+                size={18}
+                className="shrink-0 mt-0.5"
+              />
+              <span>{feedback.message}</span>
+            </div>
+          )}
           
           {/* Perincian Kewangan */}
           <section>
@@ -254,12 +276,22 @@ export default function KemasKiniModal({ isOpen, onClose, selectedCount }: Kemas
               <Icon icon="close" size={20} />
               Batal
             </button>
-            <button 
+            <button
               onClick={handleSave}
-              className="flex items-center gap-2 bg-(--color-green) hover:bg-green-800 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors"
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-(--color-green) hover:bg-green-800 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed min-w-37.5 justify-center"
             >
-              <Icon icon="save" size={20} />
-              Simpan Rekod
+              {isSaving ? (
+                <>
+                  <Icon icon="progress_activity" size={20} className="animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Icon icon="save" size={20} />
+                  Simpan Rekod
+                </>
+              )}
             </button>
           </div>
         </div>

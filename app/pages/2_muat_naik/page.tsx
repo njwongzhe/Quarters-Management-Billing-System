@@ -37,11 +37,14 @@ export default function MuatNaikPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState("");
   const [processingError, setProcessingError] = useState("");
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStage, setProcessingStage] = useState("");
   const [processingDrafts, setProcessingDrafts] = useState<ProcessingDraft[]>(
     [],
   );
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const activeDraftKind = draftKindByCategory[activeCategory];
   const activeRows = useMemo(
     () =>
@@ -86,6 +89,12 @@ export default function MuatNaikPage() {
     void loadProcessingDrafts();
   }, [activeDraftKind]);
 
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   // Handler for file selection button click
   function handleChooseFile() {
     fileInputRef.current?.click();
@@ -97,6 +106,20 @@ export default function MuatNaikPage() {
     setSelectedFileName(file?.name ?? "");
     setSelectedFile(file ?? null);
     setProcessingError("");
+    setProcessingProgress(0);
+    setProcessingStage("");
+  }
+
+  function handleClearSelectedFile() {
+    setSelectedFileName("");
+    setSelectedFile(null);
+    setProcessingError("");
+    setProcessingProgress(0);
+    setProcessingStage("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   // Handler for upload button click - initiates file processing
@@ -106,9 +129,23 @@ export default function MuatNaikPage() {
       return;
     }
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     setIsProcessing(true);
     setProcessingStep("Mengekstrak data daripada dokumen...");
     setProcessingError("");
+    setProcessingProgress(8);
+    setProcessingStage("Menyediakan fail untuk kenal pasti...");
+
+    const progressTimer = window.setInterval(() => {
+      setProcessingProgress((currentProgress) => {
+        if (currentProgress >= 88) {
+          return currentProgress;
+        }
+
+        return currentProgress + (currentProgress < 55 ? 4 : 2);
+      });
+    }, 700);
 
     try {
       const formData = new FormData();
@@ -116,9 +153,12 @@ export default function MuatNaikPage() {
 
       const apiBaseUrl = process.env.NEXT_PUBLIC_AI_SERVICE_URL ?? "http://127.0.0.1:8000";
       const extractKind = reviewRoutes[activeCategory];
+      setProcessingProgress(18);
+      setProcessingStage(`Mengekstrak data ${extractKind}...`);
       const response = await fetch(`${apiBaseUrl}/extract/${extractKind}`, {
         method: "POST",
         body: formData,
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
@@ -129,7 +169,6 @@ export default function MuatNaikPage() {
       }
 
       const extractedData = await response.json();
-      setProcessingStep("Menyimpan hasil ekstrak untuk semakan...");
       const saveResponse = await fetch("/api/uploaded-documents", {
         method: "POST",
         headers: {
@@ -142,6 +181,7 @@ export default function MuatNaikPage() {
           fileSize: selectedFile.size,
           extractResult: extractedData as ExtractResult,
         }),
+        signal: abortController.signal,
       });
       const saveResult = await saveResponse.json();
 
@@ -152,22 +192,40 @@ export default function MuatNaikPage() {
       }
 
       const draft = saveResult.data.document as ProcessingDraft;
+      setProcessingProgress(96);
+      setProcessingStage("Membuka halaman semakan...");
       setProcessingDrafts((currentDrafts) => [draft, ...currentDrafts]);
       sessionStorage.setItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY, draft.id);
-      sessionStorage.setItem(`${extractKind}ExtractResult`, JSON.stringify(extractedData));
+      sessionStorage.setItem(
+        `${extractKind}ExtractResult`,
+        JSON.stringify(draft.extractResult),
+      );
       sessionStorage.setItem(`${extractKind}ExtractFileName`, selectedFile.name);
       router.push(`${ROUTES.muatNaik}/semakan/${extractKind}`);
     } catch (error) {
       const extractKind = reviewRoutes[activeCategory];
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setProcessingError("Proses kenal pasti telah dibatalkan.");
+        setProcessingStage("");
+        setProcessingProgress(0);
+        return;
+      }
+
       setProcessingError(
         error instanceof Error
           ? error.message
           : `Gagal mengekstrak data ${extractKind}.`,
       );
     } finally {
+      window.clearInterval(progressTimer);
+      abortControllerRef.current = null;
       setIsProcessing(false);
       setProcessingStep("");
     }
+  }
+
+  function handleCancelProcessing() {
+    abortControllerRef.current?.abort();
   }
 
   function handleContinueDraft(draft: ProcessingDraft) {
@@ -227,11 +285,13 @@ export default function MuatNaikPage() {
                   type="button"
                   aria-pressed={isActive}
                   onClick={() => setActiveCategory(category)}
+                  disabled={isProcessing}
                   className={[
                     "rounded-lg text-xs font-extrabold transition-colors",
                     isActive
                       ? "bg-white text-dark-blue shadow-[0_2px_8px_rgba(15,23,42,0.08)]"
                       : "text-[#43506B] hover:bg-white/60 hover:text-dark-blue",
+                    isProcessing ? "cursor-not-allowed opacity-60" : "",
                   ].join(" ")}
                 >
                   {category}
@@ -306,6 +366,28 @@ export default function MuatNaikPage() {
               ? "Kenal Pasti Untuk Proses"
               : "Pilih Fail Dari Komputer"}
           </button>
+          {isProcessing ? (
+            <div className="mt-5 w-full max-w-md">
+              <div className="mb-2 flex items-center justify-between gap-4 text-xs font-extrabold text-[#344054]">
+                <span className="min-w-0 truncate">{processingStage}</span>
+                <span>{Math.min(processingProgress, 99)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[#E8EEF9]">
+                <div
+                  className="h-full rounded-full bg-green transition-all duration-500"
+                  style={{ width: `${Math.min(processingProgress, 99)}%` }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelProcessing}
+                className="mt-4 inline-flex h-9 items-center justify-center gap-2 rounded border border-[#F0C7C7] bg-white px-5 text-xs font-extrabold text-red shadow-sm transition hover:bg-[#FFF7F7]"
+              >
+                <Icon icon="cancel" size={16} weight={700} />
+                Batal
+              </button>
+            </div>
+          ) : null}
           <input
             ref={fileInputRef}
             type="file"
@@ -313,10 +395,20 @@ export default function MuatNaikPage() {
             className="hidden"
             onChange={handleFileChange}
           />
-          {selectedFileName ? (
-            <p className="mt-3 max-w-full truncate text-xs font-bold text-[#43506B]">
-              Fail dipilih: {selectedFileName}
-            </p>
+          {selectedFileName && !isProcessing ? (
+            <div className="mt-4 flex max-w-full flex-wrap items-center justify-center gap-3">
+              <p className="min-w-0 max-w-md truncate text-xs font-bold text-[#43506B]">
+                Fail dipilih: {selectedFileName}
+              </p>
+              <button
+                type="button"
+                onClick={handleClearSelectedFile}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded border border-[#F0C7C7] bg-white px-3 text-[11px] font-extrabold text-red shadow-sm transition hover:bg-[#FFF7F7]"
+              >
+                <Icon icon="close" size={14} weight={700} />
+                Batal
+              </button>
+            </div>
           ) : null}
           {processingError ? (
             <p className="mt-3 max-w-xl text-xs font-bold text-red">
