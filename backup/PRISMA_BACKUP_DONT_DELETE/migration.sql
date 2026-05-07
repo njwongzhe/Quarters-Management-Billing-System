@@ -34,12 +34,6 @@ DECLARE
   v_has_transaction BOOLEAN;
   v_ic_number TEXT;
   v_old_status "ResidentStatus"; -- Used to check the current status before update.
-  v_age INT := 0;
-  v_ic_yy INT;
-  v_ic_mm INT;
-  v_ic_dd INT;
-  v_birth_year INT;
-  v_birth_date DATE;
   v_new_status "ResidentStatus"; -- Strictly using the Prisma Enum type.
 BEGIN
   -- 1. Retrieve the IC Number and Current Status of the resident.
@@ -55,46 +49,54 @@ BEGIN
     SELECT 1 FROM "Transaction" WHERE "residentId" = p_resident_id
   ) INTO v_has_transaction;
 
-  -- 4. Calculate exact age based on Malaysian IC Number. (YYMMDD-PB-###G)
-  BEGIN
-    IF LENGTH(v_ic_number) >= 6 THEN
-      v_ic_yy := SUBSTRING(v_ic_number FROM 1 FOR 2)::INT;
-      v_ic_mm := SUBSTRING(v_ic_number FROM 3 FOR 2)::INT;
-      v_ic_dd := SUBSTRING(v_ic_number FROM 5 FOR 2)::INT;
-
-      IF v_ic_yy > (EXTRACT(YEAR FROM CURRENT_DATE) - 2000) THEN
-        v_birth_year := 1900 + v_ic_yy;
-      ELSE
-        v_birth_year := 2000 + v_ic_yy;
-      END IF;
-
-      IF v_ic_mm BETWEEN 1 AND 12 AND v_ic_dd BETWEEN 1 AND 31 THEN
-        v_birth_date := make_date(v_birth_year, v_ic_mm, v_ic_dd);
-        v_age := EXTRACT(YEAR FROM age(CURRENT_DATE, v_birth_date));
-      END IF;
-    END IF;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_age := 0; 
-  END;
-
-  -- 5. Priority Evaluation (Using ResidentStatus Enum)
- 
+  -- 4. Optimized Priority Evaluation (Lazy Evaluation)
+  
+  -- [Step A]: Check for incomplete data (Highest Priority).
   IF v_has_occupancy = false AND v_has_transaction = true THEN
-     v_new_status := 'DATA_TIDAK_LENGKAP';
-  ELSIF v_age >= 60 THEN
-    v_new_status := 'TIDAK_LAYAK';
-  ELSIF v_age = 59 THEN
-    v_new_status := 'PENCEN_MENDATANG';
-  ELSE
-    v_new_status := 'AKTIF';
-  END IF;
+    v_new_status := 'DATA_TIDAK_LENGKAP';
 
-  -- [Sticky Status Logic]: 
-  -- If the resident is already 'TIDAK_LAYAK', they cannot go back to 'AKTIF' or 'PENCEN_MENDATANG'.
-  -- The only exception is if their data becomes incomplete ('DATA_TIDAK_LENGKAP').
-  IF v_old_status = 'TIDAK_LAYAK' AND v_new_status != 'DATA_TIDAK_LENGKAP' THEN
+  -- [Step B]: Check if original status is already 'TIDAK_LAYAK' (Sticky Rule).
+  ELSIF v_old_status = 'TIDAK_LAYAK' THEN
     v_new_status := 'TIDAK_LAYAK';
+
+  -- [Step C]: Only calculate age if previous conditions are NOT met.
+  ELSE
+    DECLARE
+      v_age INT := 0;
+      v_ic_yy INT; v_ic_mm INT; v_ic_dd INT;
+      v_birth_year INT; v_birth_date DATE;
+    BEGIN
+      -- Calculate exact age based on Malaysian IC Number.
+      IF LENGTH(v_ic_number) >= 6 THEN
+        v_ic_yy := SUBSTRING(v_ic_number FROM 1 FOR 2)::INT;
+        v_ic_mm := SUBSTRING(v_ic_number FROM 3 FOR 2)::INT;
+        v_ic_dd := SUBSTRING(v_ic_number FROM 5 FOR 2)::INT;
+
+        IF v_ic_yy > (EXTRACT(YEAR FROM CURRENT_DATE) - 2000) THEN
+          v_birth_year := 1900 + v_ic_yy;
+        ELSE
+          v_birth_year := 2000 + v_ic_yy;
+        END IF;
+
+        IF v_ic_mm BETWEEN 1 AND 12 AND v_ic_dd BETWEEN 1 AND 31 THEN
+          v_birth_date := make_date(v_birth_year, v_ic_mm, v_ic_dd);
+          v_age := EXTRACT(YEAR FROM age(CURRENT_DATE, v_birth_date));
+        END IF;
+      END IF;
+
+      -- Apply Age Rule
+      IF v_age >= 60 THEN
+        v_new_status := 'TIDAK_LAYAK';
+      ELSIF v_age = 59 THEN
+        v_new_status := 'PENCEN_MENDATANG';
+      ELSIF v_age >= 0 THEN
+        v_new_status := 'AKTIF';
+      ELSE
+        v_new_status := 'DATA_TIDAK_LENGKAP';
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_new_status := 'DATA_TIDAK_LENGKAP'; -- Fallback if IC parsing fails.
+    END;
   END IF;
 
   -- 6. Execute update. (Ensure we only write to the DB if the status actually changes.)
@@ -106,9 +108,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ==============================================
+-- ==================================
 -- 2. Real-time Monitoring: Triggers
--- ==============================================
+-- ==================================
 
 -- A. Resident Table Trigger: Triggered by ANY data update on the Resident record.
 CREATE OR REPLACE FUNCTION trigger_on_resident_change()
@@ -158,7 +160,7 @@ FOR EACH ROW EXECUTE FUNCTION trigger_relation_status_update();
 
 
 -- =============================================
--- 3. Daily Check: Scheduled task using pg_cron
+-- 3. Daily Check: Scheduled Task Using pg_cron
 -- =============================================
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
@@ -179,8 +181,8 @@ BEGIN
                 PERFORM calculate_and_update_resident_status(r.id);
               END LOOP;
             END;
-            $do$;
-          $cron$
-        );
+          $do$;
+        $cron$
+      );
     END IF;
 END $$;

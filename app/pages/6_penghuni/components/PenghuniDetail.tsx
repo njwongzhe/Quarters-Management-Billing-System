@@ -1,12 +1,13 @@
 "use client";
 
 import Icon from "@/app/components/Icon";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { calculateAgeByIc } from "@/app/utils/resident";
 import type { ResidentRecord } from "../page";
 import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "./InputField";
-import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave } from "./DatabaseControl";
+import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave } from "../controller/DatabaseControl";
 import PenghuniDetailHistory from "./PenghuniDetailHistory";
+import { resolveResidentStatusRules } from "../controller/StatusControl";
 
 
 type PenghuniDetailWithCloseProps = ResidentRecord & {
@@ -108,6 +109,23 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         setTimeout(() => setNotification({ type: null, message: "" }), 3000);
     };
 
+    const statusRules = resolveResidentStatusRules(
+        originalData.status as string,
+        formData.icNumber,
+        kemasKini,
+        statusOptions,
+    );
+
+    useEffect(() => {
+        if (!statusRules.forcedStatus) {
+            return;
+        }
+
+        if (formData.status !== statusRules.forcedStatus) {
+            setFormData(prev => ({ ...prev, status: statusRules.forcedStatus ?? prev.status }));
+        }
+    }, [formData.status, setFormData, statusRules.forcedStatus]);
+
     // Handlers for Save operation.
     const handleSaveResident = handleSave.bind(null, {
         residentId: residentId ?? "",
@@ -121,19 +139,9 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         onClose,
     });
 
-    // Validate status transition rules before saving
+    // Validate status transition rules before saving.
     const validateAndSave = () => {
-        const original = originalData.status as string;
-        const newStatus = formData.status as string;
-
-        const allowed = (() => {
-            if (original === "DATA_TIDAK_LENGKAP") return [original];
-            if (original === "AKTIF" || original === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"];
-            if (original === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"];
-            return ["AKTIF", "TIDAK_LAYAK", "PENCEN_MENDATANG", "DATA_TIDAK_LENGKAP"];
-        })();
-
-        if (!allowed.includes(newStatus)) {
+        if (!statusRules.allowedStatuses.includes(formData.status as string)) {
             showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
             return;
         }
@@ -163,6 +171,9 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         const date = new Date(dateString);
         return date.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
     }
+
+    const statusFieldOptions = statusRules.options;
+    const statusFieldState = statusRules.state;
 
     return (
         <div>
@@ -243,30 +254,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                         {/* Status Selection With Restricted Transitions */}
                                         <DropdownField
                                             label="STATUS"
-                                            options={(() => {
-                                                const current = originalData.status as string;
-                                                // If DATA_TIDAK_LENGKAP, do not allow changing.
-                                                if (current === "DATA_TIDAK_LENGKAP") return [{ label: "Data Tidak Lengkap", color: "text-x-lengkap" }];
-
-                                                // From AKTIF or PENCEN_MENDATANG: can remain or change to TIDAK_LAYAK.
-                                                if (current === "AKTIF" || current === "PENCEN_MENDATANG") {
-                                                    return [
-                                                        { label: "Aktif", color: "text-aktif" },
-                                                        { label: "Tidak Layak", color: "text-x-layak" },
-                                                    ];
-                                                }
-
-                                                // From TIDAK_LAYAK: can remain or change back to AKTIF.
-                                                if (current === "TIDAK_LAYAK") {
-                                                    return [
-                                                        { label: "Aktif", color: "text-aktif" },
-                                                        { label: "Tidak Layak", color: "text-x-layak" },
-                                                    ];
-                                                }
-
-                                                // Fallback: Show full set.
-                                                return statusOptions;
-                                            })()}
+                                            options={statusFieldOptions}
                                             value={(function() {
                                                 switch (formData.status) {
                                                     case "AKTIF": return "Aktif";
@@ -276,10 +264,8 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                                     default: return formData.status as string;
                                                 }
                                             })()}
-                                            state={inputState}
+                                            state={statusFieldState}
                                             onChange={(val: string) => {
-                                                // If original is DATA_TIDAK_LENGKAP, prevent changes
-                                                const original = originalData.status as string;
                                                 const mapping: Record<string, string> = {
                                                     "Aktif": "AKTIF",
                                                     "Tidak Layak": "TIDAK_LAYAK",
@@ -289,15 +275,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
 
                                                 const newStatus = mapping[val] ?? val;
 
-                                                // Validate allowed transitions.
-                                                const allowed = (() => {
-                                                    if (original === "DATA_TIDAK_LENGKAP") return [original];
-                                                    if (original === "AKTIF" || original === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"];
-                                                    if (original === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"];
-                                                    return ["AKTIF", "TIDAK_LAYAK", "PENCEN_MENDATANG", "DATA_TIDAK_LENGKAP"];
-                                                })();
-
-                                                if (!allowed.includes(newStatus)) {
+                                                if (!statusRules.allowedStatuses.includes(newStatus)) {
                                                     showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
                                                     return;
                                                 }

@@ -15,11 +15,11 @@ export function usePaginationLogic(totalItems: number, itemsPerPage: number) {
         }
     }, [totalItems, currentPage, totalPages]);
 
-    const handlePageChange = (action: 'prev' | 'next' | 'goto', pageNum?: number) => {
+    const handlePageChange = (action: "prev" | "next" | "goto", pageNum?: number) => {
         switch (action) {
-            case 'prev': setCurrentPage(prev => Math.max(prev - 1, 1)); break;
-            case 'next': setCurrentPage(prev => Math.min(prev + 1, totalPages)); break;
-            case 'goto': if (pageNum !== undefined && pageNum >= 1 && pageNum <= totalPages)
+            case "prev": setCurrentPage(prev => Math.max(prev - 1, 1)); break;
+            case "next": setCurrentPage(prev => Math.min(prev + 1, totalPages)); break;
+            case "goto": if (pageNum !== undefined && pageNum >= 1 && pageNum <= totalPages)
                             setCurrentPage(pageNum);
                          break;
         }
@@ -68,9 +68,9 @@ export function PaginationControls({
     endIndex: number;
     totalRecords: number;
     paginationItems: (number | "ellipsis")[];
-    onPageChange: (action: 'prev' | 'next' | 'goto', pageNum?: number) => void;
+    onPageChange: (action: "prev" | "next" | "goto", pageNum?: number) => void;
 }) {
-    const PageButtonComponent = ({ item, currentPage, onPageChange }: { item: number | "ellipsis"; currentPage: number; onPageChange: (action: 'prev' | 'next' | 'goto', pageNum?: number) => void }) => {
+    const PageButtonComponent = ({ item, currentPage, onPageChange }: { item: number | "ellipsis"; currentPage: number; onPageChange: (action: "prev" | "next" | "goto", pageNum?: number) => void }) => {
         if (item === "ellipsis") {
             // Pagination component for ellipsis (non-clickable).
             return (
@@ -90,7 +90,7 @@ export function PaginationControls({
                         : "border-light-grey/30 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
                 }`}
                 aria-current={isActive ? "page" : undefined}
-                onClick={() => onPageChange('goto', item)}
+                onClick={() => onPageChange("goto", item)}
             >
                 {item}
             </button>
@@ -105,7 +105,7 @@ export function PaginationControls({
                 {/* Previous Button */}
                 <button
                     type="button"
-                    onClick={() => onPageChange('prev')}
+                    onClick={() => onPageChange("prev")}
                     disabled={currentPage === 1}
                     className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:pointer-events-none disabled:opacity-40"
                     aria-label="Halaman sebelumnya"
@@ -121,7 +121,7 @@ export function PaginationControls({
                 {/* Next Button */}
                 <button
                     type="button"
-                    onClick={() => onPageChange('next')}
+                    onClick={() => onPageChange("next")}
                     disabled={currentPage === totalPages}
                     className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:pointer-events-none disabled:opacity-40"
                     aria-label="Halaman seterusnya"

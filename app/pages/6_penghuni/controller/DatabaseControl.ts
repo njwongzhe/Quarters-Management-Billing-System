@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ResidentRecord } from "../page";
-import type { PenghuniFilterState } from "./PenghuniFilter";
+import type { PenghuniFilterState } from "../components/PenghuniFilter";
 
 export type NotificationType = "success" | "error";
 

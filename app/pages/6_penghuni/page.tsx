@@ -5,7 +5,7 @@ import { PenghuniHeader } from "./components/PenghuniHeader";
 import PenghuniTable from "./components/PenghuniTable";
 import PenghuniCreate from "./components/PenghuniCreate";
 import Icon from "@/app/components/Icon";
-import { handleCreateSuccess } from "./components/DatabaseControl";
+import { handleCreateSuccess } from "./controller/DatabaseControl";
 
 export type ResidentsQuarterInfo = {
     unitCode: string;

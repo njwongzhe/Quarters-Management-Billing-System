@@ -3,12 +3,12 @@
 import { useState, useMemo } from "react";
 
 import Icon from "@/app/components/Icon";
-import { usePaginationLogic, PaginationControls } from "./PaginationControl";
+import { usePaginationLogic, PaginationControls } from "../controller/PaginationControl";
 import PenghuniDetail from "./PenghuniDetail";
 import { PatternFormat } from "react-number-format";
 import type { ResidentRecord, PenghuniTableProps } from "../page";
 import { PenghuniFilter, type PenghuniFilterState } from "./PenghuniFilter";
-import { handleFilterReset, handleFilterSearch, handleResidentDelete, handleResidentUpdate } from "./DatabaseControl";
+import { handleFilterReset, handleFilterSearch, handleResidentDelete, handleResidentUpdate } from "../controller/DatabaseControl";
 
 // Text size constants for table display
 const mainTextSize = "text-[12px]";

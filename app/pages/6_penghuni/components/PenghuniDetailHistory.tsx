@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePaginationLogic, PaginationControls } from "./PaginationControl";
+import { usePaginationLogic, PaginationControls } from "../controller/PaginationControl";
 import { Topic } from "./InputField";
 import Icon from "@/app/components/Icon";
 

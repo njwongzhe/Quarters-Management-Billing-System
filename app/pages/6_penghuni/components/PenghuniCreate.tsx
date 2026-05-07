@@ -3,7 +3,7 @@
 import Icon from "@/app/components/Icon";
 import { useState } from "react";
 import { InputField, InputFieldFormat, InputBox, DropdownField, Topic } from "./InputField";
-import { handleCreate, handleFieldChange } from "./DatabaseControl";
+import { handleCreate, handleFieldChange } from "../controller/DatabaseControl";
 
 type PenghuniCreateProps = {
     onClose?: () => void;
@@ -20,6 +20,7 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
     const tarafPerkhidmatanOptions = ["Persekutuan", "Negeri"];
     // Only allow setting initial status to Aktif or Tidak Layak during creation
     const statusOptions = [
+        { label: "Data Tidak Lengkap", color: "text-x-lengkap" },
         { label: "Aktif", color: "text-aktif" },
         { label: "Tidak Layak", color: "text-x-layak" },
     ];
