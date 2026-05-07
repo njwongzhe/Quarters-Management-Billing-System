@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Icon from "../../../components/Icon";
+import Icon from "../../../../../components/Icon";
 import {
   Pagination,
   RESIDENTS_PER_PAGE,

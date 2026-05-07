@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import type {
   ExtractResult,
   ProcessingDraft,
-} from "@/app/pages/2_muat_naik/components/extract-review-shared";
+} from "@/app/pages/2_muat_naik/semakan/[jenis]/components/extract-review-shared";
 
 export type UploadedDocumentWithUploader = UploadedDocument & {
   uploadedBy?: {

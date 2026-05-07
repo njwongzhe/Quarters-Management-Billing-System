@@ -7,13 +7,13 @@ import {
   applyVerifiedPenghuniOccupancy,
   parseExtractResult,
 } from "@/lib/uploaded-documents";
-import type { ExtractResult } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import type { ExtractResult } from "@/app/pages/2_muat_naik/semakan/[jenis]/components/extract-review-shared";
 import type {
   ExtractedBayaranRecord,
   ExtractedPenghuniRecord,
   ExtractedQuarterRecord,
   ExtractedTunggakanRecord,
-} from "@/app/pages/2_muat_naik/components/extract-review-shared";
+} from "@/app/pages/2_muat_naik/semakan/[jenis]/components/extract-review-shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

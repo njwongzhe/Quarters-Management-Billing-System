@@ -9,7 +9,7 @@ import {
   type ExtractResult,
   type ProcessingDraft,
   formatDraftDateTime,
-} from "./components/extract-review-shared";
+} from "./semakan/[jenis]/components/extract-review-shared";
 
 const categories = ["Bayaran", "Tunggakan", "Penghuni", "Kuarters"] as const;
 

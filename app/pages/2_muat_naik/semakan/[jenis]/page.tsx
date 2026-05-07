@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import ExtractReviewPage, {
   type ReviewKind,
-} from "../../components/ExtractReviewPage";
+} from "./components/ExtractReviewPage";
 
 const reviewKinds = new Set<string>([
   "bayaran",

@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import Icon from "../../../components/Icon";
-import { ROUTES } from "../../../constants/routes";
+import Icon from "../../../../../components/Icon";
+import { ROUTES } from "../../../../../constants/routes";
 import BayaranReviewTable from "./BayaranReviewTable";
 import KuartersReviewTable from "./KuartersReviewTable";
 import PenghuniReviewTable from "./PenghuniReviewTable";
