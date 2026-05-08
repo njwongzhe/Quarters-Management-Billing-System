@@ -504,9 +504,17 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block truncate" title={rate.categoryName}>
-                          {rate.categoryName}
-                        </span>
+                        <>
+                          <span
+                            className="block truncate"
+                            title={rate.categoryName}
+                          >
+                            {rate.categoryName}
+                          </span>
+                          <span className="block text-[11px] font-medium text-grey">
+                            {rate.unitCount} unit
+                          </span>
+                        </>
                       )}
                     </td>
                     <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">

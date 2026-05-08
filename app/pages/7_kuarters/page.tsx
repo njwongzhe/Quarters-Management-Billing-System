@@ -29,7 +29,11 @@ async function getInitialKuartersPageData(): Promise<{
           include: {
             _count: {
               select: {
-                units: true,
+                units: {
+                  where: {
+                    recordStatus: "VERIFIED",
+                  },
+                },
               },
             },
           },

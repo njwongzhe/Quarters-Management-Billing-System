@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import Icon, { commonIcons } from "@/app/components/Icon";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
@@ -42,7 +43,6 @@ type KuartersUnitsPanelProps = {
   totalPages: number;
   onAddUnit: () => void;
   onCancelEdit: () => void;
-  onClearFilter: () => void;
   onDeleteUnit: (rowId: string) => void;
   onDraftChange: (field: keyof QuarterUnitDraft, value: string) => void;
   onEditUnit: (unit: QuarterUnitRecord) => void;
@@ -143,6 +143,23 @@ function InputField({
   );
 }
 
+function getFloatingDatePickerPosition(buttonRect: DOMRect, pickerWidth: number) {
+  const horizontalPadding = 12;
+  const verticalGap = 8;
+  const estimatedPickerHeight = 360;
+  const left = Math.min(
+    Math.max(horizontalPadding, buttonRect.right - pickerWidth),
+    window.innerWidth - pickerWidth - horizontalPadding,
+  );
+  const hasBottomRoom =
+    buttonRect.bottom + verticalGap + estimatedPickerHeight <= window.innerHeight;
+  const top = hasBottomRoom
+    ? buttonRect.bottom + verticalGap
+    : Math.max(verticalGap, buttonRect.top - estimatedPickerHeight - verticalGap);
+
+  return { left, top };
+}
+
 function DatePickerField({
   value,
   disabled = false,
@@ -159,23 +176,47 @@ function DatePickerField({
   onChange: (value: string) => void;
 }) {
   const initialDate = parseDateInput(value);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [pickerPosition, setPickerPosition] = useState({
+    left: 0,
+    top: 0,
+  });
   const [visibleMonth, setVisibleMonth] = useState(
     initialDate ?? startOfDay(new Date()),
   );
   const days = buildCalendarDays(visibleMonth);
+  const pickerWidth = 288;
 
   useEffect(() => {
-    const nextDate = parseDateInput(value);
-
-    if (nextDate) {
-      setVisibleMonth(nextDate);
+    if (!isOpen) {
+      return;
     }
-  }, [value]);
+
+    function updatePickerPosition() {
+      const buttonRect = buttonRef.current?.getBoundingClientRect();
+
+      if (!buttonRect) {
+        return;
+      }
+
+      setPickerPosition(getFloatingDatePickerPosition(buttonRect, pickerWidth));
+    }
+
+    updatePickerPosition();
+    window.addEventListener("resize", updatePickerPosition);
+    window.addEventListener("scroll", updatePickerPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePickerPosition);
+      window.removeEventListener("scroll", updatePickerPosition, true);
+    };
+  }, [isOpen]);
 
   return (
-    <div className="relative">
+    <div>
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
         className={`flex min-h-10 w-full items-center gap-2 rounded-2xl border bg-white py-2 pl-3 pr-3 text-left text-sm font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_3px_10px_rgba(15,23,42,0.04)] outline-none transition-colors disabled:cursor-not-allowed disabled:bg-background disabled:text-light-grey ${
@@ -185,7 +226,21 @@ function DatePickerField({
         }`}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        onClick={() => setIsOpen((currentState) => !currentState)}
+        onClick={() => {
+          if (!isOpen) {
+            const buttonRect = buttonRef.current?.getBoundingClientRect();
+
+            if (buttonRect) {
+              setPickerPosition(
+                getFloatingDatePickerPosition(buttonRect, pickerWidth),
+              );
+            }
+
+            setVisibleMonth(parseDateInput(value) ?? startOfDay(new Date()));
+          }
+
+          setIsOpen((currentState) => !currentState);
+        }}
       >
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-xl bg-light-blue text-dark-blue">
           <Icon icon="calendar_month" size={16} />
@@ -195,9 +250,15 @@ function DatePickerField({
         </span>
       </button>
 
-      {isOpen ? (
+      {isOpen && typeof document !== "undefined"
+        ? createPortal(
         <div
-          className="absolute right-0 top-full z-40 mt-2 w-72 rounded-3xl border border-light-grey/20 bg-white p-3 text-left shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+          data-kuarters-date-picker="true"
+          className="fixed z-60 w-72 rounded-3xl border border-light-grey/20 bg-white p-3 text-left shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+          style={{
+            left: `${pickerPosition.left}px`,
+            top: `${pickerPosition.top}px`,
+          }}
           role="dialog"
           aria-label="Pilih tarikh penghunian"
         >
@@ -283,8 +344,10 @@ function DatePickerField({
               Kosongkan tarikh
             </button>
           ) : null}
-        </div>
-      ) : null}
+        </div>,
+          document.body,
+        )
+        : null}
     </div>
   );
 }
@@ -348,7 +411,6 @@ export default function KuartersUnitsPanel({
   isResidentPickerOpen,
   onAddUnit,
   onCancelEdit,
-  onClearFilter,
   onDeleteUnit,
   onDraftChange,
   onEditUnit,
@@ -386,6 +448,13 @@ export default function KuartersUnitsPanel({
     const target = event.target;
 
     if (!(target instanceof Node)) {
+      return;
+    }
+
+    if (
+      target instanceof Element &&
+      target.closest("[data-kuarters-date-picker='true']")
+    ) {
       return;
     }
 
@@ -720,7 +789,7 @@ export default function KuartersUnitsPanel({
       </div>
       ) : null}
 
-      <div className="mt-5 flex min-h-120 flex-col overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
+      <div className="mt-5 flex flex-col overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
         <div className="flex-1 overflow-x-auto">
           <table className="w-full min-w-260 table-fixed border-collapse">
             <thead className="bg-background">

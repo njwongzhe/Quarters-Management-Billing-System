@@ -196,11 +196,6 @@ export default function KuartersCategoryDetailPageClient({
     }));
   }
 
-  function handleClearFilter() {
-    setCurrentPage(1);
-    setFilters(createEmptyQuarterUnitFilters());
-  }
-
   function handleAddUnit() {
     if (!ensureActionIsAvailable()) {
       return;
@@ -320,26 +315,6 @@ export default function KuartersCategoryDetailPageClient({
           occupantIcNumber: resident.icNumber,
           occupantName: resident.fullName,
           moveInDate: currentEditor.draft.moveInDate || getTodayDateInputValue(),
-          moveOutDate: "",
-        },
-      };
-    });
-    closeResidentPicker();
-  }
-
-  function handleClearAssignedResident() {
-    setEditor((currentEditor) => {
-      if (!currentEditor) {
-        return currentEditor;
-      }
-
-      return {
-        ...currentEditor,
-        draft: {
-          ...currentEditor.draft,
-          occupantIcNumber: "",
-          occupantName: "",
-          moveInDate: "",
           moveOutDate: "",
         },
       };
@@ -579,7 +554,6 @@ export default function KuartersCategoryDetailPageClient({
         isResidentPickerOpen={residentPicker.isOpen}
         onAddUnit={handleAddUnit}
         onCancelEdit={handleCancelEdit}
-        onClearFilter={handleClearFilter}
         onDeleteUnit={handleDeleteUnit}
         onDraftChange={handleDraftChange}
         onEditUnit={handleEditUnit}

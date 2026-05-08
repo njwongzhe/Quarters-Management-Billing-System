@@ -38,7 +38,11 @@ export async function GET() {
           include: {
             _count: {
               select: {
-                units: true,
+                units: {
+                  where: {
+                    recordStatus: "VERIFIED",
+                  },
+                },
               },
             },
           },
@@ -162,7 +166,11 @@ export async function POST(request: Request) {
         include: {
           _count: {
             select: {
-              units: true,
+              units: {
+                where: {
+                  recordStatus: "VERIFIED",
+                },
+              },
             },
           },
         },
