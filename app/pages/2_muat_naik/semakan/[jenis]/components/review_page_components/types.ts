@@ -11,7 +11,6 @@ export type StatCard = {
 export type ReviewContent = {
   fileName: string;
   stats: StatCard[];
-  addLabel: string;
 };
 
-export type VerifyingMode = "selected" | "all";
+export type VerifyingMode = "selected";

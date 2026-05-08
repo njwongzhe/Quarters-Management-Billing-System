@@ -26,7 +26,6 @@ export const reviewContent: Record<ReviewKind, ReviewContent> = {
         tone: "green",
       },
     ],
-    addLabel: "Tambah Bayaran",
   },
   tunggakan: {
     fileName: "Penyata_Tunggakan_Jan_2024.pdf",
@@ -53,7 +52,6 @@ export const reviewContent: Record<ReviewKind, ReviewContent> = {
         tone: "green",
       },
     ],
-    addLabel: "Tambah Tunggakan",
   },
   penghuni: {
     fileName: "Penyata_Penghuni_Jan_2024.pdf",
@@ -66,18 +64,10 @@ export const reviewContent: Record<ReviewKind, ReviewContent> = {
         tone: "green",
       },
     ],
-    addLabel: "Tambah Penghuni",
   },
   kuarters: {
     fileName: "Penyata_Kuarters_Jan_2024.pdf",
     stats: [
-      {
-        label: "Jumlah Rekod",
-        value: "158",
-        helper: "Perlu Disemak",
-        icon: "fact_check",
-        tone: "green",
-      },
       {
         label: "Total Kategori",
         value: "12",
@@ -93,6 +83,5 @@ export const reviewContent: Record<ReviewKind, ReviewContent> = {
         tone: "blue",
       },
     ],
-    addLabel: "Tambah Kategori",
   },
 };

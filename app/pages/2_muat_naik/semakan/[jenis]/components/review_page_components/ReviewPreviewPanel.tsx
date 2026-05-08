@@ -20,7 +20,7 @@ type ReviewPreviewPanelProps = {
   penghuniRecords: ExtractedPenghuniRecord[];
   kuartersRecords: ExtractedQuarterRecord[];
   kuartersParsingMode?: KuartersExtractResult["parsingMode"];
-  onKuartersRecordsChange?: (records: ExtractedQuarterRecord[]) => void;
+  onKuartersRecordsChange?: (records: ExtractedQuarterRecord[]) => Promise<void>;
   tunggakanRecords: ExtractedTunggakanRecord[];
   onTunggakanRecordsChange?: (
     records: ExtractedTunggakanRecord[],

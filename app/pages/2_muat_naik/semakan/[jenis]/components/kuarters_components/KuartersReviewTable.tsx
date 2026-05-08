@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   type ExtractedQuarterRecord,
   QUARTER_CATEGORIES_PER_PAGE,
   QUARTER_UNITS_PER_PAGE,
 } from "../../../../components/extract-review-shared";
-import { getUnitKey } from "./helpers";
+import { getKuartersRecordKey, getUnitKey } from "./helpers";
 import KuartersCategoryTable from "./KuartersCategoryTable";
 import KuartersUnitPanel from "./KuartersUnitPanel";
 import type { KuartersCategoryDraft, KuartersPriceField } from "./types";
 
 type KuartersReviewTableProps = {
   records: ExtractedQuarterRecord[];
-  onRecordsChange?: (records: ExtractedQuarterRecord[]) => void;
+  onRecordsChange?: (records: ExtractedQuarterRecord[]) => Promise<void>;
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
 };
@@ -29,14 +29,19 @@ export default function KuartersReviewTable({
     Record<string, KuartersCategoryDraft>
   >({});
   const [unitDrafts, setUnitDrafts] = useState<Record<string, string>>({});
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState(
+    records[0]?.id ?? "",
+  );
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingUnitKey, setEditingUnitKey] = useState<string | null>(null);
   const [categoryPage, setCategoryPage] = useState(1);
   const [unitPage, setUnitPage] = useState(1);
 
   const selectedCategory =
-    categories.find((category) => category.id === selectedCategoryId) ?? null;
+    categories.find((category) => category.id === selectedCategoryId) ??
+    categories[0] ??
+    null;
+  const resolvedSelectedCategoryId = selectedCategory?.id ?? "";
   const totalCategoryPages = Math.max(
     1,
     Math.ceil(categories.length / QUARTER_CATEGORIES_PER_PAGE),
@@ -60,6 +65,39 @@ export default function KuartersReviewTable({
   const unitDisplayStart = units.length === 0 ? 0 : unitStartIndex + 1;
   const unitDisplayEnd = unitStartIndex + pageUnits.length;
   const selectedKeySet = new Set(selectedKeys);
+  const allCategoryKeys = categories.map(getKuartersRecordKey);
+  const isAllCategoriesSelected =
+    allCategoryKeys.length > 0 &&
+    allCategoryKeys.every((key) => selectedKeySet.has(key));
+
+  useEffect(() => {
+    if (!editingCategoryId && !editingUnitKey) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        setEditingCategoryId(null);
+        setEditingUnitKey(null);
+        return;
+      }
+
+      if (target.closest("[data-kuarters-editor='true']")) {
+        return;
+      }
+
+      setEditingCategoryId(null);
+      setEditingUnitKey(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [editingCategoryId, editingUnitKey]);
 
   const selectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
@@ -75,6 +113,20 @@ export default function KuartersReviewTable({
     } else {
       nextKeys.delete(categoryKey);
     }
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
+  const toggleAllCategories = (checked: boolean) => {
+    const nextKeys = new Set(selectedKeys);
+
+    allCategoryKeys.forEach((key) => {
+      if (checked) {
+        nextKeys.add(key);
+      } else {
+        nextKeys.delete(key);
+      }
+    });
 
     onSelectedKeysChange?.([...nextKeys]);
   };
@@ -111,7 +163,7 @@ export default function KuartersReviewTable({
     }));
   };
 
-  const saveCategory = (categoryId: string) => {
+  const saveCategory = async (categoryId: string) => {
     const draft = categoryDrafts[categoryId];
 
     if (!draft) {
@@ -119,14 +171,22 @@ export default function KuartersReviewTable({
       return;
     }
 
-    setCategories((currentCategories) => {
-      const nextCategories = currentCategories.map((category) =>
-        category.id === categoryId ? { ...category, ...draft } : category,
-      );
-      onRecordsChange?.(nextCategories);
-      return nextCategories;
-    });
+    const nextCategories = categories.map((category) =>
+      category.id === categoryId ? { ...category, ...draft } : category,
+    );
+
+    try {
+      await onRecordsChange?.(nextCategories);
+      setCategories(nextCategories);
+      setEditingCategoryId(null);
+    } catch {
+      // Keep edit mode open; the parent displays the backend error message.
+    }
+  };
+
+  const cancelEditing = () => {
     setEditingCategoryId(null);
+    setEditingUnitKey(null);
   };
 
   const startUnitEdit = (unitKey: string, unitCode: string) => {
@@ -137,7 +197,7 @@ export default function KuartersReviewTable({
     setEditingUnitKey(unitKey);
   };
 
-  const saveUnit = (unitKey: string) => {
+  const saveUnit = async (unitKey: string) => {
     const draftUnitCode = unitDrafts[unitKey];
 
     if (!draftUnitCode || !selectedCategory) {
@@ -145,32 +205,38 @@ export default function KuartersReviewTable({
       return;
     }
 
-    setCategories((currentCategories) => {
-      const nextCategories = currentCategories.map((category) =>
-        category.id === selectedCategory.id
-          ? {
-              ...category,
-              units: category.units.map((unit) =>
-                getUnitKey(unit) === unitKey
-                  ? { ...unit, unitCode: draftUnitCode }
-                  : unit,
-              ),
-            }
-          : category,
-      );
-      onRecordsChange?.(nextCategories);
-      return nextCategories;
-    });
-    setEditingUnitKey(null);
+    const nextCategories = categories.map((category) =>
+      category.id === selectedCategory.id
+        ? {
+            ...category,
+            units: category.units.map((unit) =>
+              getUnitKey(unit) === unitKey
+                ? { ...unit, unitCode: draftUnitCode }
+                : unit,
+            ),
+          }
+        : category,
+    );
+
+    try {
+      await onRecordsChange?.(nextCategories);
+      setCategories(nextCategories);
+      setEditingUnitKey(null);
+    } catch {
+      // Keep edit mode open; the parent displays the backend error message.
+    }
   };
 
   return (
-    <div className="grid overflow-hidden rounded-lg border border-[#DCE2F1] bg-white lg:grid-cols-[1fr_240px]">
+    <div
+      className="grid overflow-hidden rounded-2xl border border-light-grey/20 bg-white lg:grid-cols-[1fr_260px]"
+    >
       <KuartersCategoryTable
         categories={categories}
         pageCategories={pageCategories}
-        selectedCategoryId={selectedCategoryId}
+        selectedCategoryId={resolvedSelectedCategoryId}
         selectedKeys={selectedKeySet}
+        isAllSelected={isAllCategoriesSelected}
         editingCategoryId={editingCategoryId}
         categoryDrafts={categoryDrafts}
         currentPage={safeCategoryPage}
@@ -180,9 +246,11 @@ export default function KuartersReviewTable({
         onPageChange={setCategoryPage}
         onSelectCategory={selectCategory}
         onToggleCategory={toggleSelectedCategory}
+        onToggleAllCategories={toggleAllCategories}
         onStartEdit={startCategoryEdit}
         onUpdateDraft={updateCategoryDraft}
         onSaveCategory={saveCategory}
+        onCancelEdit={cancelEditing}
       />
 
       <KuartersUnitPanel
@@ -198,6 +266,7 @@ export default function KuartersReviewTable({
         onDraftsChange={setUnitDrafts}
         onStartEdit={startUnitEdit}
         onSaveUnit={saveUnit}
+        onCancelEdit={cancelEditing}
       />
     </div>
   );

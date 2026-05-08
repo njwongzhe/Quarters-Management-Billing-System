@@ -46,7 +46,7 @@ Rule-based parsing only. If extraction or validation fails, the extractor stops 
 
 `assisted`
 
-Rule-based parsing is attempted first. Gemini is called only if rule-based parsing fails or the rule result does not pass validation.
+Rule-based parsing is attempted first. If the rule result does not pass validation, the extractor sends only the invalid records/rows to Gemini for repair instead of sending the whole document. This keeps token usage lower and avoids asking Gemini to re-process large files that were mostly parsed correctly.
 
 ## XLSX Rule Extraction
 
@@ -132,7 +132,21 @@ Validation applies to both rule-based and Gemini-assisted results.
 
 ## Gemini Assisted Parsing
 
-Gemini is used only in `assisted` mode after rule parsing fails.
+Gemini is used only in `assisted` mode after rule parsing produces records that fail validation.
+
+The assisted repair flow is:
+
+1. Rule extraction parses the document.
+2. Validation identifies incomplete records, such as missing category, missing unit code, missing unit list, or invalid price fields.
+3. Only those invalid records are sent to Gemini with a repair prompt.
+4. Gemini must return corrected JSON for the invalid records only.
+5. The repaired records are merged back into the rule-based result.
+6. If Gemini cannot repair the data, the extractor applies conservative defaults:
+   - invalid `rentalPrice`, `maintenancePrice`, and `penaltyPrice` become `0`
+   - missing optional string fields such as `address` become `N/A`
+   - required business fields such as `categoryName` and `unitCode` are never set to `N/A`
+   - unresolved `categoryName` becomes `Kategori Tidak Dikenal`
+   - unresolved `unitCode` becomes a unique `UNIT-TIDAK-DIKENAL-*` value
 
 The extractor reads API keys from environment variables in this order:
 

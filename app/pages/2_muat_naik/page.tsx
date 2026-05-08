@@ -1,23 +1,38 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ROUTES } from "../../constants/routes";
 import CategoryTabs from "./components/CategoryTabs";
 import DemoDocumentButton from "./components/DemoDocumentButton";
 import ParsingModeTabs from "./components/ParsingModeTabs";
 import ProcessingQueueTable from "./components/ProcessingQueueTable";
 import UploadDropzone from "./components/UploadDropzone";
-import { draftKindByCategory, reviewRoutes } from "./components/constants";
+import {
+  categoryByDraftKind,
+  draftKindByCategory,
+  reviewRoutes,
+} from "./components/constants";
 import {
   type ExtractResult,
   type ProcessingDraft,
 } from "./components/extract-review-shared";
 import type { Category, ParsingMode } from "./components/types";
 
+function getCategoryFromParam(categoryParam: string | null): Category {
+  if (!categoryParam) {
+    return "Bayaran";
+  }
+
+  return categoryByDraftKind[categoryParam as ProcessingDraft["kind"]] ?? "Bayaran";
+}
+
 export default function MuatNaikPage() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState<Category>("Bayaran");
+  const searchParams = useSearchParams();
+  const [activeCategory, setActiveCategory] = useState<Category>(() =>
+    getCategoryFromParam(searchParams.get("kategori")),
+  );
   const [parsingMode, setParsingMode] = useState<ParsingMode>("strict");
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -250,7 +265,7 @@ export default function MuatNaikPage() {
             </p>
           </div>
 
-          <DemoDocumentButton />
+          <DemoDocumentButton activeCategory={activeCategory} />
         </div>
 
         <CategoryTabs

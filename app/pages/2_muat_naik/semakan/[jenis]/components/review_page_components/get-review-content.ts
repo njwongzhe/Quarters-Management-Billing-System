@@ -74,7 +74,7 @@ export function getReviewContent({
       ...baseContent,
       fileName: uploadedFileName || baseContent.fileName,
       stats: baseContent.stats.map((stat) => {
-        if (stat.label === "Jumlah Rekod" || stat.label === "Total Kategori") {
+        if (stat.label === "Total Kategori") {
           return { ...stat, value: String(kuartersExtract.recordCount) };
         }
 

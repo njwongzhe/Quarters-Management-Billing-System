@@ -10,7 +10,16 @@ export default function ReviewHeader({
   onReviewLater,
 }: ReviewHeaderProps) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="flex items-start gap-4">
+      <button
+        type="button"
+        className="fixed left-61 top-6 z-40 inline-flex min-h-10 items-center gap-2 rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-extrabold text-grey shadow-[0_12px_30px_rgba(13,47,86,0.12)] transition-colors hover:border-dark-blue hover:text-dark-blue"
+        onClick={onReviewLater}
+      >
+        <Icon icon="arrow_back" size={18} />
+        Semak Nanti
+      </button>
+
       <div className="flex min-w-0 items-start gap-4">
         <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded bg-[#FFEAEA] text-red">
           <Icon icon="picture_as_pdf" size={22} filled weight={700} />
@@ -24,15 +33,6 @@ export default function ReviewHeader({
           </p>
         </div>
       </div>
-
-      <button
-        type="button"
-        className="inline-flex h-11 items-center justify-center gap-2 rounded border border-[#E1E5EF] bg-white px-6 text-xs font-extrabold text-[#344054] shadow-sm"
-        onClick={onReviewLater}
-      >
-        <Icon icon="history" size={16} weight={600} />
-        Semak Nanti
-      </button>
     </div>
   );
 }

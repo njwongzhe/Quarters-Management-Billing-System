@@ -20,7 +20,7 @@ type ReviewTableProps = {
   ) => void;
   penghuniRecords: ExtractedPenghuniRecord[];
   kuartersRecords: ExtractedQuarterRecord[];
-  onKuartersRecordsChange?: (records: ExtractedQuarterRecord[]) => void;
+  onKuartersRecordsChange?: (records: ExtractedQuarterRecord[]) => Promise<void>;
   tunggakanRecords: ExtractedTunggakanRecord[];
   onTunggakanRecordsChange?: (
     records: ExtractedTunggakanRecord[],

@@ -23,3 +23,10 @@ export const draftKindByCategory: Partial<
   Penghuni: "penghuni",
   Kuarters: "kuarters",
 };
+
+export const categoryByDraftKind: Record<ProcessingDraft["kind"], Category> = {
+  bayaran: "Bayaran",
+  tunggakan: "Tunggakan",
+  penghuni: "Penghuni",
+  kuarters: "Kuarters",
+};

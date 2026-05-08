@@ -17,8 +17,33 @@ type KuartersUnitPanelProps = {
   onPageChange: (page: number) => void;
   onDraftsChange: (updater: (currentDrafts: Record<string, string>) => Record<string, string>) => void;
   onStartEdit: (unitKey: string, unitCode: string) => void;
-  onSaveUnit: (unitKey: string) => void;
+  onSaveUnit: (unitKey: string) => Promise<void>;
+  onCancelEdit: () => void;
 };
+
+function ActionButton({
+  icon,
+  label,
+  textClass,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  textClass: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background ${textClass}`}
+      onClick={onClick}
+    >
+      <Icon icon={icon} size={18} />
+    </button>
+  );
+}
 
 export default function KuartersUnitPanel({
   units,
@@ -33,19 +58,19 @@ export default function KuartersUnitPanel({
   onDraftsChange,
   onStartEdit,
   onSaveUnit,
+  onCancelEdit,
 }: KuartersUnitPanelProps) {
   return (
-    <div className="border-t border-[#DCE2F1] lg:border-l lg:border-t-0">
-      <div className="flex items-center justify-between bg-[#F7F9FF] px-5 py-4 text-[10px] font-extrabold uppercase text-dark-blue">
+    <div className="border-t border-light-grey/20 bg-white lg:border-l lg:border-t-0">
+      <div className="flex items-center justify-between bg-background px-4 py-4 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
         Senarai Unit
-        <Icon icon="add_circle" size={15} weight={700} />
       </div>
-      <div className="grid grid-cols-[1fr_64px] border-b border-[#EEF1F7] px-5 py-3 text-[10px] font-extrabold uppercase text-[#667085]">
+      <div className="grid grid-cols-[minmax(0,120px)_1fr] border-t border-light-grey/20 bg-background px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
         <span>ID Unit</span>
         <span className="text-center">Tindakan</span>
       </div>
       {pageUnits.length === 0 ? (
-        <div className="px-5 py-10 text-center text-xs font-semibold text-[#667085]">
+        <div className="border-t border-light-grey/20 px-5 py-10 text-center text-xs font-semibold text-grey">
           Tiada unit baharu.
         </div>
       ) : (
@@ -56,12 +81,14 @@ export default function KuartersUnitPanel({
           return (
             <div
               key={unitKey}
-              className="grid grid-cols-[1fr_64px] items-center px-5 py-4 text-xs"
+              data-kuarters-editor={isEditing ? "true" : undefined}
+              className="grid grid-cols-[minmax(0,120px)_1fr] items-center border-t border-light-grey/20 px-4 py-3.5 text-xs transition-colors hover:bg-background/60"
             >
               <span>
                 {isEditing ? (
                   <input
-                    className="h-9 w-full rounded border border-[#E6EAF2] px-3 font-extrabold"
+                    className="min-h-8 w-full rounded-lg border border-light-grey/35 bg-white px-3 py-1.5 text-xs font-medium text-dark-blue outline-none transition-colors placeholder:text-light-grey focus:border-dark-blue"
+                    placeholder="Masukkan kod unit"
                     value={unitDrafts[unitKey] ?? unit.unitCode}
                     onChange={(event) =>
                       onDraftsChange((currentDrafts) => ({
@@ -71,43 +98,36 @@ export default function KuartersUnitPanel({
                     }
                   />
                 ) : (
-                  <span className="font-extrabold text-[#172033]">
+                  <span className="block truncate font-medium text-dark-grey">
                     {unit.unitCode}
                   </span>
                 )}
-                {unit.address ? (
-                  <span className="block text-[10px] font-semibold text-[#667085]">
-                    {unit.address}
-                  </span>
-                ) : null}
               </span>
-              <span className="flex justify-center gap-3">
+              <span className="flex justify-center gap-1">
                 {isEditing ? (
                   <>
-                    <button
-                      type="button"
-                      aria-label="Simpan perubahan unit"
-                      onClick={() => onSaveUnit(unitKey)}
-                    >
-                      <Icon icon="save" size={15} weight={700} className="text-green" />
-                    </button>
-                    <button type="button" aria-label="Padam unit">
-                      <Icon icon="delete" size={15} weight={700} className="text-red" />
-                    </button>
+                    <ActionButton
+                      icon="save"
+                      label="Simpan perubahan unit"
+                      textClass="text-green"
+                      onClick={() => {
+                        void onSaveUnit(unitKey);
+                      }}
+                    />
+                    <ActionButton
+                      icon="delete"
+                      label="Batal edit unit"
+                      textClass="text-red"
+                      onClick={onCancelEdit}
+                    />
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    aria-label="Edit unit"
+                  <ActionButton
+                    icon="edit"
+                    label="Edit unit"
+                    textClass="text-dark-blue"
                     onClick={() => onStartEdit(unitKey, unit.unitCode)}
-                  >
-                    <Icon
-                      icon="edit"
-                      size={15}
-                      weight={700}
-                      className="text-dark-blue"
-                    />
-                  </button>
+                  />
                 )}
               </span>
             </div>
@@ -120,6 +140,7 @@ export default function KuartersUnitPanel({
         onPageChange={onPageChange}
         label={`Memaparkan ${displayStart}-${displayEnd} daripada ${units.length} Unit`}
         showLabel={false}
+        size="compact"
       />
     </div>
   );

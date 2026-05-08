@@ -126,10 +126,9 @@ export default function ExtractReviewPage({
       records,
     };
     if (!draftId) {
-      return;
+      throw new Error("Dokumen semakan tidak ditemui.");
     }
 
-    setExtractResult(nextExtract);
     const response = await fetch(`/api/uploaded-documents/${draftId}`, {
       method: "PATCH",
       headers: {
@@ -218,15 +217,17 @@ export default function ExtractReviewPage({
 
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
-    } else if (!response.ok) {
-      setVerificationMessage(
-        result?.message ?? "Gagal menyimpan perubahan kuarters.",
-      );
+      setVerificationMessage("");
+      return;
     }
+
+    const message = result?.message ?? "Gagal menyimpan perubahan kuarters.";
+    setVerificationMessage(message);
+    throw new Error(message);
   };
 
   const handleReviewLater = () => {
-    router.push(ROUTES.muatNaik);
+    router.push(`${ROUTES.muatNaik}?kategori=${encodeURIComponent(kind)}`);
   };
 
   const handleVerifyData = async (mode: VerifyingMode) => {
@@ -239,7 +240,7 @@ export default function ExtractReviewPage({
       return;
     }
 
-    if (mode === "selected" && selectedRecordKeys.length === 0) {
+    if (selectedRecordKeys.length === 0) {
       setVerificationMessage("Sila pilih sekurang-kurangnya satu rekod untuk disahkan.");
       return;
     }
@@ -253,10 +254,7 @@ export default function ExtractReviewPage({
         headers: {
           "Content-Type": "application/json",
         },
-        body:
-          mode === "selected"
-            ? JSON.stringify({ selectedKeys: selectedRecordKeys })
-            : undefined,
+        body: JSON.stringify({ selectedKeys: selectedRecordKeys }),
       });
       const result = await response.json().catch(() => null);
 
@@ -317,7 +315,6 @@ export default function ExtractReviewPage({
         />
 
         <ReviewActions
-          addLabel={content.addLabel}
           verifyingMode={verifyingMode}
           verificationMessage={verificationMessage}
           onVerify={handleVerifyData}

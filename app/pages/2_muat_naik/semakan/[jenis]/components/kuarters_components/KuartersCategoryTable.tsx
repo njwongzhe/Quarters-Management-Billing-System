@@ -11,6 +11,7 @@ type KuartersCategoryTableProps = {
   pageCategories: ExtractedQuarterRecord[];
   selectedCategoryId: string;
   selectedKeys: Set<string>;
+  isAllSelected: boolean;
   editingCategoryId: string | null;
   categoryDrafts: Record<string, KuartersCategoryDraft>;
   currentPage: number;
@@ -20,28 +21,65 @@ type KuartersCategoryTableProps = {
   onPageChange: (page: number) => void;
   onSelectCategory: (categoryId: string) => void;
   onToggleCategory: (categoryKey: string, checked: boolean) => void;
+  onToggleAllCategories: (checked: boolean) => void;
   onStartEdit: (category: ExtractedQuarterRecord) => void;
   onUpdateDraft: (
     categoryId: string,
     field: KuartersPriceField,
     value: string,
   ) => void;
-  onSaveCategory: (categoryId: string) => void;
+  onSaveCategory: (categoryId: string) => Promise<void>;
+  onCancelEdit: () => void;
 };
 
-const priceFields: Array<[KuartersPriceField, string]> = [
-  ["categoryName", "Kategori"],
-  ["address", "Alamat"],
-  ["rentalPrice", "Sewa (RM)"],
-  ["maintenancePrice", "Senggara (RM)"],
-  ["penaltyPrice", "Penalti (RM)"],
+const priceFields: Array<[KuartersPriceField, string, string]> = [
+  ["categoryName", "Kategori", "w-[22%]"],
+  ["address", "Alamat", "w-[28%]"],
+  ["rentalPrice", "Sewa (RM)", "w-[13%]"],
+  ["maintenancePrice", "Senggara (RM)", "w-[14%]"],
+  ["penaltyPrice", "Penalti (RM)", "w-[13%]"],
 ];
+
+function ActionButton({
+  icon,
+  label,
+  textClass,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  textClass: string;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background ${textClass}`}
+      onClick={onClick}
+    >
+      <Icon icon={icon} size={18} />
+    </button>
+  );
+}
+
+function formatPrice(value: string) {
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount)) {
+    return "0.00";
+  }
+
+  return amount.toFixed(2);
+}
 
 export default function KuartersCategoryTable({
   categories,
   pageCategories,
   selectedCategoryId,
   selectedKeys,
+  isAllSelected,
   editingCategoryId,
   categoryDrafts,
   currentPage,
@@ -51,38 +89,49 @@ export default function KuartersCategoryTable({
   onPageChange,
   onSelectCategory,
   onToggleCategory,
+  onToggleAllCategories,
   onStartEdit,
   onUpdateDraft,
   onSaveCategory,
+  onCancelEdit,
 }: KuartersCategoryTableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full table-fixed text-left text-xs">
-        <thead className="bg-[#F7F9FF] text-[10px] font-extrabold uppercase text-[#667085]">
+      <table className="w-full min-w-200 table-fixed border-collapse text-left">
+        <thead className="bg-background">
           <tr>
-            <th className="w-10 px-5 py-4">
-              <input type="checkbox" className="h-4 w-4" />
+            <th className="w-10 px-3 py-4">
+              <input
+                type="checkbox"
+                aria-label="Pilih semua rekod kuarters"
+                checked={isAllSelected}
+                className="h-4 w-4 accent-dark-blue"
+                onChange={(event) => onToggleAllCategories(event.target.checked)}
+              />
             </th>
-            {priceFields.map(([, label]) => (
+            {priceFields.map(([, label, widthClass]) => (
               <th
                 key={label}
                 className={[
-                  "px-4 py-4",
-                  label.includes("RM") ? "text-right" : "",
+                  widthClass,
+                  "px-3 py-4 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey",
+                  label.includes("RM") ? "text-center" : "text-left",
                 ].join(" ")}
               >
                 {label}
               </th>
             ))}
-            <th className="px-4 py-4 text-center">Tindakan</th>
+            <th className="w-24 px-3 py-4 text-center text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+              Tindakan
+            </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#EEF1F7]">
+        <tbody>
           {pageCategories.length === 0 ? (
-            <tr>
+            <tr className="border-t border-light-grey/20">
               <td
                 colSpan={7}
-                className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
+                className="px-6 py-10 text-center text-xs font-semibold text-grey"
               >
                 Tiada kategori atau unit kuarters baharu ditemui.
               </td>
@@ -96,10 +145,14 @@ export default function KuartersCategoryTable({
               return (
                 <tr
                   key={category.id}
-                  className={isSelected ? "bg-[#FBFCFF]" : undefined}
+                  data-kuarters-editor={isEditing ? "true" : undefined}
+                  className={[
+                    "border-t border-light-grey/20 transition-colors",
+                    isSelected ? "bg-dark-blue/3" : "hover:bg-background/60",
+                  ].join(" ")}
                   onClick={() => onSelectCategory(category.id)}
                 >
-                  <td className="px-5 py-4">
+                  <td className="px-3 py-3.5">
                     <input
                       type="checkbox"
                       checked={selectedKeys.has(selectionKey)}
@@ -112,23 +165,29 @@ export default function KuartersCategoryTable({
                   </td>
                   {priceFields.map(([field]) => {
                     const value = category[field];
-                    const draftValue = categoryDrafts[category.id]?.[field] ?? value;
+                    const draftValue =
+                      categoryDrafts[category.id]?.[field] ?? value ?? "";
                     const isMoneyField = field.endsWith("Price");
 
                     return (
                       <td
                         key={`${category.id}-${field}`}
                         className={[
-                          "px-4 py-4",
-                          isMoneyField ? "text-right" : "",
+                          "overflow-hidden px-3 py-3.5 text-xs font-medium text-dark-grey",
+                          isMoneyField ? "text-center" : "",
                         ].join(" ")}
                       >
                         {isEditing ? (
                           <input
+                            type="text"
+                            inputMode={isMoneyField ? "decimal" : "text"}
                             className={[
-                              "h-9 rounded border border-[#E6EAF2] px-3 font-extrabold",
-                              isMoneyField ? "w-22 text-right" : "w-full min-w-32",
+                              "min-h-9 rounded-xl border border-light-grey/35 bg-white px-4 py-2 text-xs font-medium text-dark-blue outline-none transition-colors placeholder:text-light-grey focus:border-dark-blue",
+                              isMoneyField
+                                ? "w-full min-w-22 text-center"
+                                : "w-full min-w-28 text-left",
                             ].join(" ")}
+                            placeholder={isMoneyField ? "0.00" : "Masukkan maklumat"}
                             value={draftValue}
                             onChange={(event) =>
                               onUpdateDraft(category.id, field, event.target.value)
@@ -136,11 +195,17 @@ export default function KuartersCategoryTable({
                           />
                         ) : (
                           <>
-                            <span className="font-extrabold text-[#172033]">
-                              {value || "-"}
+                            <span
+                              className={[
+                                "block truncate font-medium text-dark-grey",
+                                isMoneyField ? "text-center" : "",
+                              ].join(" ")}
+                              title={String(value || "-")}
+                            >
+                              {isMoneyField ? formatPrice(value) : value || "-"}
                             </span>
                             {field === "categoryName" ? (
-                              <span className="block text-[10px] font-semibold text-[#667085]">
+                              <span className="block text-[10px] font-medium text-grey">
                                 {category.unitCount} unit
                               </span>
                             ) : null}
@@ -149,92 +214,45 @@ export default function KuartersCategoryTable({
                       </td>
                     );
                   })}
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-center gap-4">
+                  <td className="px-3 py-3.5">
+                    <div className="flex items-center justify-center gap-1">
                       {isEditing ? (
                         <>
-                          <button
-                            type="button"
-                            aria-label="Simpan perubahan kategori"
+                          <ActionButton
+                            icon="save"
+                            label="Simpan perubahan kategori"
+                            textClass="text-green"
                             onClick={(event) => {
                               event.stopPropagation();
-                              onSaveCategory(category.id);
+                              void onSaveCategory(category.id);
                             }}
-                          >
-                            <Icon
-                              icon="save"
-                              size={16}
-                              weight={700}
-                              className="text-green"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Padam kategori"
+                          />
+                          <ActionButton
+                            icon="delete"
+                            label="Padam kategori"
+                            textClass="text-red"
                             onClick={(event) => event.stopPropagation()}
-                          >
-                            <Icon
-                              icon="delete"
-                              size={16}
-                              weight={700}
-                              className="text-red"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Sembunyikan senarai unit"
+                          />
+                          <ActionButton
+                            icon="chevron_left"
+                            label="Sembunyikan senarai unit"
+                            textClass="text-grey"
                             onClick={(event) => {
                               event.stopPropagation();
-                              onSelectCategory(category.id);
+                              onCancelEdit();
                             }}
-                          >
-                            <Icon
-                              icon="chevron_left"
-                              size={16}
-                              weight={700}
-                              className="text-[#98A2B3]"
-                            />
-                          </button>
+                          />
                         </>
                       ) : (
-                        <>
-                          <Icon
-                            icon="check_circle"
-                            size={16}
-                            weight={700}
-                            className="text-green"
-                          />
-                          <button
-                            type="button"
-                            aria-label="Edit kategori"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onStartEdit(category);
-                            }}
-                          >
-                            <Icon
-                              icon="edit"
-                              size={16}
-                              weight={700}
-                              className="text-dark-blue"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Lihat senarai unit"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onSelectCategory(category.id);
-                            }}
-                          >
-                            <Icon
-                              icon="chevron_right"
-                              size={16}
-                              weight={700}
-                              className="text-[#98A2B3]"
-                            />
-                          </button>
-                        </>
+                        <ActionButton
+                          icon="edit"
+                          label="Edit kategori"
+                          textClass="text-dark-blue"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onStartEdit(category);
+                          }}
+                        />
                       )}
                     </div>
                   </td>

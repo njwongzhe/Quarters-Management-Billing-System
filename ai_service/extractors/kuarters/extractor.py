@@ -140,23 +140,23 @@ def extract_kuarters_document(
     normalized_mode = _normalize_parsing_mode(parsing_mode)
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-    try:
-        if extension == "xlsx":
-            response = extract_kuarters_from_xlsx(file_bytes, limit=limit)
-        elif extension == "pdf":
-            response = extract_kuarters_from_pdf(file_bytes, limit=limit)
-        else:
-            raise ValueError("Sila muat naik fail .xlsx atau .pdf sahaja.")
+    if extension == "xlsx":
+        response = extract_kuarters_from_xlsx(file_bytes, limit=limit)
+    elif extension == "pdf":
+        response = extract_kuarters_from_pdf(file_bytes, limit=limit)
+    else:
+        raise ValueError("Sila muat naik fail .xlsx atau .pdf sahaja.")
 
+    try:
         return _with_parsing_metadata(
             _validate_kuarters_response(response),
             normalized_mode,
         )
-    except Exception as rule_error:
+    except ValueError as rule_error:
         if normalized_mode == PARSING_MODE_STRICT:
             raise
 
-        ai_response = _extract_kuarters_with_gemini(file_bytes, filename, limit)
+        ai_response = _repair_kuarters_with_gemini(response, str(rule_error))
         return _with_parsing_metadata(
             _validate_kuarters_response(ai_response),
             normalized_mode,
@@ -181,10 +181,7 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
         current_penalty = ""
         sheet_category_name = _sheet_category_name(sheet["name"])
 
-        for row_offset, row in enumerate(
-            sheet["rows"][header_index + 1 :],
-            start=header_index + 2,
-        ):
+        for row in sheet["rows"][header_index + 1 :]:
             rental = normalize_fee(get_cell(row, header_map, "sewaBulanan"))
             maintenance = get_cell(row, header_map, "senggara")
             penalty = normalize_fee(get_cell(row, header_map, "kadarDenda"))
@@ -199,8 +196,6 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
             category = _category_from_row(
                 row,
                 header_map,
-                sheet["name"],
-                row_offset,
                 sheet_category_name,
                 current_rental,
                 current_maintenance,
@@ -216,19 +211,14 @@ def extract_kuarters_from_xlsx(file_bytes: bytes, limit: int | None = None) -> d
                 categories[category.id].units.extend(category.units)
 
             if limit is not None and len(categories) >= limit:
-                return _build_quarters_response(
-                    workbook["sheet_names"],
-                    list(categories.values()),
-                )
+                return _build_quarters_response(list(categories.values()))
 
-    return _build_quarters_response(workbook["sheet_names"], list(categories.values()))
+    return _build_quarters_response(list(categories.values()))
 
 
 def _category_from_row(
     row: list[str],
     header_map: dict[str, int],
-    sheet_name: str,
-    source_row: int,
     sheet_category_name: str,
     current_rental: str = "",
     current_maintenance: str = "",
@@ -299,15 +289,10 @@ def extract_kuarters_from_pdf(file_bytes: bytes, limit: int | None = None) -> di
         column_count = len(header)
         data_lines = rows[header_index + 1 :]
 
-        for row_offset, row in enumerate(
-            _chunk_pdf_rows(data_lines, column_count),
-            start=header_index + 2,
-        ):
+        for row in _chunk_pdf_rows(data_lines, column_count):
             category = _category_from_row(
                 row,
                 header_map,
-                sheet_name=f"Halaman {page_number}",
-                source_row=row_offset,
                 sheet_category_name=_pdf_page_category(text),
             )
 
@@ -321,15 +306,9 @@ def extract_kuarters_from_pdf(file_bytes: bytes, limit: int | None = None) -> di
                 categories[category.id] = category
 
             if limit is not None and len(categories) >= limit:
-                return _build_quarters_response(
-                    [f"Halaman {index}" for index in range(1, len(reader.pages) + 1)],
-                    list(categories.values()),
-                )
+                return _build_quarters_response(list(categories.values()))
 
-    return _build_quarters_response(
-        [f"Halaman {index}" for index in range(1, len(reader.pages) + 1)],
-        list(categories.values()),
-    )
+    return _build_quarters_response(list(categories.values()))
 
 
 def _find_quarter_header_row(rows: list[list[str]]) -> int | None:
@@ -342,10 +321,7 @@ def _find_quarter_header_row(rows: list[list[str]]) -> int | None:
     return None
 
 
-def _build_quarters_response(
-    _sheet_names: list[str],
-    categories: list[ExtractedQuarterCategory],
-) -> dict:
+def _build_quarters_response(categories: list[ExtractedQuarterCategory]) -> dict:
     total_units = sum(len(category.units) for category in categories)
 
     return {
@@ -498,64 +474,6 @@ def _pdf_page_category(text: str) -> str:
     return ""
 
 
-def _extract_kuarters_with_gemini(
-    file_bytes: bytes,
-    filename: str,
-    limit: int | None,
-) -> dict:
-    api_keys = _gemini_api_keys()
-    if not api_keys:
-        raise ValueError(
-            "Parsing bantuan AI gagal kerana tiada kunci API Gemini dikonfigurasi."
-        )
-
-    raw_text = _raw_text_for_ai(file_bytes, filename)
-    if not raw_text:
-        raise ValueError("Kandungan dokumen tidak dapat dibaca untuk bantuan AI.")
-
-    prompt = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": (
-                            "Extract Malaysian quarters/unit data as compact JSON. "
-                            "Return only JSON with documentType='kuarters', recordCount, "
-                            "totalUnits, and records. Each record requires id, categoryName, "
-                            "address, rentalPrice, maintenancePrice, penaltyPrice, "
-                            "unitCount, units. Each unit requires unitCode and address. "
-                            "Use strings for money. If address is missing, set it to N/A.\n\n"
-                            f"Filename: {filename}\nLimit: {limit or 'none'}\n\n{raw_text[:24000]}"
-                        )
-                    }
-                ]
-            }
-        ],
-        "generationConfig": {"responseMimeType": "application/json"},
-    }
-
-    errors: list[str] = []
-    for key_index, api_key in enumerate(api_keys, start=1):
-        try:
-            parsed = _call_gemini_kuarters_parser(api_key, prompt)
-
-            if limit is not None:
-                parsed["records"] = parsed.get("records", [])[:limit]
-
-            parsed["recordCount"] = len(parsed.get("records", []))
-            parsed["totalUnits"] = sum(
-                len(record.get("units", [])) for record in parsed.get("records", [])
-            )
-            return parsed
-        except Exception as error:
-            errors.append(f"kunci #{key_index}: {error}")
-
-    raise ValueError(
-        "Parsing bantuan AI gagal untuk semua kunci API Gemini. "
-        + " | ".join(errors[:5])
-    )
-
-
 def _gemini_api_keys() -> list[str]:
     keys = [
         os.getenv(f"GEMINI_API_KEY_{index}", "").strip()
@@ -620,21 +538,194 @@ def _compact_error_body(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()[:300]
 
 
-def _raw_text_for_ai(file_bytes: bytes, filename: str) -> str:
-    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if extension == "pdf":
-        reader = PdfReader(BytesIO(file_bytes))
-        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+def _repair_kuarters_with_gemini(response: dict, validation_error: str) -> dict:
+    invalid_records = _invalid_records_for_ai(response)
+    if not invalid_records:
+        raise ValueError(validation_error)
 
-    if extension == "xlsx":
-        workbook = read_xlsx(file_bytes)
-        lines = []
-        for sheet in workbook["sheets"]:
-            lines.append(f"Sheet: {sheet['name']}")
-            lines.extend("\t".join(row) for row in sheet["rows"])
-        return "\n".join(lines)
+    api_keys = _gemini_api_keys()
+    if not api_keys:
+        return _apply_default_repairs(response, invalid_records)
 
-    return ""
+    prompt = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": (
+                            "You are validating Malaysian quarters extraction rows. "
+                            "Only analyze the provided invalid records, not the full file. "
+                            "Return only JSON with a 'repairs' array. Each repair must include "
+                            "index, categoryName, address, rentalPrice, maintenancePrice, "
+                            "penaltyPrice, and units. Each unit must include unitCode and address. "
+                            "Rules: categoryName and unitCode are required business values and "
+                            "must never be 'N/A'. If categoryName cannot be confidently repaired, "
+                            "use 'Kategori Tidak Dikenal'. If unitCode cannot be repaired, use "
+                            "a unique 'UNIT-TIDAK-DIKENAL-{index}-{number}'. Optional string "
+                            "fields such as address may be 'N/A'. Invalid or missing prices "
+                            "must be '0'. Use money strings only. Do not invent extra rows.\n\n"
+                            f"Validation error: {validation_error}\n\n"
+                            f"Invalid records JSON:\n{json.dumps(invalid_records, ensure_ascii=False)}"
+                        )
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {"responseMimeType": "application/json"},
+    }
+
+    for api_key in api_keys:
+        try:
+            parsed = _call_gemini_kuarters_parser(api_key, prompt)
+            repaired = _merge_ai_repairs(response, parsed.get("repairs", []))
+            return _apply_default_repairs(repaired, _invalid_records_for_ai(repaired))
+        except Exception:
+            continue
+
+    return _apply_default_repairs(response, invalid_records)
+
+
+def _invalid_records_for_ai(response: dict) -> list[dict]:
+    invalid_records: list[dict] = []
+    records = response.get("records")
+
+    if not isinstance(records, list):
+        return invalid_records
+
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            invalid_records.append({"index": index, "record": record, "issues": ["record invalid"]})
+            continue
+
+        issues = []
+        category_name = str(record.get("categoryName", "")).strip()
+        units = record.get("units")
+
+        if not category_name or clean_header(category_name) == clean_header(UNKNOWN_ADDRESS):
+            issues.append("categoryName missing or invalid")
+
+        for field in ("rentalPrice", "maintenancePrice", "penaltyPrice"):
+            if not _is_valid_money(str(record.get(field, ""))):
+                issues.append(f"{field} invalid")
+
+        if not isinstance(units, list) or len(units) == 0:
+            issues.append("units missing")
+        else:
+            for unit_index, unit in enumerate(units):
+                if not isinstance(unit, dict):
+                    issues.append(f"unit {unit_index + 1} invalid")
+                    continue
+
+                if not str(unit.get("unitCode", "")).strip():
+                    issues.append(f"unit {unit_index + 1} unitCode missing")
+
+        if issues:
+            invalid_records.append(
+                {
+                    "index": index,
+                    "issues": issues,
+                    "record": record,
+                }
+            )
+
+    return invalid_records
+
+
+def _merge_ai_repairs(response: dict, repairs: list) -> dict:
+    records = response.get("records")
+    if not isinstance(records, list):
+        return response
+
+    records_by_index = {item["index"]: item for item in repairs if isinstance(item, dict)}
+    merged_records = []
+
+    for index, record in enumerate(records):
+        repair = records_by_index.get(index)
+        if not isinstance(record, dict) or not repair:
+            merged_records.append(record)
+            continue
+
+        next_record = {
+            **record,
+            "categoryName": str(repair.get("categoryName") or record.get("categoryName") or "").strip(),
+            "address": _fallback_address(str(repair.get("address") or record.get("address") or "")),
+            "rentalPrice": _normalize_money_or_zero(str(repair.get("rentalPrice", record.get("rentalPrice", "")))),
+            "maintenancePrice": _normalize_money_or_zero(str(repair.get("maintenancePrice", record.get("maintenancePrice", "")))),
+            "penaltyPrice": _normalize_money_or_zero(str(repair.get("penaltyPrice", record.get("penaltyPrice", "")))),
+        }
+
+        repaired_units = repair.get("units")
+        if isinstance(repaired_units, list):
+            next_record["units"] = repaired_units
+
+        merged_records.append(next_record)
+
+    return {
+        **response,
+        "records": merged_records,
+    }
+
+
+def _apply_default_repairs(response: dict, invalid_records: list[dict]) -> dict:
+    records = response.get("records")
+    if not isinstance(records, list):
+        return response
+
+    invalid_indexes = {
+        item["index"]
+        for item in invalid_records
+        if isinstance(item.get("index"), int)
+    }
+    repaired_records = []
+
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            continue
+
+        if index not in invalid_indexes:
+            repaired_records.append(record)
+            continue
+
+        category_name = str(record.get("categoryName", "")).strip()
+        if not category_name or clean_header(category_name) == clean_header(UNKNOWN_ADDRESS):
+            category_name = "Kategori Tidak Dikenal"
+
+        units = record.get("units")
+        if not isinstance(units, list) or len(units) == 0:
+            units = [{"unitCode": f"UNIT-TIDAK-DIKENAL-{index + 1}-1", "address": UNKNOWN_ADDRESS}]
+
+        repaired_units = []
+        for unit_index, unit in enumerate(units, start=1):
+            unit = unit if isinstance(unit, dict) else {}
+            unit_code = str(unit.get("unitCode", "")).strip()
+            if not unit_code or clean_header(unit_code) == clean_header(UNKNOWN_ADDRESS):
+                unit_code = f"UNIT-TIDAK-DIKENAL-{index + 1}-{unit_index}"
+
+            repaired_units.append(
+                {
+                    "unitCode": unit_code,
+                    "address": _fallback_address(str(unit.get("address", ""))),
+                }
+            )
+
+        repaired_records.append(
+            {
+                **record,
+                "categoryName": category_name,
+                "address": _fallback_address(str(record.get("address", ""))),
+                "rentalPrice": _normalize_money_or_zero(str(record.get("rentalPrice", ""))),
+                "maintenancePrice": _normalize_money_or_zero(str(record.get("maintenancePrice", ""))),
+                "penaltyPrice": _normalize_money_or_zero(str(record.get("penaltyPrice", ""))),
+                "units": repaired_units,
+            }
+        )
+
+    return {
+        **response,
+        "recordCount": len(repaired_records),
+        "totalUnits": sum(len(record.get("units", [])) for record in repaired_records),
+        "records": repaired_records,
+    }
 
 
 def _sheet_category_name(sheet_name: str) -> str:

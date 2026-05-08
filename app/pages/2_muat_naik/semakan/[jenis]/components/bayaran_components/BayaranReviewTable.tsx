@@ -46,6 +46,9 @@ export default function BayaranReviewTable({
   const pendingDeleteRow =
     savedRows.find((row) => row.id === pendingDeleteId) ?? null;
   const selectedKeySet = new Set(selectedKeys);
+  const allRecordKeys = savedRows.map(getBayaranRecordKey);
+  const isAllSelected =
+    allRecordKeys.length > 0 && allRecordKeys.every((key) => selectedKeySet.has(key));
 
   const calculateTotalAmount = (rows: BayaranReviewRowModel[]) =>
     rows.reduce((total, row) => total + (Number(row.amaunRm) || 0), 0).toFixed(2);
@@ -139,13 +142,33 @@ export default function BayaranReviewTable({
     onSelectedKeysChange?.([...nextKeys]);
   };
 
+  const toggleAllRows = (checked: boolean) => {
+    const nextKeys = new Set(selectedKeys);
+
+    allRecordKeys.forEach((key) => {
+      if (checked) {
+        nextKeys.add(key);
+      } else {
+        nextKeys.delete(key);
+      }
+    });
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
   return (
     <div className="overflow-x-auto rounded-lg border border-[#DCE2F1] bg-white">
       <table className="min-w-7xl table-fixed text-left text-xs">
         <thead className="bg-[#F7F9FF] text-[10px] font-extrabold uppercase text-[#667085]">
           <tr>
             <th className="w-14 px-5 py-4">
-              <input type="checkbox" className="h-4 w-4" />
+              <input
+                type="checkbox"
+                aria-label="Pilih semua rekod bayaran"
+                checked={isAllSelected}
+                className="h-4 w-4 accent-dark-blue"
+                onChange={(event) => toggleAllRows(event.target.checked)}
+              />
             </th>
             <th className="w-56 px-4 py-4">Penghuni</th>
             <th className="w-40 px-4 py-4 whitespace-nowrap">PTJPK / Jabatan</th>

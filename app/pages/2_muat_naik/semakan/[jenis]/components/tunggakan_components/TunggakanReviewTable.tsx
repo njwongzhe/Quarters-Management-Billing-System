@@ -30,6 +30,9 @@ export default function TunggakanReviewTable({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const selectedKeySet = new Set(selectedKeys);
+  const allRecordKeys = savedRows.map(getTunggakanRowKey);
+  const isAllSelected =
+    allRecordKeys.length > 0 && allRecordKeys.every((key) => selectedKeySet.has(key));
 
   const totalPages = Math.max(1, Math.ceil(savedRows.length / RESIDENTS_PER_PAGE));
   const paginatedRows = useMemo(
@@ -112,13 +115,33 @@ export default function TunggakanReviewTable({
     onSelectedKeysChange?.([...nextKeys]);
   };
 
+  const toggleAllRows = (checked: boolean) => {
+    const nextKeys = new Set(selectedKeys);
+
+    allRecordKeys.forEach((key) => {
+      if (checked) {
+        nextKeys.add(key);
+      } else {
+        nextKeys.delete(key);
+      }
+    });
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
   return (
     <div className="overflow-hidden rounded-lg border border-[#DCE2F1] bg-white">
       <table className="w-full table-fixed text-left text-xs">
         <thead className="bg-[#F7F9FF] text-[10px] font-extrabold uppercase text-[#667085]">
           <tr>
             <th className="w-10 px-5 py-4">
-              <input type="checkbox" className="h-4 w-4" />
+              <input
+                type="checkbox"
+                aria-label="Pilih semua rekod tunggakan"
+                checked={isAllSelected}
+                className="h-4 w-4 accent-dark-blue"
+                onChange={(event) => toggleAllRows(event.target.checked)}
+              />
             </th>
             <th className="px-4 py-4">Penghuni</th>
             <th className="w-[18%] px-4 py-4 text-right">Jumlah Tunggakan (RM)</th>

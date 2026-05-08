@@ -143,16 +143,19 @@ export function Pagination({
   totalPages = 1,
   onPageChange,
   showLabel = true,
+  size = "default",
 }: {
   label: string;
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
   showLabel?: boolean;
+  size?: "default" | "compact";
 }) {
   const canGoPrevious = currentPage > 1;
   const canGoNext = currentPage < totalPages;
   const visiblePages = getVisiblePages(currentPage, totalPages);
+  const isCompact = size === "compact";
 
   const changePage = (page: number) => {
     if (!onPageChange || page < 1 || page > totalPages || page === currentPage) {
@@ -163,22 +166,34 @@ export function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-[#EEF1F7] px-5 py-3 text-[11px] text-[#4B5567]">
-      <div className="flex items-center gap-1">
+    <div
+      className={[
+        "flex flex-col border-t border-light-grey/20 sm:flex-row sm:items-center sm:justify-between",
+        isCompact ? "gap-2 px-3 py-3" : "gap-3 px-4 py-4 sm:px-5",
+      ].join(" ")}
+    >
+      <div className={["flex flex-wrap items-center", isCompact ? "gap-1" : "gap-2"].join(" ")}>
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded text-[#344054] disabled:cursor-not-allowed disabled:opacity-40"
+          className={[
+            "inline-flex items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40",
+            isCompact ? "min-h-7 min-w-7" : "min-h-8 min-w-8",
+          ].join(" ")}
           onClick={() => changePage(currentPage - 1)}
           disabled={!canGoPrevious}
           aria-label="Halaman sebelumnya"
         >
-          <Icon icon="chevron_left" size={14} />
+          <Icon icon="chevron_left" size={isCompact ? 14 : 18} />
         </button>
         {visiblePages.map((page, index) =>
           page === "ellipsis" ? (
             <span
               key={`ellipsis-${index}`}
-              className="flex h-7 w-7 items-center justify-center text-[#98A2B3]"
+              className={[
+                "px-1 font-semibold text-grey",
+                isCompact ? "text-xs" : "text-sm",
+              ].join(" ")}
+              aria-hidden="true"
             >
               ...
             </span>
@@ -187,9 +202,13 @@ export function Pagination({
               key={page}
               type="button"
               className={[
-                "h-7 w-7 rounded",
-                page === currentPage ? "bg-dark-blue text-white" : "text-[#344054]",
+                "rounded-md border transition-colors",
+                isCompact ? "min-h-7 min-w-7 px-1.5 text-xs" : "min-h-8 min-w-8 px-2 text-sm",
+                page === currentPage
+                  ? "border-dark-blue bg-dark-blue font-bold text-white"
+                  : "border-light-grey/30 bg-white text-grey hover:border-dark-blue hover:text-dark-blue",
               ].join(" ")}
+              aria-current={page === currentPage ? "page" : undefined}
               onClick={() => changePage(page)}
             >
               {page}
@@ -198,15 +217,18 @@ export function Pagination({
         )}
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded text-[#344054] disabled:cursor-not-allowed disabled:opacity-40"
+          className={[
+            "inline-flex items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40",
+            isCompact ? "min-h-7 min-w-7" : "min-h-8 min-w-8",
+          ].join(" ")}
           onClick={() => changePage(currentPage + 1)}
           disabled={!canGoNext}
           aria-label="Halaman seterusnya"
         >
-          <Icon icon="chevron_right" size={14} />
+          <Icon icon="chevron_right" size={isCompact ? 14 : 18} />
         </button>
       </div>
-      {showLabel ? <span className="min-w-0 truncate">{label}</span> : null}
+      {showLabel ? <p className="text-sm text-grey">{label}</p> : null}
     </div>
   );
 }
