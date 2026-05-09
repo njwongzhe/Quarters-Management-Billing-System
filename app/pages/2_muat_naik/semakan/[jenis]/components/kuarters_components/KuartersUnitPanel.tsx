@@ -12,12 +12,16 @@ type KuartersUnitPanelProps = {
   editingUnitKey: string | null;
   savingUnitKey: string | null;
   isSaving: boolean;
+  selectedKeys: Set<string>;
+  isAllSelected: boolean;
   currentPage: number;
   totalPages: number;
   displayStart: number;
   displayEnd: number;
   onPageChange: (page: number) => void;
   onDraftsChange: (updater: (currentDrafts: Record<string, string>) => Record<string, string>) => void;
+  onToggleUnit: (unitKey: string, checked: boolean) => void;
+  onToggleAllUnits: (checked: boolean) => void;
   onStartEdit: (unitKey: string, unitCode: string) => void;
   onSaveUnit: (unitKey: string) => Promise<void>;
   onCancelEdit: () => void;
@@ -63,12 +67,16 @@ export default function KuartersUnitPanel({
   editingUnitKey,
   savingUnitKey,
   isSaving,
+  selectedKeys,
+  isAllSelected,
   currentPage,
   totalPages,
   displayStart,
   displayEnd,
   onPageChange,
   onDraftsChange,
+  onToggleUnit,
+  onToggleAllUnits,
   onStartEdit,
   onSaveUnit,
   onCancelEdit,
@@ -78,7 +86,15 @@ export default function KuartersUnitPanel({
       <div className="flex items-center justify-between bg-background px-4 py-4 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
         Senarai Unit
       </div>
-      <div className="grid grid-cols-[minmax(0,120px)_1fr] border-t border-light-grey/20 bg-background px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+      <div className="grid grid-cols-[32px_minmax(0,120px)_1fr] border-t border-light-grey/20 bg-background px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+        <input
+          type="checkbox"
+          aria-label="Pilih semua unit kategori ini"
+          checked={isAllSelected}
+          disabled={isSaving || units.length === 0}
+          className="h-4 w-4 accent-dark-blue"
+          onChange={(event) => onToggleAllUnits(event.target.checked)}
+        />
         <span>ID Unit</span>
         <span className="text-center">Tindakan</span>
       </div>
@@ -96,8 +112,18 @@ export default function KuartersUnitPanel({
             <div
               key={unitKey}
               data-kuarters-editor={isEditing ? "true" : undefined}
-              className="grid grid-cols-[minmax(0,120px)_1fr] items-center border-t border-light-grey/20 px-4 py-3.5 text-xs transition-colors hover:bg-background/60"
+              className={[
+                "grid grid-cols-[32px_minmax(0,120px)_1fr] items-center border-t border-light-grey/20 px-4 py-3.5 text-xs transition-colors",
+                unit.isExisted ? "bg-amber-50" : "hover:bg-background/60",
+              ].join(" ")}
             >
+              <input
+                type="checkbox"
+                checked={selectedKeys.has(unitKey)}
+                disabled={isSaving}
+                className="h-4 w-4 accent-dark-blue"
+                onChange={(event) => onToggleUnit(unitKey, event.target.checked)}
+              />
               <span>
                 {isEditing ? (
                   <input

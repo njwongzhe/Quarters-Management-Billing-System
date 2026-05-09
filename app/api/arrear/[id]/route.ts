@@ -20,10 +20,9 @@ export async function GET(
           },
         },
         monthlyCharges: {
-          where: { recordStatus: "VERIFIED" },
           include: {
-            additionalCharges: { where: { recordStatus: "VERIFIED" } },
-            rebates: { where: { recordStatus: "VERIFIED" } },
+            additionalCharges: true,
+            rebates: true,
           },
         },
         // Pull their full transaction ledger, newest first

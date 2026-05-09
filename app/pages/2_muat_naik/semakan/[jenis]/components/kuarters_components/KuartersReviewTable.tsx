@@ -89,6 +89,10 @@ export default function KuartersReviewTable({
   const isAllCategoriesSelected =
     allCategoryKeys.length > 0 &&
     allCategoryKeys.every((key) => selectedKeySet.has(key));
+  const allSelectedCategoryUnitKeys = units.map(getUnitKey);
+  const isAllSelectedCategoryUnitsSelected =
+    allSelectedCategoryUnitKeys.length > 0 &&
+    allSelectedCategoryUnitKeys.every((key) => selectedKeySet.has(key));
 
   const showNotice = (noticeTone: KuartersNotice["tone"], message: string) => {
     setNotice({ tone: noticeTone, message });
@@ -164,6 +168,40 @@ export default function KuartersReviewTable({
     const nextKeys = new Set(selectedKeys);
 
     allCategoryKeys.forEach((key) => {
+      if (checked) {
+        nextKeys.add(key);
+      } else {
+        nextKeys.delete(key);
+      }
+    });
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
+  const toggleSelectedUnit = (unitKey: string, checked: boolean) => {
+    if (isSaving) {
+      return;
+    }
+
+    const nextKeys = new Set(selectedKeys);
+
+    if (checked) {
+      nextKeys.add(unitKey);
+    } else {
+      nextKeys.delete(unitKey);
+    }
+
+    onSelectedKeysChange?.([...nextKeys]);
+  };
+
+  const toggleAllSelectedCategoryUnits = (checked: boolean) => {
+    if (isSaving) {
+      return;
+    }
+
+    const nextKeys = new Set(selectedKeys);
+
+    allSelectedCategoryUnitKeys.forEach((key) => {
       if (checked) {
         nextKeys.add(key);
       } else {
@@ -362,6 +400,8 @@ export default function KuartersReviewTable({
             savingTarget?.startsWith("unit:") ? savingTarget.slice(5) : null
           }
           isSaving={isSaving}
+          selectedKeys={selectedKeySet}
+          isAllSelected={isAllSelectedCategoryUnitsSelected}
           currentPage={safeUnitPage}
           totalPages={totalUnitPages}
           displayStart={unitDisplayStart}
@@ -372,6 +412,8 @@ export default function KuartersReviewTable({
             }
           }}
           onDraftsChange={setUnitDrafts}
+          onToggleUnit={toggleSelectedUnit}
+          onToggleAllUnits={toggleAllSelectedCategoryUnits}
           onStartEdit={startUnitEdit}
           onSaveUnit={saveUnit}
           onCancelEdit={cancelEditing}

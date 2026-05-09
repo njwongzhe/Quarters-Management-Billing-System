@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
-import { getCurrentAdmin } from "@/lib/current-admin";
 import {
   applyVerifiedPenghuniOccupancy,
-  parseExtractResult,
+  mapUploadedDocumentForReview,
 } from "@/lib/uploaded-documents";
+import { getCurrentAdmin } from "@/lib/current-admin";
+import { prisma } from "@/lib/prisma";
 import type { ExtractResult } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import type {
-  ExtractedBayaranRecord,
-  ExtractedPenghuniRecord,
-  ExtractedQuarterRecord,
-  ExtractedTunggakanRecord,
-} from "@/app/pages/2_muat_naik/components/extract-review-shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,148 +18,165 @@ const uploadedDocumentTransactionOptions = {
 };
 
 type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
-// This route handler is responsible for verifying the selected records from the extract result of an uploaded document. It updates the record status of the selected records to "VERIFIED" and sets the verifiedAt timestamp. If all records are verified, it also updates the uploaded document's record status to "VERIFIED". If there are remaining unverified records, it updates the uploaded document's remark with the remaining extract result and keeps the record status as "PENDING".
+type VerifyResult = {
+  verifiedRows: number;
+  failedMessages: string[];
+};
+
+async function findResidentIdByIc(tx: Prisma.TransactionClient, icNumber: string) {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "Resident"
+    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
+      regexp_replace(${icNumber}, '\\D', '', 'g')
+    ORDER BY "createdAt" ASC
+    LIMIT 1
+  `;
+
+  return rows[0]?.id ?? "";
+}
+
+async function findQuarterCategoryByNameAddress(
+  tx: Prisma.TransactionClient,
+  categoryName: string,
+  address: string | null,
+) {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "QuarterCategory"
+    WHERE UPPER(TRIM(regexp_replace("categoryName", '\\s+', ' ', 'g'))) =
+      UPPER(TRIM(regexp_replace(${categoryName}, '\\s+', ' ', 'g')))
+      AND UPPER(TRIM(regexp_replace(COALESCE("address", ''), '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(COALESCE(${address}::text, ''), '\\s+', ' ', 'g')))
+    LIMIT 1
+  `;
+
+  return rows[0]?.id ?? "";
+}
+
+async function findUnitByCategoryIdAndCode(
+  tx: Prisma.TransactionClient,
+  categoryId: string,
+  unitCode: string,
+) {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id"
+    FROM "Unit"
+    WHERE "categoryId" = ${categoryId}::uuid
+      AND UPPER(TRIM(regexp_replace("unitCode", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(${unitCode}, '\\s+', ' ', 'g')))
+    LIMIT 1
+  `;
+
+  return rows[0]?.id ?? "";
+}
+
+async function ensureResidentFromDraft(
+  tx: Prisma.TransactionClient,
+  draft: {
+    fullName: string;
+    icNumber: string;
+    phone?: string | null;
+    position?: string | null;
+    department?: string | null;
+    description?: string | null;
+  },
+) {
+  const existingResidentId = await findResidentIdByIc(tx, draft.icNumber);
+
+  if (existingResidentId) {
+    return existingResidentId;
+  }
+
+  const resident = await tx.resident.create({
+    data: {
+      fullName: draft.fullName,
+      icNumber: draft.icNumber,
+      phone: draft.phone ?? null,
+      position: draft.position ?? null,
+      department: draft.department ?? null,
+      description: draft.description ?? null,
+    },
+    select: { id: true },
+  });
+
+  return resident.id;
+}
+
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const currentAdmin = await getCurrentAdmin();
+    await getCurrentAdmin();
     const { id } = await context.params;
-    const verifiedAt = new Date();
     const body = await request.json().catch(() => null);
-    const selectedKeys: Set<string> | null = Array.isArray(body?.selectedKeys)
-      ? new Set(
-          body.selectedKeys.filter(
-            (key: unknown): key is string => typeof key === "string",
-          ),
-        )
-      : null;
+    const selectedKeys = Array.isArray(body?.selectedKeys)
+      ? body.selectedKeys.filter((key: unknown): key is string => typeof key === "string")
+      : [];
 
-    const remainingExtractResult = await prisma.$transaction(
+    if (selectedKeys.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Sila pilih sekurang-kurangnya satu rekod untuk disahkan." },
+        { status: 400 },
+      );
+    }
+
+    const result = await prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
         const document = await tx.uploadedDocument.findUnique({
           where: { id },
-          select: {
-            remark: true,
-            recordStatus: true,
-          },
+          include: { uploadedBy: { select: { fullName: true } } },
         });
 
         if (!document) {
           throw new Error("Dokumen tidak ditemui.");
         }
 
-        if (document.recordStatus !== "PENDING") {
-          throw new Error("Dokumen ini sudah diproses.");
+        let verifyResult: VerifyResult;
+
+        if (document.category === "BAYARAN") {
+          verifyResult = await verifyBayaranDrafts(tx, id, selectedKeys);
+        } else if (document.category === "TUNGGAKAN") {
+          verifyResult = await verifyTunggakanDrafts(tx, id, selectedKeys);
+        } else if (document.category === "PENGHUNI") {
+          verifyResult = await verifyPenghuniDrafts(tx, id, selectedKeys);
+        } else {
+          verifyResult = await verifyKuartersDrafts(tx, id, selectedKeys);
         }
 
-        const extractResult = parseExtractResult(document.remark);
-
-        if (selectedKeys && selectedKeys.size === 0) {
-          throw new Error("Sila pilih sekurang-kurangnya satu rekod untuk disahkan.");
-        }
-
-        if (extractResult && selectedKeys) {
-          const selectedExtractResult = buildSelectedExtractResult(
-            extractResult,
-            selectedKeys,
-          );
-          const nextRemainingExtractResult = buildRemainingExtractResult(
-            extractResult,
-            selectedKeys,
-          );
-
-          if (selectedExtractResult.records.length === 0) {
-            throw new Error("Rekod dipilih tidak ditemui.");
-          }
-
-          const verifiedRows = await verifySelectedExtractResult(
-            tx,
-            id,
-            verifiedAt,
-            selectedExtractResult,
-          );
-
-          if (verifiedRows === 0) {
-            throw new Error(
-              "Rekod dipilih tidak dapat disahkan. Sila semak status rekod.",
-            );
-          }
-
-          if (selectedExtractResult.documentType === "penghuni") {
-            await applyVerifiedPenghuniOccupancy(tx, selectedExtractResult);
-          }
-
-          await tx.uploadedDocument.update({
-            where: { id },
-            data:
-              nextRemainingExtractResult.records.length > 0
-                ? {
-                    remark: JSON.stringify(nextRemainingExtractResult),
-                    recordStatus: "PENDING",
-                  }
-                : {
-                    recordStatus: "VERIFIED",
-                    verifiedAt,
-                  },
-          });
-
-          return nextRemainingExtractResult.records.length > 0
-            ? nextRemainingExtractResult
-            : null;
-        }
-
-        await tx.$executeRaw`
-          UPDATE "Resident"
-          SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-          WHERE "uploadedDocumentId" = ${id}::uuid
-            AND "recordStatus" = 'PENDING'::"RecordStatus"
-        `;
-        await tx.$executeRaw`
-          UPDATE "QuarterCategory"
-          SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-          WHERE "uploadedDocumentId" = ${id}::uuid
-            AND "recordStatus" = 'PENDING'::"RecordStatus"
-        `;
-        await tx.$executeRaw`
-          UPDATE "Unit"
-          SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-          WHERE "uploadedDocumentId" = ${id}::uuid
-            AND "recordStatus" = 'PENDING'::"RecordStatus"
-        `;
-        await tx.$executeRaw`
-          UPDATE "ArrearsSummary"
-          SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-          WHERE "uploadedDocumentId" = ${id}::uuid
-            AND "recordStatus" = 'PENDING'::"RecordStatus"
-        `;
-        await tx.$executeRaw`
-          UPDATE "Payment"
-          SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-          WHERE "uploadedDocumentId" = ${id}::uuid
-            AND "recordStatus" = 'PENDING'::"RecordStatus"
-        `;
-        await tx.uploadedDocument.update({
-          where: {
-            id,
-          },
-          data: {
-            recordStatus: "VERIFIED",
-            verifiedAt,
-          },
+        const remainingDocument = await tx.uploadedDocument.findUnique({
+          where: { id },
+          include: { uploadedBy: { select: { fullName: true } } },
         });
+
+        if (!remainingDocument) {
+          throw new Error("Dokumen tidak ditemui.");
+        }
+
+        return {
+          ...verifyResult,
+          document: remainingDocument,
+        };
       },
       uploadedDocumentTransactionOptions,
     );
 
+    const remainingDraft = await mapUploadedDocumentForReview(result.document);
+    const failedSuffix =
+      result.failedMessages.length > 0
+        ? ` ${result.failedMessages.join(" ")}`
+        : "";
+
     return NextResponse.json({
       success: true,
-      message: "Data berjaya disahkan.",
+      message:
+        result.verifiedRows > 0
+          ? `Data berjaya disahkan.${failedSuffix}`
+          : `Tiada rekod baharu disahkan.${failedSuffix}`,
       data: {
-        remainingExtractResult,
+        remainingExtractResult: remainingDraft?.extractResult ?? null,
+        failedMessages: result.failedMessages,
       },
     });
   } catch (error) {
@@ -180,241 +191,275 @@ export async function POST(request: Request, context: RouteContext) {
   }
 }
 
-type ExtractRecord = ExtractResult["records"][number];
-
-function getExtractRecordKey(
-  documentType: ExtractResult["documentType"],
-  record: ExtractRecord,
-) {
-  if (documentType === "bayaran") {
-    const bayaranRecord = record as ExtractedBayaranRecord;
-    return (
-      bayaranRecord.paymentId ??
-      `${bayaranRecord.page}-${bayaranRecord.bil}-${bayaranRecord.noGajiNoKp}-${bayaranRecord.noRujukan}`
-    );
-  }
-
-  if (documentType === "tunggakan") {
-    const tunggakanRecord = record as ExtractedTunggakanRecord;
-    return (
-      tunggakanRecord.arrearsSummaryId ??
-      `${tunggakanRecord.noKadPengenalan}-${tunggakanRecord.sourceSheet}-${tunggakanRecord.sourceRow}`
-    );
-  }
-
-  if (documentType === "penghuni") {
-    const penghuniRecord = record as ExtractedPenghuniRecord;
-    return (
-      penghuniRecord.residentId ??
-      `${penghuniRecord.noKadPengenalan}-${penghuniRecord.sourceSheet}-${penghuniRecord.sourceRow}`
-    );
-  }
-
-  const kuartersRecord = record as ExtractedQuarterRecord;
-  return kuartersRecord.categoryId ?? kuartersRecord.id;
-}
-
-function buildSelectedExtractResult(
-  extractResult: ExtractResult,
-  selectedKeys: Set<string>,
-) {
-  return buildExtractResultWithRecords(
-    extractResult,
-    extractResult.records.filter((record) =>
-      selectedKeys.has(getExtractRecordKey(extractResult.documentType, record)),
-    ) as ExtractResult["records"],
-  );
-}
-
-function buildRemainingExtractResult(
-  extractResult: ExtractResult,
-  selectedKeys: Set<string>,
-) {
-  return buildExtractResultWithRecords(
-    extractResult,
-    extractResult.records.filter(
-      (record) =>
-        !selectedKeys.has(getExtractRecordKey(extractResult.documentType, record)),
-    ) as ExtractResult["records"],
-  );
-}
-
-function buildExtractResultWithRecords(
-  extractResult: ExtractResult,
-  records: ExtractResult["records"],
-): ExtractResult {
-  if (extractResult.documentType === "bayaran") {
-    const bayaranRecords = records as typeof extractResult.records;
-    return {
-      ...extractResult,
-      recordCount: bayaranRecords.length,
-      records: bayaranRecords,
-    };
-  }
-
-  if (extractResult.documentType === "tunggakan") {
-    const tunggakanRecords = records as typeof extractResult.records;
-    return {
-      ...extractResult,
-      recordCount: tunggakanRecords.filter(
-        (record) => record.importStatus !== "IGNORED",
-      ).length,
-      totalAmount: tunggakanRecords
-        .filter((record) => record.importStatus !== "IGNORED")
-        .reduce((total, record) => total + Number(record.jumlahTunggakan || 0), 0)
-        .toFixed(2),
-      records: tunggakanRecords,
-    };
-  }
-
-  if (extractResult.documentType === "kuarters") {
-    const kuartersRecords = records as typeof extractResult.records;
-    return {
-      ...extractResult,
-      recordCount: kuartersRecords.length,
-      totalUnits: kuartersRecords.reduce(
-        (total, record) => total + record.units.length,
-        0,
-      ),
-      records: kuartersRecords,
-    };
-  }
-
-  const penghuniRecords = records as typeof extractResult.records;
-  return {
-    ...extractResult,
-    recordCount: penghuniRecords.length,
-    records: penghuniRecords,
-  };
-}
-
-async function verifySelectedExtractResult(
+async function verifyBayaranDrafts(
   tx: Prisma.TransactionClient,
   uploadedDocumentId: string,
-  verifiedAt: Date,
-  extractResult: ExtractResult,
-) {
+  selectedKeys: string[],
+): Promise<VerifyResult> {
+  const drafts = await tx.paymentDraft.findMany({
+    where: { uploadedDocumentId, id: { in: selectedKeys } },
+  });
+  const failedMessages: string[] = [];
   let verifiedRows = 0;
 
-  if (extractResult.documentType === "bayaran") {
-    const ids = extractResult.records
-      .map((record) => record.paymentId)
-      .filter((value): value is string => Boolean(value));
-    const residentIds = extractResult.records
-      .map((record) => record.residentId)
-      .filter((value): value is string => Boolean(value));
+  for (const draft of drafts) {
+    const residentId = await ensureResidentFromDraft(tx, {
+      fullName: draft.residentName,
+      icNumber: draft.residentIcNumber,
+      department: draft.department,
+    });
+    const existingPayment = await tx.payment.findFirst({
+      where: {
+        residentId,
+        paymentDate: draft.paymentDate,
+        receiptNo: draft.referenceNo ?? draft.receiptNo ?? undefined,
+      },
+      select: { id: true },
+    });
 
-    if (ids.length > 0) {
-      verifiedRows += await tx.$executeRaw`
-        UPDATE "Payment"
-        SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-        WHERE "id" IN (${Prisma.join(ids.map((item) => Prisma.sql`${item}::uuid`))})
-          AND "uploadedDocumentId" = ${uploadedDocumentId}::uuid
-          AND "recordStatus" = 'PENDING'::"RecordStatus"
-      `;
+    if (existingPayment) {
+      failedMessages.push(`Bayaran ${draft.referenceNo ?? draft.residentName} telah wujud.`);
+      await tx.paymentDraft.update({
+        where: { id: draft.id },
+        data: { isExisted: true, originalPaymentId: existingPayment.id },
+      });
+      continue;
     }
 
-    verifiedRows += await verifySelectedResidents(
-      tx,
-      uploadedDocumentId,
-      verifiedAt,
-      residentIds,
-    );
+    await tx.payment.create({
+      data: {
+        residentId,
+        paymentDate: draft.paymentDate,
+        receiptNo: draft.referenceNo ?? draft.receiptNo,
+        amount: draft.amount,
+        description: draft.description,
+      },
+    });
+    await tx.paymentDraft.delete({ where: { id: draft.id } });
+    verifiedRows += 1;
   }
 
-  if (extractResult.documentType === "tunggakan") {
-    const ids = extractResult.records
-      .map((record) => record.arrearsSummaryId)
-      .filter((value): value is string => Boolean(value));
-    const residentIds = extractResult.records
-      .map((record) => record.residentId)
-      .filter((value): value is string => Boolean(value));
-
-    if (ids.length > 0) {
-      verifiedRows += await tx.$executeRaw`
-        UPDATE "ArrearsSummary"
-        SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-        WHERE "id" IN (${Prisma.join(ids.map((item) => Prisma.sql`${item}::uuid`))})
-          AND "uploadedDocumentId" = ${uploadedDocumentId}::uuid
-          AND "recordStatus" = 'PENDING'::"RecordStatus"
-      `;
-    }
-
-    verifiedRows += await verifySelectedResidents(
-      tx,
-      uploadedDocumentId,
-      verifiedAt,
-      residentIds,
-    );
-  }
-
-  if (extractResult.documentType === "penghuni") {
-    const ids = extractResult.records
-      .map((record) => record.residentId)
-      .filter((value): value is string => Boolean(value));
-
-    if (ids.length > 0) {
-      verifiedRows += await tx.$executeRaw`
-        UPDATE "Resident"
-        SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-        WHERE "id" IN (${Prisma.join(ids.map((item) => Prisma.sql`${item}::uuid`))})
-          AND "uploadedDocumentId" = ${uploadedDocumentId}::uuid
-          AND "recordStatus" = 'PENDING'::"RecordStatus"
-      `;
-    }
-  }
-
-  if (extractResult.documentType === "kuarters") {
-    const categoryIds = extractResult.records
-      .map((record) => record.categoryId)
-      .filter((value): value is string => Boolean(value));
-    const unitIds = extractResult.records
-      .flatMap((record) => record.units.map((unit) => unit.unitId))
-      .filter((value): value is string => Boolean(value));
-
-    if (categoryIds.length > 0) {
-      verifiedRows += await tx.$executeRaw`
-        UPDATE "QuarterCategory"
-        SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-        WHERE "id" IN (${Prisma.join(
-          categoryIds.map((item) => Prisma.sql`${item}::uuid`),
-        )})
-          AND "uploadedDocumentId" = ${uploadedDocumentId}::uuid
-          AND "recordStatus" = 'PENDING'::"RecordStatus"
-      `;
-    }
-
-    if (unitIds.length > 0) {
-      verifiedRows += await tx.$executeRaw`
-        UPDATE "Unit"
-        SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-        WHERE "id" IN (${Prisma.join(unitIds.map((item) => Prisma.sql`${item}::uuid`))})
-          AND "uploadedDocumentId" = ${uploadedDocumentId}::uuid
-          AND "recordStatus" = 'PENDING'::"RecordStatus"
-      `;
-    }
-  }
-
-  return verifiedRows;
+  return { verifiedRows, failedMessages };
 }
 
-async function verifySelectedResidents(
+async function verifyTunggakanDrafts(
   tx: Prisma.TransactionClient,
   uploadedDocumentId: string,
-  verifiedAt: Date,
-  residentIds: string[],
-) {
-  if (residentIds.length === 0) {
-    return 0;
+  selectedKeys: string[],
+): Promise<VerifyResult> {
+  const drafts = await tx.arrearsSummaryDraft.findMany({
+    where: { uploadedDocumentId, id: { in: selectedKeys } },
+  });
+  const failedMessages: string[] = [];
+  let verifiedRows = 0;
+
+  for (const draft of drafts) {
+    const residentId = await ensureResidentFromDraft(tx, {
+      fullName: draft.residentName,
+      icNumber: draft.residentIcNumber,
+    });
+    const existingSummary = await tx.arrearsSummary.findUnique({
+      where: { residentId },
+      select: { id: true },
+    });
+
+    if (existingSummary) {
+      failedMessages.push(`Tunggakan ${draft.residentName} telah wujud.`);
+      await tx.arrearsSummaryDraft.update({
+        where: { id: draft.id },
+        data: { isExisted: true, originalSummaryId: existingSummary.id },
+      });
+      continue;
+    }
+
+    await tx.arrearsSummary.create({
+      data: {
+        residentId,
+        totalArrearsAmount: draft.totalArrearsAmount,
+        description: draft.description,
+      },
+    });
+    await tx.arrearsSummaryDraft.delete({ where: { id: draft.id } });
+    verifiedRows += 1;
   }
 
-  return tx.$executeRaw`
-    UPDATE "Resident"
-    SET "recordStatus" = 'VERIFIED'::"RecordStatus", "verifiedAt" = ${verifiedAt}, "updatedAt" = NOW()
-    WHERE "id" IN (${Prisma.join(
-      residentIds.map((item) => Prisma.sql`${item}::uuid`),
-    )})
-      AND "uploadedDocumentId" = ${uploadedDocumentId}::uuid
-      AND "recordStatus" = 'PENDING'::"RecordStatus"
-  `;
+  return { verifiedRows, failedMessages };
+}
+
+async function verifyPenghuniDrafts(
+  tx: Prisma.TransactionClient,
+  uploadedDocumentId: string,
+  selectedKeys: string[],
+): Promise<VerifyResult> {
+  const drafts = await tx.residentDraft.findMany({
+    where: { uploadedDocumentId, id: { in: selectedKeys } },
+  });
+  const failedMessages: string[] = [];
+  let verifiedRows = 0;
+  const verifiedRecords: ExtractResult = {
+    documentType: "penghuni",
+    recordCount: 0,
+    records: [],
+  };
+
+  for (const draft of drafts) {
+    const existingResidentId = await findResidentIdByIc(tx, draft.icNumber);
+
+    if (existingResidentId) {
+      failedMessages.push(`Penghuni ${draft.fullName} telah wujud.`);
+      await tx.residentDraft.update({
+        where: { id: draft.id },
+        data: { isExisted: true, originalResidentId: existingResidentId },
+      });
+      continue;
+    }
+
+    const resident = await tx.resident.create({
+      data: {
+        fullName: draft.fullName,
+        icNumber: draft.icNumber,
+        phone: draft.phone,
+        position: draft.position,
+        department: draft.department,
+        serviceLevel: draft.serviceLevel,
+        status: draft.status,
+        description: draft.description,
+      },
+      select: { id: true },
+    });
+    const rawRecord =
+      draft.rawData && typeof draft.rawData === "object" && !Array.isArray(draft.rawData)
+        ? draft.rawData
+        : {};
+
+    verifiedRecords.records.push({
+      ...rawRecord,
+      originalResidentId: resident.id,
+      nama: draft.fullName,
+      noKadPengenalan: draft.icNumber,
+      kuarters: "kuarters" in rawRecord ? String(rawRecord.kuarters) : "",
+      unit: "unit" in rawRecord ? String(rawRecord.unit) : "",
+      alamatKuarters: draft.description ?? "",
+      perhubungan: draft.phone ?? "",
+      pekerjaan: draft.position ?? "",
+      jabatan: draft.department ?? "",
+      sourceSheet: "sourceSheet" in rawRecord ? String(rawRecord.sourceSheet) : "",
+      sourceRow: "sourceRow" in rawRecord ? Number(rawRecord.sourceRow) : 0,
+    });
+    await tx.residentDraft.delete({ where: { id: draft.id } });
+    verifiedRows += 1;
+  }
+
+  verifiedRecords.recordCount = verifiedRecords.records.length;
+  await applyVerifiedPenghuniOccupancy(tx, verifiedRecords);
+
+  return { verifiedRows, failedMessages };
+}
+
+async function verifyKuartersDrafts(
+  tx: Prisma.TransactionClient,
+  uploadedDocumentId: string,
+  selectedKeys: string[],
+): Promise<VerifyResult> {
+  const selectedKeySet = new Set(selectedKeys);
+  const categoryDrafts = await tx.quarterCategoryDraft.findMany({
+    where: { uploadedDocumentId },
+    include: { units: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const categoryIdByDraftId = new Map<string, string>();
+  const failedMessages: string[] = [];
+  let verifiedRows = 0;
+
+  for (const draft of categoryDrafts) {
+    const categorySelected = selectedKeySet.has(draft.id);
+    let categoryId = await findQuarterCategoryByNameAddress(
+      tx,
+      draft.categoryName,
+      draft.address,
+    );
+
+    if (categorySelected) {
+      if (categoryId) {
+        failedMessages.push(`Kategori ${draft.categoryName} telah wujud.`);
+        await tx.quarterCategoryDraft.update({
+          where: { id: draft.id },
+          data: { isExisted: true, originalCategoryId: categoryId },
+        });
+      } else {
+        const category = await tx.quarterCategory.create({
+          data: {
+            categoryName: draft.categoryName,
+            address: draft.address,
+            rentalPrice: draft.rentalPrice,
+            maintenancePrice: draft.maintenancePrice,
+            penaltyPrice: draft.penaltyPrice,
+            uploadedDocumentId,
+          },
+          select: { id: true },
+        });
+        categoryId = category.id;
+        await tx.quarterCategoryDraft.update({
+          where: { id: draft.id },
+          data: { isExisted: true, originalCategoryId: categoryId },
+        });
+        verifiedRows += 1;
+      }
+    }
+
+    if (categoryId) {
+      categoryIdByDraftId.set(draft.id, categoryId);
+    }
+  }
+
+  for (const draft of categoryDrafts) {
+    const categoryId =
+      categoryIdByDraftId.get(draft.id) ??
+      (await findQuarterCategoryByNameAddress(tx, draft.categoryName, draft.address));
+
+    if (!categoryId) {
+      continue;
+    }
+
+    for (const unit of draft.units) {
+      if (!selectedKeySet.has(unit.id)) {
+        continue;
+      }
+
+      const existingUnitId = await findUnitByCategoryIdAndCode(
+        tx,
+        categoryId,
+        unit.unitCode,
+      );
+
+      if (existingUnitId) {
+        failedMessages.push(`Unit ${unit.unitCode} telah wujud.`);
+        await tx.unitDraft.update({
+          where: { id: unit.id },
+          data: { isExisted: true, originalUnitId: existingUnitId },
+        });
+        continue;
+      }
+
+      await tx.unit.create({
+        data: {
+          unitCode: unit.unitCode,
+          status: "VACANT",
+          categoryId,
+          uploadedDocumentId,
+        },
+      });
+      await tx.unitDraft.delete({ where: { id: unit.id } });
+      verifiedRows += 1;
+    }
+  }
+
+  await tx.quarterCategoryDraft.deleteMany({
+    where: {
+      uploadedDocumentId,
+      units: { none: {} },
+    },
+  });
+
+  return { verifiedRows, failedMessages };
 }

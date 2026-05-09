@@ -56,7 +56,7 @@ export default function BayaranReviewTable({
     rows.map((row) => ({
       paymentId: row.paymentId,
       residentId: row.residentId,
-      residentRecordStatus: row.residentRecordStatus,
+      isExisted: row.isExisted,
       page: row.page,
       jabatanCode: row.jabatanCode,
       jabatanName: row.jabatanName,

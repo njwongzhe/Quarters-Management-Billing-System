@@ -20,39 +20,26 @@ async function getInitialKuartersPageData(): Promise<{
     const [quarterCategories, totalUnits, occupiedUnits, vacantUnits] =
       await prisma.$transaction([
         prisma.quarterCategory.findMany({
-          where: {
-            recordStatus: "VERIFIED",
-          },
           orderBy: {
             categoryName: "asc",
           },
           include: {
             _count: {
               select: {
-                units: {
-                  where: {
-                    recordStatus: "VERIFIED",
-                  },
-                },
+                units: true,
               },
             },
           },
         }),
-        prisma.unit.count({
-          where: {
-            recordStatus: "VERIFIED",
-          },
-        }),
+        prisma.unit.count(),
         prisma.unit.count({
           where: {
             status: "OCCUPIED",
-            recordStatus: "VERIFIED",
           },
         }),
         prisma.unit.count({
           where: {
             status: "VACANT",
-            recordStatus: "VERIFIED",
           },
         }),
       ]);

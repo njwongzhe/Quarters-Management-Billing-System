@@ -159,7 +159,7 @@ export default function KuartersCategoryTable({
               const selectionKey = getKuartersRecordKey(category);
               const isEditing = editingCategoryId === category.id;
               const isSavingCategory = savingCategoryId === category.id;
-              const canEditCategory = category.categoryRecordStatus !== "VERIFIED";
+              const canEditCategory = true;
 
               return (
                 <tr
@@ -167,7 +167,11 @@ export default function KuartersCategoryTable({
                   data-kuarters-editor={isEditing ? "true" : undefined}
                   className={[
                     "border-t border-light-grey/20 transition-colors",
-                    isSelected ? "bg-dark-blue/3" : "hover:bg-background/60",
+                    category.categoryIsExisted || category.units.some((unit) => unit.isExisted)
+                      ? "bg-amber-50"
+                      : isSelected
+                        ? "bg-dark-blue/3"
+                        : "hover:bg-background/60",
                   ].join(" ")}
                   onClick={() => onSelectCategory(category.id)}
                 >
@@ -229,7 +233,7 @@ export default function KuartersCategoryTable({
                             {field === "categoryName" ? (
                               <span className="block text-[10px] font-medium text-grey">
                                 {category.unitCount} unit
-                                {category.categoryRecordStatus === "VERIFIED"
+                                {category.categoryIsExisted
                                   ? " - kategori sedia ada"
                                   : ""}
                               </span>
@@ -279,11 +283,11 @@ export default function KuartersCategoryTable({
                       ) : (
                         <ActionButton
                           icon="edit"
-                          label={
-                            canEditCategory
-                              ? "Edit kategori"
-                              : "Kategori sedia ada tidak boleh diedit di semakan"
-                          }
+                            label={
+                              canEditCategory
+                                ? "Edit kategori"
+                                : "Edit kategori"
+                            }
                           textClass={canEditCategory ? "text-dark-blue" : "text-grey"}
                           disabled={!canEditCategory || isSaving}
                           onClick={(event) => {

@@ -25,10 +25,7 @@ async function getInitialKuartersCategoryDetailData(id: string): Promise<{
 }> {
   try {
     const QuarterCategory = await prisma.quarterCategory.findFirst({
-      where: {
-        id,
-        recordStatus: "VERIFIED",
-      },
+      where: { id },
       include: buildQuarterCategoryUnitsDetailInclude(),
     });
 

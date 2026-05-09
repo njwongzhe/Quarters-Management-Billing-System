@@ -6,12 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum RecordStatus {
-  PENDING
-  VERIFIED
-  REJECTED
-}
-
 enum ResidentStatus {
   AKTIF
   TIDAK_LAYAK
@@ -95,47 +89,46 @@ model AdminProfile {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  createdResidents         Resident[]      @relation("ResidentCreatedBy")
-  verifiedResidents        Resident[]      @relation("ResidentVerifiedBy")
-  createdQuarterCategories    QuarterCategory[]  @relation("QuarterCategoryCreatedBy")
-  verifiedQuarterCategories   QuarterCategory[]  @relation("QuarterCategoryVerifiedBy")
-  createdUnits             Unit[]          @relation("UnitCreatedBy")
-  verifiedUnits            Unit[]          @relation("UnitVerifiedBy")
-  createdArrearsSummaries  ArrearsSummary[] @relation("ArrearsSummaryCreatedBy")
-  verifiedArrearsSummaries ArrearsSummary[] @relation("ArrearsSummaryVerifiedBy")
-  createdMonthlyCharges    MonthlyCharge[] @relation("MonthlyChargeCreatedBy")
-  verifiedMonthlyCharges   MonthlyCharge[] @relation("MonthlyChargeVerifiedBy")
-  createdPayments          Payment[]       @relation("PaymentCreatedBy")
-  verifiedPayments         Payment[]       @relation("PaymentVerifiedBy")
-  createdTransactions      Transaction[]   @relation("TransactionCreatedBy")
-  uploadedDocuments UploadedDocument[] @relation("DocumentUploadedBy")
-  verifiedDocuments UploadedDocument[] @relation("DocumentVerifiedBy")
-  auditLogs                AuditLog[]
+  createdResidents          Resident[]         @relation("ResidentCreatedBy")
+  verifiedResidents         Resident[]         @relation("ResidentVerifiedBy")
+  createdQuarterCategories  QuarterCategory[]  @relation("QuarterCategoryCreatedBy")
+  verifiedQuarterCategories QuarterCategory[]  @relation("QuarterCategoryVerifiedBy")
+  createdUnits              Unit[]             @relation("UnitCreatedBy")
+  verifiedUnits             Unit[]             @relation("UnitVerifiedBy")
+  createdArrearsSummaries   ArrearsSummary[]   @relation("ArrearsSummaryCreatedBy")
+  verifiedArrearsSummaries  ArrearsSummary[]   @relation("ArrearsSummaryVerifiedBy")
+  createdMonthlyCharges     MonthlyCharge[]    @relation("MonthlyChargeCreatedBy")
+  verifiedMonthlyCharges    MonthlyCharge[]    @relation("MonthlyChargeVerifiedBy")
+  createdPayments           Payment[]          @relation("PaymentCreatedBy")
+  verifiedPayments          Payment[]          @relation("PaymentVerifiedBy")
+  createdTransactions       Transaction[]      @relation("TransactionCreatedBy")
+  uploadedDocuments         UploadedDocument[] @relation("DocumentUploadedBy")
+  verifiedDocuments         UploadedDocument[] @relation("DocumentVerifiedBy")
+  auditLogs                 AuditLog[]
 }
 
 model Resident {
-  id             String         @id @default(uuid()) @db.Uuid
-  fullName       String
-  icNumber       String         @unique
-  phone          String?
-  email          String?
-  position       String?
-  department     String?
-  serviceLevel   String?
-  status         ResidentStatus @default(AKTIF)
-  description    String?
+  id           String         @id @default(uuid()) @db.Uuid
+  fullName     String
+  icNumber     String         @unique
+  phone        String?
+  email        String?
+  position     String?
+  department   String?
+  serviceLevel String?
+  status       ResidentStatus @default(AKTIF)
+  description  String?
 
-  recordStatus   RecordStatus   @default(VERIFIED)
-  uploadedDocumentId String?     @db.Uuid
+  uploadedDocumentId String? @db.Uuid
 
-  createdById    String?        @db.Uuid
-  verifiedById   String?        @db.Uuid
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  verifiedAt     DateTime?
+  createdById  String?   @db.Uuid
+  verifiedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  verifiedAt   DateTime?
 
-  createdBy      AdminProfile?  @relation("ResidentCreatedBy", fields: [createdById], references: [id])
-  verifiedBy     AdminProfile?  @relation("ResidentVerifiedBy", fields: [verifiedById], references: [id])
+  createdBy        AdminProfile?     @relation("ResidentCreatedBy", fields: [createdById], references: [id])
+  verifiedBy       AdminProfile?     @relation("ResidentVerifiedBy", fields: [verifiedById], references: [id])
   uploadedDocument UploadedDocument? @relation("UploadedDocumentResidents", fields: [uploadedDocumentId], references: [id])
 
   occupancies    UnitOccupancy[]
@@ -146,65 +139,60 @@ model Resident {
 
   @@index([fullName])
   @@index([status])
-  @@index([recordStatus])
   @@index([uploadedDocumentId])
 }
 
 model QuarterCategory {
-  id               String       @id @default(uuid()) @db.Uuid
+  id               String  @id @default(uuid()) @db.Uuid
   categoryName     String
   address          String?
-  rentalPrice      Decimal      @db.Decimal(12, 2)
-  maintenancePrice Decimal      @db.Decimal(12, 2)
-  penaltyPrice     Decimal      @db.Decimal(12, 2)
+  rentalPrice      Decimal @db.Decimal(12, 2)
+  maintenancePrice Decimal @db.Decimal(12, 2)
+  penaltyPrice     Decimal @db.Decimal(12, 2)
 
-  recordStatus     RecordStatus @default(VERIFIED)
-  uploadedDocumentId String?      @db.Uuid
+  uploadedDocumentId String? @db.Uuid
 
-  createdById      String?      @db.Uuid
-  verifiedById     String?      @db.Uuid
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  verifiedAt       DateTime?
+  createdById  String?   @db.Uuid
+  verifiedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  verifiedAt   DateTime?
 
-  createdBy        AdminProfile? @relation("QuarterCategoryCreatedBy", fields: [createdById], references: [id])
-  verifiedBy       AdminProfile? @relation("QuarterCategoryVerifiedBy", fields: [verifiedById], references: [id])
+  createdBy        AdminProfile?     @relation("QuarterCategoryCreatedBy", fields: [createdById], references: [id])
+  verifiedBy       AdminProfile?     @relation("QuarterCategoryVerifiedBy", fields: [verifiedById], references: [id])
   uploadedDocument UploadedDocument? @relation("UploadedDocumentQuarterCategories", fields: [uploadedDocumentId], references: [id])
 
-  units            Unit[]
+  units Unit[]
 
-  @@index([recordStatus])
-  @@index([uploadedDocumentId])
   @@unique([categoryName, address])
+  @@index([uploadedDocumentId])
 }
 
 model Unit {
-  id             String       @id @default(uuid()) @db.Uuid
-  unitCode       String
-  status         UnitStatus   @default(VACANT)
-  recordStatus   RecordStatus @default(VERIFIED)
-  uploadedDocumentId String?   @db.Uuid
+  id                 String     @id @default(uuid()) @db.Uuid
+  unitCode           String
+  status             UnitStatus @default(VACANT)
+  uploadedDocumentId String?    @db.Uuid
 
-  categoryId        String       @db.Uuid
+  categoryId String @db.Uuid
 
-  createdById    String?      @db.Uuid
-  verifiedById   String?      @db.Uuid
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  verifiedAt     DateTime?
+  createdById  String?   @db.Uuid
+  verifiedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  verifiedAt   DateTime?
 
-  quarterCategory   QuarterCategory  @relation(fields: [categoryId], references: [id])
+  quarterCategory  QuarterCategory   @relation(fields: [categoryId], references: [id])
   uploadedDocument UploadedDocument? @relation("UploadedDocumentUnits", fields: [uploadedDocumentId], references: [id])
-  occupancies    UnitOccupancy[]
-  monthlyCharges MonthlyCharge[]
+  occupancies      UnitOccupancy[]
+  monthlyCharges   MonthlyCharge[]
 
-  createdBy      AdminProfile? @relation("UnitCreatedBy", fields: [createdById], references: [id])
-  verifiedBy     AdminProfile? @relation("UnitVerifiedBy", fields: [verifiedById], references: [id])
+  createdBy  AdminProfile? @relation("UnitCreatedBy", fields: [createdById], references: [id])
+  verifiedBy AdminProfile? @relation("UnitVerifiedBy", fields: [verifiedById], references: [id])
 
-  @@index([categoryId])
   @@unique([categoryId, unitCode])
+  @@index([categoryId])
   @@index([status])
-  @@index([recordStatus])
   @@index([uploadedDocumentId])
 }
 
@@ -217,11 +205,11 @@ model UnitOccupancy {
   status      OccupancyStatus @default(CURRENT)
   description String?
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  resident    Resident        @relation(fields: [residentId], references: [id])
-  unit        Unit            @relation(fields: [unitId], references: [id])
+  resident Resident @relation(fields: [residentId], references: [id])
+  unit     Unit     @relation(fields: [unitId], references: [id])
 
   @@index([residentId])
   @@index([unitId])
@@ -230,167 +218,156 @@ model UnitOccupancy {
 }
 
 model ArrearsSummary {
-  id                 String       @id @default(uuid()) @db.Uuid
-  residentId         String       @unique @db.Uuid
-  totalArrearsAmount Decimal      @db.Decimal(12, 2) @default(0)
+  id                 String    @id @default(uuid()) @db.Uuid
+  residentId         String    @unique @db.Uuid
+  totalArrearsAmount Decimal   @default(0) @db.Decimal(12, 2)
   lastUpdatedMonth   DateTime?
   description        String?
 
-  recordStatus       RecordStatus @default(VERIFIED)
-  uploadedDocumentId String?      @db.Uuid
+  uploadedDocumentId String? @db.Uuid
 
-  createdById        String?      @db.Uuid
-  verifiedById       String?      @db.Uuid
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  verifiedAt         DateTime?
+  createdById  String?   @db.Uuid
+  verifiedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  verifiedAt   DateTime?
 
-  resident           Resident      @relation(fields: [residentId], references: [id])
-  uploadedDocument   UploadedDocument? @relation("UploadedDocumentArrearsSummaries", fields: [uploadedDocumentId], references: [id])
-  createdBy          AdminProfile? @relation("ArrearsSummaryCreatedBy", fields: [createdById], references: [id])
-  verifiedBy         AdminProfile? @relation("ArrearsSummaryVerifiedBy", fields: [verifiedById], references: [id])
+  resident         Resident          @relation(fields: [residentId], references: [id])
+  uploadedDocument UploadedDocument? @relation("UploadedDocumentArrearsSummaries", fields: [uploadedDocumentId], references: [id])
+  createdBy        AdminProfile?     @relation("ArrearsSummaryCreatedBy", fields: [createdById], references: [id])
+  verifiedBy       AdminProfile?     @relation("ArrearsSummaryVerifiedBy", fields: [verifiedById], references: [id])
 
-  @@index([recordStatus])
   @@index([uploadedDocumentId])
   @@index([lastUpdatedMonth])
 }
 
 model MonthlyCharge {
-  id                     String       @id @default(uuid()) @db.Uuid
-  residentId             String       @db.Uuid
-  unitId                 String?      @db.Uuid
+  id         String  @id @default(uuid()) @db.Uuid
+  residentId String  @db.Uuid
+  unitId     String? @db.Uuid
 
   /// Use the first day of the month to represent that month
-  chargeMonth            DateTime
+  chargeMonth DateTime
 
-  rentalAmount           Decimal      @db.Decimal(12, 2) @default(0)
-  maintenanceAmount      Decimal      @db.Decimal(12, 2) @default(0)
-  penaltyAmount          Decimal      @db.Decimal(12, 2) @default(0)
-  additionalChargesTotal Decimal      @db.Decimal(12, 2) @default(0)
-  rebateTotal            Decimal      @db.Decimal(12, 2) @default(0)
+  rentalAmount           Decimal @default(0) @db.Decimal(12, 2)
+  maintenanceAmount      Decimal @default(0) @db.Decimal(12, 2)
+  penaltyAmount          Decimal @default(0) @db.Decimal(12, 2)
+  additionalChargesTotal Decimal @default(0) @db.Decimal(12, 2)
+  rebateTotal            Decimal @default(0) @db.Decimal(12, 2)
 
-  totalMonthlyCharge     Decimal      @db.Decimal(12, 2) @default(0)
-  paymentReceived        Decimal      @db.Decimal(12, 2) @default(0)
-  balanceForMonth        Decimal      @db.Decimal(12, 2) @default(0)
+  totalMonthlyCharge Decimal @default(0) @db.Decimal(12, 2)
+  paymentReceived    Decimal @default(0) @db.Decimal(12, 2)
+  balanceForMonth    Decimal @default(0) @db.Decimal(12, 2)
 
-  description            String?
-  recordStatus           RecordStatus @default(VERIFIED)
+  description  String?
+  createdById  String?   @db.Uuid
+  verifiedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  verifiedAt   DateTime?
 
-  createdById            String?      @db.Uuid
-  verifiedById           String?      @db.Uuid
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
-  verifiedAt             DateTime?
+  resident Resident @relation(fields: [residentId], references: [id])
+  unit     Unit?    @relation(fields: [unitId], references: [id])
 
-  resident               Resident      @relation(fields: [residentId], references: [id])
-  unit                   Unit?         @relation(fields: [unitId], references: [id])
+  additionalCharges AdditionalCharge[]
+  rebates           Rebate[]
 
-  additionalCharges      AdditionalCharge[]
-  rebates                Rebate[]
-
-  createdBy              AdminProfile? @relation("MonthlyChargeCreatedBy", fields: [createdById], references: [id])
-  verifiedBy             AdminProfile? @relation("MonthlyChargeVerifiedBy", fields: [verifiedById], references: [id])
+  createdBy  AdminProfile? @relation("MonthlyChargeCreatedBy", fields: [createdById], references: [id])
+  verifiedBy AdminProfile? @relation("MonthlyChargeVerifiedBy", fields: [verifiedById], references: [id])
 
   @@unique([residentId, chargeMonth])
   @@index([residentId])
   @@index([chargeMonth])
-  @@index([recordStatus])
   @@index([unitId])
 }
 
 model AdditionalCharge {
-  id              String       @id @default(uuid()) @db.Uuid
-  monthlyChargeId String       @db.Uuid
+  id              String   @id @default(uuid()) @db.Uuid
+  monthlyChargeId String   @db.Uuid
   chargeDate      DateTime
   description     String
-  amount          Decimal      @db.Decimal(12, 2)
-  recordStatus    RecordStatus @default(VERIFIED)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  amount          Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  monthlyCharge   MonthlyCharge @relation(fields: [monthlyChargeId], references: [id])
+  monthlyCharge MonthlyCharge @relation(fields: [monthlyChargeId], references: [id])
 
   @@index([monthlyChargeId])
   @@index([chargeDate])
-  @@index([recordStatus])
 }
 
 model Rebate {
-  id              String       @id @default(uuid()) @db.Uuid
-  monthlyChargeId String       @db.Uuid
+  id              String   @id @default(uuid()) @db.Uuid
+  monthlyChargeId String   @db.Uuid
   rebateDate      DateTime
   description     String
-  amount          Decimal      @db.Decimal(12, 2)
-  recordStatus    RecordStatus @default(VERIFIED)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  amount          Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  monthlyCharge   MonthlyCharge @relation(fields: [monthlyChargeId], references: [id])
+  monthlyCharge MonthlyCharge @relation(fields: [monthlyChargeId], references: [id])
 
   @@index([monthlyChargeId])
   @@index([rebateDate])
-  @@index([recordStatus])
 }
 
 model Payment {
-  id            String       @id @default(uuid()) @db.Uuid
-  residentId    String       @db.Uuid
-  paymentDate   DateTime
-  receiptNo     String?
-  amount        Decimal      @db.Decimal(12, 2)
-  description   String?
-  recordStatus  RecordStatus @default(VERIFIED)
+  id                 String   @id @default(uuid()) @db.Uuid
+  residentId         String   @db.Uuid
+  paymentDate        DateTime
+  receiptNo          String?
+  amount             Decimal  @db.Decimal(12, 2)
+  description        String?
   uploadedDocumentId String?  @db.Uuid
 
-  createdById   String?      @db.Uuid
-  verifiedById  String?      @db.Uuid
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  verifiedAt    DateTime?
+  createdById  String?   @db.Uuid
+  verifiedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  verifiedAt   DateTime?
 
-  resident      Resident      @relation(fields: [residentId], references: [id])
+  resident         Resident          @relation(fields: [residentId], references: [id])
   uploadedDocument UploadedDocument? @relation("UploadedDocumentPayments", fields: [uploadedDocumentId], references: [id])
-  transaction   Transaction?
-  createdBy     AdminProfile? @relation("PaymentCreatedBy", fields: [createdById], references: [id])
-  verifiedBy    AdminProfile? @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
+  transaction      Transaction?
+  createdBy        AdminProfile?     @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  verifiedBy       AdminProfile?     @relation("PaymentVerifiedBy", fields: [verifiedById], references: [id])
 
   @@index([residentId])
   @@index([paymentDate])
   @@index([receiptNo])
-  @@index([recordStatus])
   @@index([uploadedDocumentId])
 }
 
 model Transaction {
-  id                   String             @id @default(uuid()) @db.Uuid
-  transactionNo        String?            @unique 
-  residentId           String?            @db.Uuid  
-  paymentId            String?            @unique @db.Uuid
+  id            String  @id @default(uuid()) @db.Uuid
+  transactionNo String? @unique
+  residentId    String? @db.Uuid
+  paymentId     String? @unique @db.Uuid
 
-  transactionDate      DateTime
-  category             TransactionCategory
-  status               TransactionStatus  @default(NORMAL)
+  transactionDate DateTime
+  category        TransactionCategory
+  status          TransactionStatus   @default(NORMAL)
 
-  relatedTransactionId String?            @db.Uuid
+  relatedTransactionId String? @db.Uuid
 
-  debitAmount          Decimal            @db.Decimal(12, 2) @default(0)
-  creditAmount         Decimal            @db.Decimal(12, 2) @default(0)
+  debitAmount  Decimal @default(0) @db.Decimal(12, 2)
+  creditAmount Decimal @default(0) @db.Decimal(12, 2)
 
-  receiptNo            String?
-  description          String?
-  runningBalance       Decimal?           @db.Decimal(12, 2)
+  receiptNo      String?
+  description    String?
+  runningBalance Decimal? @db.Decimal(12, 2)
 
-  createdById          String?            @db.Uuid
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  resident             Resident?          @relation(fields: [residentId], references: [id])
-  payment              Payment?           @relation(fields: [paymentId], references: [id])
+  resident Resident? @relation(fields: [residentId], references: [id])
+  payment  Payment?  @relation(fields: [paymentId], references: [id])
 
-  relatedTransaction   Transaction?       @relation("TransactionRelation", fields: [relatedTransactionId], references: [id])
-  childTransactions    Transaction[]      @relation("TransactionRelation")
+  relatedTransaction Transaction?  @relation("TransactionRelation", fields: [relatedTransactionId], references: [id])
+  childTransactions  Transaction[] @relation("TransactionRelation")
 
-  createdBy            AdminProfile?      @relation("TransactionCreatedBy", fields: [createdById], references: [id])
+  createdBy AdminProfile? @relation("TransactionCreatedBy", fields: [createdById], references: [id])
 
   @@index([residentId])
   @@index([paymentId])
@@ -403,42 +380,157 @@ model Transaction {
 }
 
 model UploadedDocument {
-  id            String           @id @default(uuid()) @db.Uuid
-  fileName      String
-  originalName  String?
-  fileType      String
-  fileSize      Int
-  category      DocumentCategory
+  id           String           @id @default(uuid()) @db.Uuid
+  fileName     String
+  originalName String?
+  fileType     String
+  fileSize     Int
+  category     DocumentCategory
 
-  recordStatus  RecordStatus     @default(PENDING)
+  uploadedById String? @db.Uuid
+  verifiedById String? @db.Uuid
 
-  uploadedById  String?          @db.Uuid
-  verifiedById  String?          @db.Uuid
+  uploadedAt DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  verifiedAt DateTime?
 
-  uploadedAt    DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  verifiedAt    DateTime?
+  description String?
+  remark      String?
 
-  description   String?
-  remark        String?
-
-  uploadedBy    AdminProfile?    @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
-  verifiedBy    AdminProfile?    @relation("DocumentVerifiedBy", fields: [verifiedById], references: [id])
-  residents     Resident[]       @relation("UploadedDocumentResidents")
-  quarterCategories QuarterCategory[] @relation("UploadedDocumentQuarterCategories")
-  units         Unit[]           @relation("UploadedDocumentUnits")
-  arrearsSummaries ArrearsSummary[] @relation("UploadedDocumentArrearsSummaries")
-  payments      Payment[]        @relation("UploadedDocumentPayments")
+  uploadedBy            AdminProfile?          @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  verifiedBy            AdminProfile?          @relation("DocumentVerifiedBy", fields: [verifiedById], references: [id])
+  residents             Resident[]             @relation("UploadedDocumentResidents")
+  quarterCategories     QuarterCategory[]      @relation("UploadedDocumentQuarterCategories")
+  units                 Unit[]                 @relation("UploadedDocumentUnits")
+  arrearsSummaries      ArrearsSummary[]       @relation("UploadedDocumentArrearsSummaries")
+  payments              Payment[]              @relation("UploadedDocumentPayments")
+  residentDrafts        ResidentDraft[]
+  quarterCategoryDrafts QuarterCategoryDraft[]
+  unitDrafts            UnitDraft[]
+  arrearsSummaryDrafts  ArrearsSummaryDraft[]
+  paymentDrafts         PaymentDraft[]
 
   @@index([category])
-  @@index([recordStatus])
   @@index([uploadedAt])
   @@index([uploadedById])
 }
 
+model ResidentDraft {
+  id                 String         @id @default(uuid()) @db.Uuid
+  fullName           String
+  icNumber           String
+  phone              String?
+  email              String?
+  position           String?
+  department         String?
+  serviceLevel       String?
+  status             ResidentStatus @default(AKTIF)
+  description        String?
+  uploadedDocumentId String         @db.Uuid
+  originalResidentId String?        @db.Uuid
+  isExisted          Boolean        @default(false)
+  rawData            Json?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  uploadedDocument UploadedDocument @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([uploadedDocumentId])
+  @@index([icNumber])
+  @@index([isExisted])
+}
+
+model QuarterCategoryDraft {
+  id                 String   @id @default(uuid()) @db.Uuid
+  categoryName       String
+  address            String?
+  rentalPrice        Decimal  @db.Decimal(12, 2)
+  maintenancePrice   Decimal  @db.Decimal(12, 2)
+  penaltyPrice       Decimal  @db.Decimal(12, 2)
+  uploadedDocumentId String   @db.Uuid
+  originalCategoryId String?  @db.Uuid
+  isExisted          Boolean  @default(false)
+  rawData            Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  uploadedDocument UploadedDocument @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+  units            UnitDraft[]
+
+  @@index([uploadedDocumentId])
+  @@index([isExisted])
+}
+
+model UnitDraft {
+  id                 String     @id @default(uuid()) @db.Uuid
+  unitCode           String
+  status             UnitStatus @default(VACANT)
+  uploadedDocumentId String     @db.Uuid
+  categoryDraftId    String?    @db.Uuid
+  originalUnitId     String?    @db.Uuid
+  isExisted          Boolean    @default(false)
+  rawData            Json?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  uploadedDocument     UploadedDocument      @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+  quarterCategoryDraft QuarterCategoryDraft? @relation(fields: [categoryDraftId], references: [id], onDelete: Cascade)
+
+  @@index([uploadedDocumentId])
+  @@index([categoryDraftId])
+  @@index([isExisted])
+}
+
+model ArrearsSummaryDraft {
+  id                 String    @id @default(uuid()) @db.Uuid
+  residentName       String
+  residentIcNumber   String
+  totalArrearsAmount Decimal   @default(0) @db.Decimal(12, 2)
+  lastUpdatedMonth   DateTime?
+  description        String?
+  uploadedDocumentId String    @db.Uuid
+  originalResidentId String?   @db.Uuid
+  originalSummaryId  String?   @db.Uuid
+  isExisted          Boolean   @default(false)
+  rawData            Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  uploadedDocument UploadedDocument @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([uploadedDocumentId])
+  @@index([residentIcNumber])
+  @@index([isExisted])
+}
+
+model PaymentDraft {
+  id                 String   @id @default(uuid()) @db.Uuid
+  residentName       String
+  residentIcNumber   String
+  department         String?
+  paymentDate        DateTime
+  receiptNo          String?
+  referenceNo        String?
+  amount             Decimal  @db.Decimal(12, 2)
+  description        String?
+  uploadedDocumentId String   @db.Uuid
+  originalResidentId String?  @db.Uuid
+  originalPaymentId  String?  @db.Uuid
+  isExisted          Boolean  @default(false)
+  rawData            Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  uploadedDocument UploadedDocument @relation(fields: [uploadedDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([uploadedDocumentId])
+  @@index([residentIcNumber])
+  @@index([isExisted])
+}
+
 model AuditLog {
-  id          String          @id @default(uuid()) @db.Uuid
-  timestamp   DateTime        @default(now())
+  id        String   @id @default(uuid()) @db.Uuid
+  timestamp DateTime @default(now())
 
   userId      String?         @db.Uuid
   userName    String
@@ -447,10 +539,10 @@ model AuditLog {
   actionType  AuditActionType
   description String
 
-  entityType  EntityType?
-  entityId    String?         @db.Uuid
+  entityType EntityType?
+  entityId   String?     @db.Uuid
 
-  admin       AdminProfile?   @relation(fields: [userId], references: [id])
+  admin AdminProfile? @relation(fields: [userId], references: [id])
 
   @@index([timestamp])
   @@index([userId])

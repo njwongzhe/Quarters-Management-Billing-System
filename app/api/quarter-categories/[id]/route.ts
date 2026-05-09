@@ -90,11 +90,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       include: {
         _count: {
           select: {
-            units: {
-              where: {
-                recordStatus: "VERIFIED",
-              },
-            },
+            units: true,
           },
         },
       },
@@ -176,11 +172,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         include: {
           _count: {
             select: {
-              units: {
-                where: {
-                  recordStatus: "VERIFIED",
-                },
-              },
+              units: true,
             },
           },
         },

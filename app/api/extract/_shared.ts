@@ -1,35 +1,18 @@
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024;
-const allowedKinds = ["bayaran", "tunggakan", "penghuni", "kuarters"] as const;
-const supportedTypesByKind: Record<(typeof allowedKinds)[number], string[]> = {
+
+const supportedTypesByKind = {
   bayaran: [".pdf"],
   tunggakan: [".xlsx"],
   penghuni: [".xlsx"],
   kuarters: [".pdf", ".xlsx"],
-};
+} as const;
 
-type RouteContext = {
-  params: Promise<{
-    kind: string;
-  }>;
-};
+export type ExtractKind = keyof typeof supportedTypesByKind;
 
-export async function POST(request: Request, context: RouteContext) {
+export async function handleExtractRequest(request: Request, kind: ExtractKind) {
   try {
-    const { kind } = await context.params;
-    const normalizedKind = kind.toLowerCase() as (typeof allowedKinds)[number];
-
-    if (!allowedKinds.includes(normalizedKind)) {
-      return NextResponse.json(
-        { success: false, message: "Jenis dokumen tidak sah." },
-        { status: 400 },
-      );
-    }
-
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -57,9 +40,9 @@ export async function POST(request: Request, context: RouteContext) {
     const extension = file.name.includes(".")
       ? `.${file.name.split(".").pop()?.toLowerCase()}`
       : "";
-    const supportedTypes = supportedTypesByKind[normalizedKind];
+    const supportedTypes = supportedTypesByKind[kind];
 
-    if (!supportedTypes.includes(extension)) {
+    if (!supportedTypes.includes(extension as never)) {
       return NextResponse.json(
         {
           success: false,
@@ -76,9 +59,9 @@ export async function POST(request: Request, context: RouteContext) {
       process.env.AI_SERVICE_URL ??
       process.env.NEXT_PUBLIC_AI_SERVICE_URL ??
       "http://127.0.0.1:8000";
-    const extractionUrl = new URL(`${aiServiceBaseUrl}/extract/${normalizedKind}`);
+    const extractionUrl = new URL(`${aiServiceBaseUrl}/extract/${kind}`);
 
-    if (normalizedKind === "kuarters") {
+    if (kind === "kuarters") {
       const parsingMode = formData.get("parsingMode");
       extractionUrl.searchParams.set(
         "parsing_mode",
@@ -104,9 +87,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        extractResult: result,
-      },
+      data: { extractResult: result },
     });
   } catch (error) {
     return NextResponse.json(

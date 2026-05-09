@@ -4,7 +4,8 @@ import Icon from "../../../components/Icon";
 
 export type ExtractedPenghuniRecord = {
   residentId?: string;
-  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  originalResidentId?: string;
+  isExisted?: boolean;
   nama: string;
   noKadPengenalan: string;
   kuarters: string;
@@ -29,6 +30,8 @@ export type PenghuniExtractResult = {
 
 export type ExtractedQuarterUnit = {
   unitId?: string;
+  originalUnitId?: string;
+  isExisted?: boolean;
   unitCode: string;
   address: string;
 };
@@ -36,7 +39,8 @@ export type ExtractedQuarterUnit = {
 export type ExtractedQuarterRecord = {
   id: string;
   categoryId?: string;
-  categoryRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  originalCategoryId?: string;
+  categoryIsExisted?: boolean;
   categoryName: string;
   address: string;
   rentalPrice: string;
@@ -57,7 +61,7 @@ export type KuartersExtractResult = {
 export type ExtractedBayaranRecord = {
   paymentId?: string;
   residentId?: string;
-  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  isExisted?: boolean;
   page: number;
   jabatanCode: string;
   jabatanName: string;
@@ -84,7 +88,7 @@ export type BayaranExtractResult = {
 export type ExtractedTunggakanRecord = {
   arrearsSummaryId?: string;
   residentId?: string;
-  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  isExisted?: boolean;
   importStatus?: "PENDING" | "IGNORED";
   importMessage?: string;
   nama: string;

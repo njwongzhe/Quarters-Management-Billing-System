@@ -31,14 +31,11 @@ export async function GET(request: Request) {
 
     const documents = await prisma.uploadedDocument.findMany({
       where: {
-        recordStatus: "PENDING",
         ...(normalizedCategory &&
         documentCategories.includes(
           normalizedCategory as (typeof documentCategories)[number],
         )
-          ? {
-              category: normalizedCategory as (typeof documentCategories)[number],
-            }
+          ? { category: normalizedCategory as (typeof documentCategories)[number] }
           : {}),
       },
       orderBy: {
@@ -56,9 +53,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        documents: documents
-          .map(mapUploadedDocumentForQueue)
-          .filter((document) => document !== null),
+        documents: (await Promise.all(documents.map(mapUploadedDocumentForQueue))).filter(
+          (document) => document !== null,
+        ),
       },
     });
   } catch (error) {
@@ -103,10 +100,9 @@ export async function POST(request: Request) {
             fileType,
             fileSize,
             category: documentCategoryForKind(kind),
-            recordStatus: "PENDING",
             uploadedById: currentAdmin?.profile.id ?? null,
             description: "Menunggu semakan dan pengesahan data ekstrak.",
-            remark: JSON.stringify(extractResult),
+            remark: null,
           },
         });
 
@@ -125,26 +121,15 @@ export async function POST(request: Request) {
           createdDocument.id,
           tunggakanExtractResult,
         );
-        const enrichedExtractResult = await createPendingKuartersRows(
+        await createPendingKuartersRows(
           tx,
           createdDocument.id,
           penghuniExtractResult,
         );
 
-        const updatedDocument = await tx.uploadedDocument.update({
-          where: {
-            id: createdDocument.id,
-          },
-          data: {
-            remark: JSON.stringify(enrichedExtractResult),
-          },
-          include: {
-            uploadedBy: {
-              select: {
-                fullName: true,
-              },
-            },
-          },
+        const updatedDocument = await tx.uploadedDocument.findUniqueOrThrow({
+          where: { id: createdDocument.id },
+          include: { uploadedBy: { select: { fullName: true } } },
         });
 
         await createAuditLog(tx, {
@@ -163,7 +148,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        document: mapUploadedDocumentForQueue(document),
+        document: await mapUploadedDocumentForQueue(document),
       },
     });
   } catch (error) {

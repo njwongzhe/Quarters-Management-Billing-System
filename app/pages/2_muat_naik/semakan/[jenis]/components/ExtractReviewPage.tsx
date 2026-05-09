@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
+import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 import { ROUTES } from "../../../../../constants/routes";
 import type {
   BayaranExtractResult,
@@ -36,25 +38,37 @@ export default function ExtractReviewPage({
   const [bayaranEditedTotalAmount, setBayaranEditedTotalAmount] = useState<
     string | null
   >(null);
-  const [, setVerificationMessage] = useState("");
+  const [verificationNotice, setVerificationNotice] =
+    useState<KuartersNotice | null>(null);
   const [verifyingMode, setVerifyingMode] = useState<VerifyingMode | null>(null);
   const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
   const [extractResult, setExtractResult] = useState<ExtractResult | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
 
+  const showVerificationNotice = (
+    tone: KuartersNotice["tone"],
+    message: string,
+  ) => {
+    setVerificationNotice(message ? { tone, message } : null);
+  };
+
+  const clearVerificationNotice = () => {
+    setVerificationNotice(null);
+  };
+
   useEffect(() => {
     let isActive = true;
 
     async function loadDraft() {
       if (!draftId) {
-        setVerificationMessage("Dokumen semakan tidak ditemui.");
+        showVerificationNotice("error", "Dokumen semakan tidak ditemui.");
         setIsLoadingDraft(false);
         return;
       }
 
       setIsLoadingDraft(true);
-      setVerificationMessage("");
+      clearVerificationNotice();
 
       try {
         const response = await fetch(`/api/uploaded-documents/${draftId}`);
@@ -83,7 +97,8 @@ export default function ExtractReviewPage({
 
         setExtractResult(null);
         setUploadedFileName("");
-        setVerificationMessage(
+        showVerificationNotice(
+          "error",
           error instanceof Error
             ? error.message
             : "Gagal mendapatkan draf dokumen.",
@@ -143,7 +158,8 @@ export default function ExtractReviewPage({
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
     } else if (!response.ok) {
-      setVerificationMessage(
+      showVerificationNotice(
+        "error",
         result?.message ?? "Gagal menyimpan perubahan bayaran.",
       );
     }
@@ -182,7 +198,8 @@ export default function ExtractReviewPage({
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
     } else if (!response.ok) {
-      setVerificationMessage(
+      showVerificationNotice(
+        "error",
         result?.message ?? "Gagal menyimpan perubahan tunggakan.",
       );
     }
@@ -216,12 +233,12 @@ export default function ExtractReviewPage({
 
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
-      setVerificationMessage("");
+      clearVerificationNotice();
       return;
     }
 
     const message = result?.message ?? "Gagal menyimpan perubahan kuarters.";
-    setVerificationMessage(message);
+    showVerificationNotice("error", message);
     throw new Error(message);
   };
 
@@ -263,12 +280,12 @@ export default function ExtractReviewPage({
 
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
-      setVerificationMessage("");
+      clearVerificationNotice();
       return;
     }
 
     const message = result?.message ?? "Gagal menyimpan perubahan kategori kuarters.";
-    setVerificationMessage(message);
+    showVerificationNotice("error", message);
     throw new Error(message);
   };
 
@@ -301,12 +318,12 @@ export default function ExtractReviewPage({
 
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
-      setVerificationMessage("");
+      clearVerificationNotice();
       return;
     }
 
     const message = result?.message ?? "Gagal menyimpan perubahan unit kuarters.";
-    setVerificationMessage(message);
+    showVerificationNotice("error", message);
     throw new Error(message);
   };
 
@@ -320,17 +337,20 @@ export default function ExtractReviewPage({
     }
 
     if (!draftId) {
-      setVerificationMessage("Dokumen semakan tidak ditemui.");
+      showVerificationNotice("error", "Dokumen semakan tidak ditemui.");
       return;
     }
 
     if (selectedRecordKeys.length === 0) {
-      setVerificationMessage("Sila pilih sekurang-kurangnya satu rekod untuk disahkan.");
+      showVerificationNotice(
+        "error",
+        "Sila pilih sekurang-kurangnya satu rekod untuk disahkan.",
+      );
       return;
     }
 
     setVerifyingMode(mode);
-    setVerificationMessage("");
+    clearVerificationNotice();
 
     try {
       const response = await fetch(`/api/uploaded-documents/${draftId}/verify`, {
@@ -349,12 +369,19 @@ export default function ExtractReviewPage({
       if (result?.data?.remainingExtractResult) {
         setExtractResult(result.data.remainingExtractResult as ExtractResult);
         setSelectedRecordKeys([]);
-        setVerificationMessage("Rekod dipilih berjaya disahkan.");
+        const failedMessages = Array.isArray(result?.data?.failedMessages)
+          ? result.data.failedMessages
+          : [];
+        showVerificationNotice(
+          failedMessages.length > 0 ? "info" : "success",
+          result?.message ?? "Rekod dipilih berjaya disahkan.",
+        );
       } else {
         router.push(ROUTES.muatNaik);
       }
     } catch (error) {
-      setVerificationMessage(
+      showVerificationNotice(
+        "error",
         error instanceof Error ? error.message : "Gagal mengesahkan data.",
       );
     } finally {
@@ -404,6 +431,11 @@ export default function ExtractReviewPage({
         <ReviewActions
           verifyingMode={verifyingMode}
           onVerify={handleVerifyData}
+        />
+
+        <KuartersFeedbackBanner
+          notice={kind === "kuarters" ? verificationNotice : null}
+          onDismiss={clearVerificationNotice}
         />
       </div>
     </section>

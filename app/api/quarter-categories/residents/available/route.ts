@@ -13,7 +13,6 @@ export async function GET(request: Request) {
 
     const residents = await prisma.resident.findMany({
       where: {
-        recordStatus: "VERIFIED",
         ...(query.length > 0
           ? {
               OR: [

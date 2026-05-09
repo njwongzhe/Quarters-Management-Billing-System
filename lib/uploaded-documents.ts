@@ -1,8 +1,11 @@
 import type { DocumentCategory, Prisma, UploadedDocument } from "@prisma/client";
-import { randomUUID } from "crypto";
 
 import type {
+  ExtractedBayaranRecord,
+  ExtractedPenghuniRecord,
   ExtractedQuarterRecord,
+  ExtractedQuarterUnit,
+  ExtractedTunggakanRecord,
   ExtractResult,
   KuartersExtractResult,
   ProcessingDraft,
@@ -15,7 +18,6 @@ export type UploadedDocumentWithUploader = UploadedDocument & {
   } | null;
 };
 
-// Define a list of valid document categories for filtering
 export function parseExtractResult(value: string | null): ExtractResult | null {
   if (!value) {
     return null;
@@ -38,11 +40,16 @@ export function parseExtractResult(value: string | null): ExtractResult | null {
   return null;
 }
 
-// Define valid document categories for filtering in GET handler
-export function mapUploadedDocumentForQueue(
+export async function mapUploadedDocumentForQueue(
   document: UploadedDocumentWithUploader,
-): ProcessingDraft | null {
-  const extractResult = parseExtractResult(document.remark);
+): Promise<ProcessingDraft | null> {
+  return mapUploadedDocumentForReview(document);
+}
+
+export async function mapUploadedDocumentForReview(
+  document: UploadedDocumentWithUploader,
+): Promise<ProcessingDraft | null> {
+  const extractResult = await buildExtractResultFromDraftRows(document);
 
   if (!extractResult) {
     return null;
@@ -58,147 +65,6 @@ export function mapUploadedDocumentForQueue(
     uploadedAt: document.uploadedAt.toISOString(),
     extractResult,
   };
-}
-
-export async function mapUploadedDocumentForReview(
-  document: UploadedDocumentWithUploader,
-): Promise<ProcessingDraft | null> {
-  const snapshotExtractResult = parseExtractResult(document.remark);
-  const documentType =
-    snapshotExtractResult?.documentType ?? document.category.toLowerCase();
-
-  if (documentType === "kuarters") {
-    const extractResult = await buildKuartersExtractResultFromPendingRows(
-      document.id,
-      snapshotExtractResult?.documentType === "kuarters"
-        ? snapshotExtractResult
-        : null,
-    );
-
-    if (!extractResult) {
-      return null;
-    }
-
-    return buildProcessingDraft(document, extractResult);
-  }
-
-  if (!snapshotExtractResult) {
-    return null;
-  }
-
-  return buildProcessingDraft(document, snapshotExtractResult);
-}
-
-function buildProcessingDraft(
-  document: UploadedDocumentWithUploader,
-  extractResult: ExtractResult,
-): ProcessingDraft {
-  return {
-    id: document.id,
-    kind: extractResult.documentType,
-    fileName: document.originalName ?? document.fileName,
-    fileType: document.fileType,
-    fileSize: document.fileSize,
-    uploadedBy: document.uploadedBy?.fullName ?? "Username",
-    uploadedAt: document.uploadedAt.toISOString(),
-    extractResult,
-  };
-}
-
-async function buildKuartersExtractResultFromPendingRows(
-  uploadedDocumentId: string,
-  snapshotExtractResult: KuartersExtractResult | null,
-): Promise<KuartersExtractResult | null> {
-  const pendingCategories = await prismaQuarterCategoriesForReview(uploadedDocumentId);
-  const pendingUnits = await prismaUnitsForReview(uploadedDocumentId);
-
-  if (pendingCategories.length === 0 && pendingUnits.length === 0) {
-    return snapshotExtractResult;
-  }
-
-  const categoriesById = new Map<
-    string,
-    | (typeof pendingCategories)[number]
-    | (typeof pendingUnits)[number]["quarterCategory"]
-  >();
-
-  pendingCategories.forEach((category) => {
-    categoriesById.set(category.id, category);
-  });
-  pendingUnits.forEach((unit) => {
-    categoriesById.set(unit.quarterCategory.id, unit.quarterCategory);
-  });
-
-  const unitsByCategoryId = new Map<string, typeof pendingUnits>();
-  pendingUnits.forEach((unit) => {
-    const units = unitsByCategoryId.get(unit.categoryId) ?? [];
-    units.push(unit);
-    unitsByCategoryId.set(unit.categoryId, units);
-  });
-
-  const snapshotRecordsByCategoryId = new Map(
-    snapshotExtractResult?.records
-      .filter((record) => record.categoryId)
-      .map((record) => [record.categoryId as string, record]) ?? [],
-  );
-
-  const records: ExtractedQuarterRecord[] = [...categoriesById.values()]
-    .map((category) => {
-      const units = unitsByCategoryId.get(category.id) ?? [];
-      const snapshotRecord = snapshotRecordsByCategoryId.get(category.id);
-
-      return {
-        id: snapshotRecord?.id ?? category.id,
-        categoryId: category.id,
-        categoryRecordStatus: category.recordStatus,
-        categoryName: category.categoryName,
-        address: category.address ?? "N/A",
-        rentalPrice: category.rentalPrice.toFixed(2),
-        maintenancePrice: category.maintenancePrice.toFixed(2),
-        penaltyPrice: category.penaltyPrice.toFixed(2),
-        unitCount: units.length,
-        units: units.map((unit) => ({
-          unitId: unit.id,
-          unitCode: unit.unitCode,
-          address: category.address ?? "N/A",
-        })),
-      };
-    })
-    .filter((record) => record.units.length > 0)
-    .sort((firstRecord, secondRecord) =>
-      firstRecord.categoryName.localeCompare(secondRecord.categoryName, "ms"),
-    );
-
-  return {
-    documentType: "kuarters",
-    parsingMode: snapshotExtractResult?.parsingMode,
-    recordCount: records.length,
-    totalUnits: records.reduce((total, record) => total + record.units.length, 0),
-    records,
-  };
-}
-
-function prismaQuarterCategoriesForReview(uploadedDocumentId: string) {
-  return prisma.quarterCategory.findMany({
-    where: {
-      uploadedDocumentId,
-      recordStatus: "PENDING",
-    },
-    orderBy: [{ categoryName: "asc" }, { createdAt: "asc" }],
-  });
-}
-
-function prismaUnitsForReview(uploadedDocumentId: string) {
-  return prisma.unit.findMany({
-    where: {
-      uploadedDocumentId,
-      recordStatus: "PENDING",
-    },
-    include: {
-      quarterCategory: true,
-    },
-    orderBy: [{ unitCode: "asc" }, { createdAt: "asc" }],
-  });
 }
 
 export function documentCategoryForKind(kind: ProcessingDraft["kind"]) {
@@ -236,72 +102,214 @@ export function getBayaranPaymentDate(paymentMonth: string) {
   return new Date(Date.UTC(year, monthIndex, 1));
 }
 
-async function findResidentByIcNumber(
+async function buildExtractResultFromDraftRows(
+  document: UploadedDocumentWithUploader,
+): Promise<ExtractResult | null> {
+  if (document.category === "BAYARAN") {
+    return buildBayaranExtractResultFromDraftRows(document.id);
+  }
+
+  if (document.category === "TUNGGAKAN") {
+    return buildTunggakanExtractResultFromDraftRows(document.id);
+  }
+
+  if (document.category === "PENGHUNI") {
+    return buildPenghuniExtractResultFromDraftRows(document.id);
+  }
+
+  if (document.category === "KUARTERS") {
+    return buildKuartersExtractResultFromDraftRows(document.id);
+  }
+
+  return null;
+}
+
+function jsonRecord<T>(value: Prisma.JsonValue | null, fallback: T): T {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? ({ ...fallback, ...value } as T)
+    : fallback;
+}
+
+async function buildBayaranExtractResultFromDraftRows(
+  uploadedDocumentId: string,
+) {
+  const rows = await prisma.paymentDraft.findMany({
+    where: { uploadedDocumentId },
+    orderBy: [{ createdAt: "asc" }],
+  });
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const records = rows.map((row) =>
+    jsonRecord<ExtractedBayaranRecord>(row.rawData, {
+      paymentId: row.id,
+      residentId: row.originalResidentId ?? undefined,
+      isExisted: row.isExisted,
+      page: 0,
+      jabatanCode: "",
+      jabatanName: "",
+      ptjpkCode: "",
+      ptjpkName: row.department ?? "",
+      bil: "",
+      noRujukan: row.referenceNo ?? row.receiptNo ?? "",
+      noGajiNoKp: row.residentIcNumber,
+      nama: row.residentName,
+      amaunRm: row.amount.toFixed(2),
+      tarikh: row.paymentDate.toISOString(),
+      noResit: row.receiptNo ?? "",
+      catatan: row.description ?? "",
+    }),
+  );
+
+  const totalAmount = records
+    .reduce((total, record) => total + Number(record.amaunRm || 0), 0)
+    .toFixed(2);
+
+  return {
+    documentType: "bayaran" as const,
+    recordCount: records.length,
+    totalAmount,
+    paymentMonth: rows[0]?.paymentDate.toLocaleDateString("ms-MY", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }) ?? "",
+    records,
+  };
+}
+
+async function buildTunggakanExtractResultFromDraftRows(
+  uploadedDocumentId: string,
+) {
+  const rows = await prisma.arrearsSummaryDraft.findMany({
+    where: { uploadedDocumentId },
+    orderBy: [{ createdAt: "asc" }],
+  });
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const records = rows.map((row) =>
+    jsonRecord<ExtractedTunggakanRecord>(row.rawData, {
+      arrearsSummaryId: row.id,
+      residentId: row.originalResidentId ?? undefined,
+      isExisted: row.isExisted,
+      importStatus: row.isExisted ? "IGNORED" : "PENDING",
+      importMessage: row.isExisted
+        ? "Rekod tunggakan telah wujud dalam sistem."
+        : undefined,
+      nama: row.residentName,
+      noKadPengenalan: row.residentIcNumber,
+      jumlahTunggakan: row.totalArrearsAmount.toFixed(2),
+      sourceSheet: "",
+      sourceRow: 0,
+    }),
+  );
+  const acceptedRecords = records.filter((record) => record.importStatus !== "IGNORED");
+
+  return {
+    documentType: "tunggakan" as const,
+    recordCount: acceptedRecords.length,
+    totalAmount: acceptedRecords
+      .reduce((total, record) => total + Number(record.jumlahTunggakan || 0), 0)
+      .toFixed(2),
+    records,
+  };
+}
+
+async function buildPenghuniExtractResultFromDraftRows(uploadedDocumentId: string) {
+  const rows = await prisma.residentDraft.findMany({
+    where: { uploadedDocumentId },
+    orderBy: [{ createdAt: "asc" }],
+  });
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const records = rows.map((row) =>
+    jsonRecord<ExtractedPenghuniRecord>(row.rawData, {
+      residentId: row.id,
+      originalResidentId: row.originalResidentId ?? undefined,
+      isExisted: row.isExisted,
+      nama: row.fullName,
+      noKadPengenalan: row.icNumber,
+      kuarters: "",
+      unit: "",
+      alamatKuarters: row.description ?? "",
+      perhubungan: row.phone ?? "",
+      pekerjaan: row.position ?? "",
+      jabatan: row.department ?? "",
+      sourceSheet: "",
+      sourceRow: 0,
+    }),
+  );
+
+  return {
+    documentType: "penghuni" as const,
+    recordCount: records.length,
+    records,
+  };
+}
+
+export async function buildKuartersExtractResultFromDraftRows(
+  uploadedDocumentId: string,
+): Promise<KuartersExtractResult | null> {
+  const categories = await prisma.quarterCategoryDraft.findMany({
+    where: { uploadedDocumentId },
+    include: { units: { orderBy: [{ unitCode: "asc" }, { createdAt: "asc" }] } },
+    orderBy: [{ categoryName: "asc" }, { createdAt: "asc" }],
+  });
+
+  if (categories.length === 0) {
+    return null;
+  }
+
+  const records: ExtractedQuarterRecord[] = categories.map((category) => ({
+    id: category.id,
+    categoryId: category.id,
+    categoryIsExisted: category.isExisted,
+    originalCategoryId: category.originalCategoryId ?? undefined,
+    categoryName: category.categoryName,
+    address: category.address ?? "N/A",
+    rentalPrice: category.rentalPrice.toFixed(2),
+    maintenancePrice: category.maintenancePrice.toFixed(2),
+    penaltyPrice: category.penaltyPrice.toFixed(2),
+    unitCount: category.units.length,
+    units: category.units.map((unit) => ({
+      unitId: unit.id,
+      originalUnitId: unit.originalUnitId ?? undefined,
+      unitCode: unit.unitCode,
+      address: category.address ?? "N/A",
+      isExisted: unit.isExisted,
+    })),
+  }));
+
+  return {
+    documentType: "kuarters",
+    recordCount: records.length,
+    totalUnits: records.reduce((total, record) => total + record.units.length, 0),
+    records,
+  };
+}
+
+async function findResidentByNormalizedIc(
   tx: Prisma.TransactionClient,
   icNumber: string,
 ) {
-  const residents = await tx.$queryRaw<
-    { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
-  >`
-    SELECT "id", "recordStatus"
-    FROM "Resident"
-    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
-      regexp_replace(${icNumber}, '\\D', '', 'g')
-    ORDER BY
-      CASE WHEN "icNumber" = ${icNumber} THEN 0 ELSE 1 END,
-      "createdAt" ASC
-    LIMIT 1
-  `;
-
-  return residents[0] ?? null;
-}
-
-async function findResidentByIcNumberAndName(
-  tx: Prisma.TransactionClient,
-  icNumber: string,
-  fullName: string,
-) {
-  const residents = await tx.$queryRaw<
-    { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
-  >`
-    SELECT "id", "recordStatus"
-    FROM "Resident"
-    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
-      regexp_replace(${icNumber}, '\\D', '', 'g')
-      AND UPPER(TRIM(regexp_replace("fullName", '\\s+', ' ', 'g'))) =
-        UPPER(TRIM(regexp_replace(${fullName}, '\\s+', ' ', 'g')))
-    ORDER BY
-      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
-      "createdAt" ASC
-    LIMIT 1
-  `;
-
-  return residents[0] ?? null;
-}
-
-async function findArrearsSummaryByResidentId(
-  tx: Prisma.TransactionClient,
-  residentId: string,
-) {
-  const arrearsSummaries = await tx.$queryRaw<{ id: string }[]>`
+  const residents = await tx.$queryRaw<{ id: string }[]>`
     SELECT "id"
-    FROM "ArrearsSummary"
-    WHERE "residentId" = ${residentId}::uuid
-    ORDER BY
-      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
-      "createdAt" ASC
+    FROM "Resident"
+    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
+      regexp_replace(${icNumber}, '\\D', '', 'g')
+    ORDER BY "createdAt" ASC
     LIMIT 1
   `;
 
-  return arrearsSummaries[0]?.id ?? "";
-}
-
-function tunggakanIdentityKey(name: string, icNumber: string) {
-  return [normalizeExtractText(name), icNumber.replace(/\D/g, "")].join("|");
-}
-
-function normalizeExtractText(value: string | null | undefined) {
-  return (value ?? "").replace(/\s+/g, " ").trim().toUpperCase();
+  return residents[0]?.id ?? "";
 }
 
 async function findQuarterCategoryByNameAddress(
@@ -316,9 +324,6 @@ async function findQuarterCategoryByNameAddress(
       UPPER(TRIM(regexp_replace(${categoryName}, '\\s+', ' ', 'g')))
       AND UPPER(TRIM(regexp_replace(COALESCE("address", ''), '\\s+', ' ', 'g'))) =
         UPPER(TRIM(regexp_replace(COALESCE(${address}::text, ''), '\\s+', ' ', 'g')))
-    ORDER BY
-      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
-      "createdAt" ASC
     LIMIT 1
   `;
 
@@ -336,13 +341,14 @@ async function findUnitByCategoryIdAndCode(
     WHERE "categoryId" = ${categoryId}::uuid
       AND UPPER(TRIM(regexp_replace("unitCode", '\\s+', ' ', 'g'))) =
         UPPER(TRIM(regexp_replace(${unitCode}, '\\s+', ' ', 'g')))
-    ORDER BY
-      CASE WHEN "recordStatus" = 'VERIFIED'::"RecordStatus" THEN 0 ELSE 1 END,
-      "createdAt" ASC
     LIMIT 1
   `;
 
   return units[0]?.id ?? "";
+}
+
+function rawData(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? {}));
 }
 
 export async function createPendingBayaranRows(
@@ -355,50 +361,53 @@ export async function createPendingBayaranRows(
   }
 
   const paymentDate = getBayaranPaymentDate(extractResult.paymentMonth);
-  const enrichedRecords = [];
+  const records: ExtractedBayaranRecord[] = [];
 
   for (const record of extractResult.records) {
-    const icNumber = record.noGajiNoKp.trim();
-    const resident = await findResidentByIcNumber(tx, icNumber);
-    let residentId = resident?.id;
-    let residentRecordStatus = resident?.recordStatus;
+    const residentId = await findResidentByNormalizedIc(tx, record.noGajiNoKp);
+    const existingPayment = await tx.payment.findFirst({
+      where: {
+        residentId: residentId || undefined,
+        receiptNo: record.noRujukan || record.noResit || undefined,
+        paymentDate,
+      },
+      select: { id: true },
+    });
+    const draft = await tx.paymentDraft.create({
+      data: {
+        residentName: record.nama,
+        residentIcNumber: record.noGajiNoKp.trim(),
+        department: record.ptjpkName || record.jabatanName || null,
+        paymentDate,
+        receiptNo: record.noResit || null,
+        referenceNo: record.noRujukan || null,
+        amount: record.amaunRm || "0",
+        description: record.catatan || "bayaran",
+        uploadedDocumentId,
+        originalResidentId: residentId || null,
+        originalPaymentId: existingPayment?.id ?? null,
+        isExisted: Boolean(existingPayment?.id),
+        rawData: rawData(record),
+      },
+    });
 
-    if (!residentId) {
-      const nextResidentId = randomUUID();
-      const createdResidents = await tx.$queryRaw<
-        { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
-      >`
-        INSERT INTO "Resident"
-          ("id", "fullName", "icNumber", "department", "recordStatus", "uploadedDocumentId", "description", "createdAt", "updatedAt")
-        VALUES
-          (${nextResidentId}::uuid, ${record.nama}, ${icNumber}, ${record.ptjpkName || record.jabatanName || null}, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, ${"Dicipta sementara daripada dokumen bayaran belum disahkan."}, NOW(), NOW())
-        RETURNING "id", "recordStatus"
-      `;
-      residentId = createdResidents[0]?.id ?? nextResidentId;
-      residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
-    }
-
-    const paymentId = randomUUID();
-    const payments = await tx.$queryRaw<{ id: string }[]>`
-      INSERT INTO "Payment"
-        ("id", "residentId", "paymentDate", "receiptNo", "amount", "description", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
-      VALUES
-        (${paymentId}::uuid, ${residentId}::uuid, ${paymentDate}, ${record.noRujukan || null}, ${record.amaunRm}::numeric, ${record.catatan || "bayaran"}, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
-      RETURNING "id"
-    `;
-
-    enrichedRecords.push({
+    records.push({
       ...record,
-      paymentId: payments[0]?.id ?? paymentId,
-      residentId,
-      residentRecordStatus,
+      paymentId: draft.id,
+      residentId: residentId || undefined,
+      isExisted: draft.isExisted,
     });
   }
 
-  return {
-    ...extractResult,
-    records: enrichedRecords,
-  };
+  return { ...extractResult, recordCount: records.length, records };
+}
+
+function tunggakanIdentityKey(name: string, icNumber: string) {
+  return [normalizeExtractText(name), icNumber.replace(/\D/g, "")].join("|");
+}
+
+function normalizeExtractText(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim().toUpperCase();
 }
 
 export async function createPendingTunggakanRows(
@@ -410,123 +419,59 @@ export async function createPendingTunggakanRows(
     return extractResult;
   }
 
-  const enrichedRecords = [];
-  const acceptedTunggakanKeys = new Set<string>();
+  const seen = new Set<string>();
+  const records: ExtractedTunggakanRecord[] = [];
 
   for (const record of extractResult.records) {
     const icNumber = record.noKadPengenalan.trim();
     const identityKey = tunggakanIdentityKey(record.nama, icNumber);
-    const existingResident = await findResidentByIcNumberAndName(
-      tx,
-      icNumber,
-      record.nama,
-    );
-    const residentWithSameIc = existingResident
-      ? null
-      : await findResidentByIcNumber(tx, icNumber);
+    const residentId = await findResidentByNormalizedIc(tx, icNumber);
+    const existingSummary = residentId
+      ? await tx.arrearsSummary.findUnique({
+          where: { residentId },
+          select: { id: true },
+        })
+      : null;
+    const isDuplicateInDocument = seen.has(identityKey);
+    const isExisted = Boolean(existingSummary?.id || isDuplicateInDocument);
+    const draft = await tx.arrearsSummaryDraft.create({
+      data: {
+        residentName: record.nama,
+        residentIcNumber: icNumber,
+        totalArrearsAmount: record.jumlahTunggakan || "0",
+        description: "tunggakan",
+        uploadedDocumentId,
+        originalResidentId: residentId || null,
+        originalSummaryId: existingSummary?.id ?? null,
+        isExisted,
+        rawData: rawData(record),
+      },
+    });
 
-    let residentId = existingResident?.id;
-    let residentRecordStatus = existingResident?.recordStatus;
-
-    if (acceptedTunggakanKeys.has(identityKey)) {
-      enrichedRecords.push({
-        ...record,
-        residentId,
-        residentRecordStatus,
-        importStatus: "IGNORED" as const,
-        importMessage:
-          "Rekod tunggakan pendua dalam fail ini telah diabaikan. Rekod pertama dikekalkan.",
-      });
-      continue;
-    }
-
-    if (residentId) {
-      const existingArrearsSummaryId = await findArrearsSummaryByResidentId(
-        tx,
-        residentId,
-      );
-
-      if (existingArrearsSummaryId) {
-        enrichedRecords.push({
-          ...record,
-          arrearsSummaryId: existingArrearsSummaryId,
-          residentId,
-          residentRecordStatus,
-          importStatus: "IGNORED" as const,
-          importMessage:
-            "Rekod tunggakan pertama telah wujud untuk nama dan IC ini. Amaun baharu diabaikan.",
-        });
-        continue;
-      }
-    }
-
-    if (!residentId && residentWithSameIc) {
-      enrichedRecords.push({
-        ...record,
-        residentId: residentWithSameIc.id,
-        residentRecordStatus: residentWithSameIc.recordStatus,
-        importStatus: "IGNORED" as const,
-        importMessage:
-          "IC telah wujud tetapi nama tidak sepadan. Semak nama dan IC sebelum import.",
-      });
-      continue;
-    }
-
-    if (!residentId) {
-      const nextResidentId = randomUUID();
-      const createdResidents = await tx.$queryRaw<
-        { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
-      >`
-        INSERT INTO "Resident"
-          ("id", "fullName", "icNumber", "recordStatus", "uploadedDocumentId", "description", "createdAt", "updatedAt")
-        VALUES
-          (${nextResidentId}::uuid, ${record.nama}, ${icNumber}, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, ${"Dicipta sementara daripada dokumen tunggakan belum disahkan."}, NOW(), NOW())
-        RETURNING "id", "recordStatus"
-      `;
-      residentId = createdResidents[0]?.id ?? nextResidentId;
-      residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
-    }
-
-    acceptedTunggakanKeys.add(identityKey);
-
-    const arrearsSummaryId = randomUUID();
-    const arrearsSummaries = await tx.$queryRaw<{ id: string }[]>`
-      INSERT INTO "ArrearsSummary"
-        ("id", "residentId", "totalArrearsAmount", "description", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
-      VALUES
-        (${arrearsSummaryId}::uuid, ${residentId}::uuid, ${record.jumlahTunggakan || "0"}::numeric, ${"tunggakan"}, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
-      ON CONFLICT ("residentId") DO NOTHING
-      RETURNING "id"
-    `;
-
-    const resolvedArrearsSummaryId =
-      arrearsSummaries[0]?.id ??
-      (await findArrearsSummaryByResidentId(tx, residentId));
-
-    enrichedRecords.push({
+    seen.add(identityKey);
+    records.push({
       ...record,
-      arrearsSummaryId: resolvedArrearsSummaryId || arrearsSummaryId,
-      residentId,
-      residentRecordStatus,
-      importStatus: arrearsSummaries[0]?.id ? ("PENDING" as const) : ("IGNORED" as const),
-      importMessage: arrearsSummaries[0]?.id
-        ? undefined
-        : "Rekod tunggakan sedia ada ditemui. Amaun baharu diabaikan.",
+      arrearsSummaryId: draft.id,
+      residentId: residentId || undefined,
+      isExisted,
+      importStatus: isExisted ? "IGNORED" : "PENDING",
+      importMessage: isExisted
+        ? isDuplicateInDocument
+          ? "Rekod tunggakan pendua dalam fail ini."
+          : "Rekod tunggakan telah wujud dalam sistem."
+        : undefined,
     });
   }
 
-  const acceptedRecords = enrichedRecords.filter(
-    (record) => record.importStatus !== "IGNORED",
-  );
-  const totalAmount = acceptedRecords
-    .reduce((total, record) => total + Number(record.jumlahTunggakan || 0), 0)
-    .toFixed(2);
+  const acceptedRecords = records.filter((record) => record.importStatus !== "IGNORED");
 
   return {
     ...extractResult,
     recordCount: acceptedRecords.length,
-    totalAmount,
-    records: enrichedRecords,
+    totalAmount: acceptedRecords
+      .reduce((total, record) => total + Number(record.jumlahTunggakan || 0), 0)
+      .toFixed(2),
+    records,
   };
 }
 
@@ -539,49 +484,111 @@ export async function createPendingPenghuniRows(
     return extractResult;
   }
 
-  const enrichedRecords = [];
-  const acceptedPenghuniIcNumbers = new Set<string>();
+  const records: ExtractedPenghuniRecord[] = [];
 
   for (const record of extractResult.records) {
-    const icNumber = record.noKadPengenalan.trim();
-    const icKey = icNumber.replace(/\D/g, "");
-    const existingResident = await findResidentByIcNumber(tx, icNumber);
+    const residentId = await findResidentByNormalizedIc(
+      tx,
+      record.noKadPengenalan,
+    );
+    const draft = await tx.residentDraft.create({
+      data: {
+        fullName: record.nama,
+        icNumber: record.noKadPengenalan.trim(),
+        phone: record.perhubungan || null,
+        position: record.pekerjaan || null,
+        department: record.jabatan || null,
+        description: record.alamatKuarters || null,
+        uploadedDocumentId,
+        originalResidentId: residentId || null,
+        isExisted: Boolean(residentId),
+        rawData: rawData(record),
+      },
+    });
 
-    let residentId = existingResident?.id;
-    let residentRecordStatus = existingResident?.recordStatus;
-
-    if (acceptedPenghuniIcNumbers.has(icKey) || residentId) {
-      continue;
-    }
-
-    if (!residentId) {
-      const nextResidentId = randomUUID();
-      const createdResidents = await tx.$queryRaw<
-        { id: string; recordStatus: "PENDING" | "VERIFIED" | "REJECTED" }[]
-      >`
-        INSERT INTO "Resident"
-          ("id", "fullName", "icNumber", "phone", "position", "department", "recordStatus", "uploadedDocumentId", "description", "createdAt", "updatedAt")
-        VALUES
-          (${nextResidentId}::uuid, ${record.nama}, ${icNumber}, ${record.perhubungan || null}, ${record.pekerjaan || null}, ${record.jabatan || null}, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, ${record.alamatKuarters || null}, NOW(), NOW())
-        RETURNING "id", "recordStatus"
-      `;
-      residentId = createdResidents[0]?.id ?? nextResidentId;
-      residentRecordStatus = createdResidents[0]?.recordStatus ?? "PENDING";
-    }
-
-    acceptedPenghuniIcNumbers.add(icKey);
-
-    enrichedRecords.push({
+    records.push({
       ...record,
-      residentId,
-      residentRecordStatus,
+      residentId: draft.id,
+      originalResidentId: residentId || undefined,
+      isExisted: draft.isExisted,
+    });
+  }
+
+  return { ...extractResult, recordCount: records.length, records };
+}
+
+export async function createPendingKuartersRows(
+  tx: Prisma.TransactionClient,
+  uploadedDocumentId: string,
+  extractResult: ExtractResult,
+) {
+  if (extractResult.documentType !== "kuarters") {
+    return extractResult;
+  }
+
+  const records: ExtractedQuarterRecord[] = [];
+
+  for (const record of extractResult.records) {
+    const categoryAddress = record.address?.trim() || "N/A";
+    const originalCategoryId = await findQuarterCategoryByNameAddress(
+      tx,
+      record.categoryName,
+      categoryAddress,
+    );
+    const categoryDraft = await tx.quarterCategoryDraft.create({
+      data: {
+        categoryName: record.categoryName,
+        address: categoryAddress,
+        rentalPrice: record.rentalPrice || "0",
+        maintenancePrice: record.maintenancePrice || "0",
+        penaltyPrice: record.penaltyPrice || "0",
+        uploadedDocumentId,
+        originalCategoryId: originalCategoryId || null,
+        isExisted: Boolean(originalCategoryId),
+        rawData: rawData(record),
+      },
+    });
+    const units: ExtractedQuarterUnit[] = [];
+
+    for (const unit of record.units) {
+      const originalUnitId = originalCategoryId
+        ? await findUnitByCategoryIdAndCode(tx, originalCategoryId, unit.unitCode)
+        : "";
+      const unitDraft = await tx.unitDraft.create({
+        data: {
+          unitCode: unit.unitCode,
+          uploadedDocumentId,
+          categoryDraftId: categoryDraft.id,
+          originalUnitId: originalUnitId || null,
+          isExisted: Boolean(originalUnitId),
+          rawData: rawData(unit),
+        },
+      });
+
+      units.push({
+        ...unit,
+        unitId: unitDraft.id,
+        originalUnitId: originalUnitId || undefined,
+        isExisted: unitDraft.isExisted,
+      });
+    }
+
+    records.push({
+      ...record,
+      id: categoryDraft.id,
+      categoryId: categoryDraft.id,
+      originalCategoryId: originalCategoryId || undefined,
+      categoryIsExisted: categoryDraft.isExisted,
+      unitCount: units.length,
+      units,
     });
   }
 
   return {
     ...extractResult,
-    recordCount: enrichedRecords.length,
-    records: enrichedRecords,
+    recordCount: records.length,
+    totalUnits: records.reduce((total, record) => total + record.units.length, 0),
+    records,
   };
 }
 
@@ -597,17 +604,11 @@ export async function applyVerifiedPenghuniOccupancy(
 
   for (const record of extractResult.records) {
     const residentId =
-      "residentId" in record && typeof record.residentId === "string"
-        ? record.residentId
-        : "";
-    const icNumber = record.noKadPengenalan.trim();
-    const resolvedResidentId = await findVerifiedResidentIdForPenghuniRecord(
-      tx,
-      residentId,
-      icNumber,
-    );
+      "originalResidentId" in record && typeof record.originalResidentId === "string"
+        ? record.originalResidentId
+        : await findResidentByNormalizedIc(tx, record.noKadPengenalan);
 
-    if (!resolvedResidentId) {
+    if (!residentId) {
       continue;
     }
 
@@ -622,7 +623,7 @@ export async function applyVerifiedPenghuniOccupancy(
     await tx.$executeRaw`
       UPDATE "UnitOccupancy"
       SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
-      WHERE "residentId" = ${resolvedResidentId}::uuid
+      WHERE "residentId" = ${residentId}::uuid
         AND "status" = 'CURRENT'::"OccupancyStatus"
         AND "unitId" <> ${unitId}::uuid
     `;
@@ -631,7 +632,7 @@ export async function applyVerifiedPenghuniOccupancy(
       UPDATE "UnitOccupancy"
       SET "status" = 'PAST'::"OccupancyStatus", "moveOutDate" = COALESCE("moveOutDate", NOW()), "updatedAt" = NOW()
       WHERE "unitId" = ${unitId}::uuid
-        AND "residentId" <> ${resolvedResidentId}::uuid
+        AND "residentId" <> ${residentId}::uuid
         AND "status" = 'CURRENT'::"OccupancyStatus"
     `;
 
@@ -639,8 +640,8 @@ export async function applyVerifiedPenghuniOccupancy(
       INSERT INTO "UnitOccupancy"
         ("id", "residentId", "unitId", "moveInDate", "status", "description", "createdAt", "updatedAt")
       SELECT
-        ${randomUUID()}::uuid,
-        ${resolvedResidentId}::uuid,
+        gen_random_uuid(),
+        ${residentId}::uuid,
         ${unitId}::uuid,
         ${parsePenghuniMoveInDate(record.tarikhMasuk ?? "")},
         'CURRENT'::"OccupancyStatus",
@@ -650,7 +651,7 @@ export async function applyVerifiedPenghuniOccupancy(
       WHERE NOT EXISTS (
         SELECT 1
         FROM "UnitOccupancy"
-        WHERE "residentId" = ${resolvedResidentId}::uuid
+        WHERE "residentId" = ${residentId}::uuid
           AND "unitId" = ${unitId}::uuid
           AND "status" = 'CURRENT'::"OccupancyStatus"
       )
@@ -658,54 +659,11 @@ export async function applyVerifiedPenghuniOccupancy(
   }
 
   for (const unitId of touchedUnitIds) {
-    await tx.$executeRaw`
-      UPDATE "Unit"
-      SET "status" = 'OCCUPIED'::"UnitStatus", "updatedAt" = NOW()
-      WHERE "id" = ${unitId}::uuid
-        AND "recordStatus" = 'VERIFIED'::"RecordStatus"
-    `;
+    await tx.unit.update({
+      where: { id: unitId },
+      data: { status: "OCCUPIED" },
+    });
   }
-}
-
-async function findVerifiedResidentIdForPenghuniRecord(
-  tx: Prisma.TransactionClient,
-  residentId: string,
-  icNumber: string,
-) {
-  if (residentId) {
-    const residents = await tx.$queryRaw<{ id: string }[]>`
-      SELECT "id"
-      FROM "Resident"
-      WHERE "id" = ${residentId}::uuid
-        AND "recordStatus" = 'VERIFIED'::"RecordStatus"
-      LIMIT 1
-    `;
-
-    if (residents[0]?.id) {
-      return residents[0].id;
-    }
-  }
-
-  return findVerifiedResidentIdByIcNumber(tx, icNumber);
-}
-
-async function findVerifiedResidentIdByIcNumber(
-  tx: Prisma.TransactionClient,
-  icNumber: string,
-) {
-  const residents = await tx.$queryRaw<{ id: string }[]>`
-    SELECT "id"
-    FROM "Resident"
-    WHERE regexp_replace("icNumber", '\\D', '', 'g') =
-      regexp_replace(${icNumber}, '\\D', '', 'g')
-      AND "recordStatus" = 'VERIFIED'::"RecordStatus"
-    ORDER BY
-      CASE WHEN "icNumber" = ${icNumber} THEN 0 ELSE 1 END,
-      "createdAt" ASC
-    LIMIT 1
-  `;
-
-  return residents[0]?.id ?? "";
 }
 
 async function findUnitIdForPenghuniRecord(
@@ -726,8 +684,6 @@ async function findUnitIdForPenghuniRecord(
     INNER JOIN "QuarterCategory" qc
       ON qc."id" = u."categoryId"
     WHERE UPPER(TRIM(u."unitCode")) = UPPER(TRIM(${normalizedUnit}))
-      AND u."recordStatus" = 'VERIFIED'::"RecordStatus"
-      AND qc."recordStatus" = 'VERIFIED'::"RecordStatus"
       AND (
         ${normalizedKuarters} = ''
         OR UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${normalizedKuarters}))
@@ -753,114 +709,4 @@ function parsePenghuniMoveInDate(value: string) {
   }
 
   return date;
-}
-
-export async function createPendingKuartersRows(
-  tx: Prisma.TransactionClient,
-  uploadedDocumentId: string,
-  extractResult: ExtractResult,
-) {
-  if (extractResult.documentType !== "kuarters") {
-    return extractResult;
-  }
-
-  const enrichedRecords = [];
-
-  for (const record of extractResult.records) {
-    const categoryAddress = record.address?.trim() || "N/A";
-    let resolvedCategoryId = await findQuarterCategoryByNameAddress(
-      tx,
-      record.categoryName,
-      categoryAddress,
-    );
-    const isExistingCategory = Boolean(resolvedCategoryId);
-
-    if (!resolvedCategoryId) {
-      if (record.units.length === 0) {
-        continue;
-      }
-
-      const categoryId = randomUUID();
-      const createdCategories = await tx.$queryRaw<{ id: string }[]>`
-        INSERT INTO "QuarterCategory"
-          ("id", "categoryName", "address", "rentalPrice", "maintenancePrice", "penaltyPrice", "recordStatus", "uploadedDocumentId", "createdAt", "updatedAt")
-        VALUES
-          (${categoryId}::uuid, ${record.categoryName}, ${categoryAddress}, ${record.rentalPrice || "0"}::numeric, ${record.maintenancePrice || "0"}::numeric, ${record.penaltyPrice || "0"}::numeric, 'PENDING'::"RecordStatus", ${uploadedDocumentId}::uuid, NOW(), NOW())
-        ON CONFLICT ("categoryName", "address") DO NOTHING
-        RETURNING "id"
-      `;
-      resolvedCategoryId =
-        createdCategories[0]?.id ??
-        (await findQuarterCategoryByNameAddress(
-          tx,
-          record.categoryName,
-          categoryAddress,
-        ));
-    }
-    
-    // If the category still cannot be resolved, skip processing this record
-    if (!resolvedCategoryId) {
-      continue;
-    }
-
-    const enrichedUnits = [];
-
-    for (const unit of record.units) {
-      const existingUnitId = await findUnitByCategoryIdAndCode(
-        tx,
-        resolvedCategoryId,
-        unit.unitCode,
-      );
-
-      if (existingUnitId) {
-        continue;
-      }
-
-      const unitId = randomUUID();
-      const createdUnits = await tx.$queryRaw<{ id: string }[]>`
-        INSERT INTO "Unit"
-          ("id", "unitCode", "status", "recordStatus", "categoryId", "uploadedDocumentId", "createdAt", "updatedAt")
-        VALUES
-          (${unitId}::uuid, ${unit.unitCode}, 'VACANT'::"UnitStatus", 'PENDING'::"RecordStatus", ${resolvedCategoryId}::uuid, ${uploadedDocumentId}::uuid, NOW(), NOW())
-        ON CONFLICT ("categoryId", "unitCode") DO NOTHING
-        RETURNING "id"
-      `;
-      let resolvedUnitId = createdUnits[0]?.id;
-
-      if (!resolvedUnitId) {
-        resolvedUnitId = await findUnitByCategoryIdAndCode(
-          tx,
-          resolvedCategoryId,
-          unit.unitCode,
-        );
-      }
-
-      enrichedUnits.push({
-        ...unit,
-        unitId: resolvedUnitId ?? "",
-      });
-    }
-
-    if (enrichedUnits.length === 0) {
-      continue;
-    }
-
-    enrichedRecords.push({
-      ...record,
-      categoryId: resolvedCategoryId,
-      recordStatus: isExistingCategory ? "VERIFIED" : "PENDING",
-      unitCount: enrichedUnits.length,
-      units: enrichedUnits,
-    });
-  }
-
-  return {
-    ...extractResult,
-    recordCount: enrichedRecords.length,
-    totalUnits: enrichedRecords.reduce(
-      (total, record) => total + record.units.length,
-      0,
-    ),
-    records: enrichedRecords,
-  };
 }
