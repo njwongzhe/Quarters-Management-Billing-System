@@ -122,6 +122,8 @@ export type ProcessingDraft = {
   extractResult: ExtractResult;
 };
 
+export type ProcessingDraftSummary = Omit<ProcessingDraft, "extractResult">;
+
 export function formatDraftDateTime(value: string) {
   const date = new Date(value);
 

@@ -5,8 +5,80 @@ import type {
   PenghuniExtractResult,
   TunggakanExtractResult,
 } from "../../../../components/extract-review-shared";
-import { reviewContent } from "./review-content";
-import type { ReviewContent, ReviewKind } from "./types";
+import type { ReviewContent, ReviewContentTemplate, ReviewKind } from "./types";
+
+const reviewContent: Record<ReviewKind, ReviewContentTemplate> = {
+  bayaran: {
+    stats: [
+      {
+        label: "Tarikh Bayaran",
+        helper: "Data Bulanan",
+        icon: "calendar_month",
+        tone: "blue",
+      },
+      {
+        label: "Jumlah Rekod",
+        helper: "Perlu Disemak",
+        icon: "fact_check",
+        tone: "green",
+      },
+      {
+        label: "Jumlah Bayaran (RM)",
+        helper: "Telah Dikumpul",
+        icon: "payments",
+        tone: "green",
+      },
+    ],
+  },
+  tunggakan: {
+    stats: [
+      {
+        label: "Tarikh Tunggakan",
+        helper: "Data Bulanan",
+        icon: "calendar_month",
+        tone: "blue",
+      },
+      {
+        label: "Jumlah Rekod",
+        helper: "Perlu Disemak",
+        icon: "fact_check",
+        tone: "green",
+      },
+      {
+        label: "Jumlah Tunggakan (RM)",
+        helper: "Telah Tertunggak",
+        icon: "payments",
+        tone: "green",
+      },
+    ],
+  },
+  penghuni: {
+    stats: [
+      {
+        label: "Jumlah Rekod",
+        helper: "Perlu Disemak",
+        icon: "fact_check",
+        tone: "green",
+      },
+    ],
+  },
+  kuarters: {
+    stats: [
+      {
+        label: "Total Kategori",
+        helper: "Kategori Aktif",
+        icon: "category",
+        tone: "blue",
+      },
+      {
+        label: "Total Unit",
+        helper: "Unit Berdaftar",
+        icon: "apartment",
+        tone: "blue",
+      },
+    ],
+  },
+};
 
 type GetReviewContentInput = {
   kind: ReviewKind;
@@ -22,6 +94,7 @@ export function getReviewContent({
   bayaranEditedTotalAmount,
 }: GetReviewContentInput): ReviewContent {
   const baseContent = reviewContent[kind];
+  const fileName = uploadedFileName || "Dokumen semakan";
   const bayaranExtract = getExtractResult<BayaranExtractResult>(
     extractResult,
     "bayaran",
@@ -41,8 +114,7 @@ export function getReviewContent({
 
   if (kind === "bayaran" && bayaranExtract) {
     return {
-      ...baseContent,
-      fileName: uploadedFileName || baseContent.fileName,
+      fileName,
       stats: baseContent.stats.map((stat) => {
         if (stat.label === "Tarikh Bayaran") {
           return { ...stat, value: bayaranExtract.paymentMonth || "-" };
@@ -64,15 +136,14 @@ export function getReviewContent({
           };
         }
 
-        return stat;
+        return { ...stat, value: "-" };
       }),
     };
   }
 
   if (kind === "kuarters" && kuartersExtract) {
     return {
-      ...baseContent,
-      fileName: uploadedFileName || baseContent.fileName,
+      fileName,
       stats: baseContent.stats.map((stat) => {
         if (stat.label === "Total Kategori") {
           return { ...stat, value: String(kuartersExtract.recordCount) };
@@ -82,15 +153,14 @@ export function getReviewContent({
           return { ...stat, value: String(kuartersExtract.totalUnits) };
         }
 
-        return stat;
+        return { ...stat, value: "-" };
       }),
     };
   }
 
   if (kind === "tunggakan" && tunggakanExtract) {
     return {
-      ...baseContent,
-      fileName: uploadedFileName || baseContent.fileName,
+      fileName,
       stats: baseContent.stats.map((stat) => {
         if (stat.label === "Tarikh Tunggakan") {
           return { ...stat, value: "-" };
@@ -113,24 +183,26 @@ export function getReviewContent({
           };
         }
 
-        return stat;
+        return { ...stat, value: "-" };
       }),
     };
   }
 
   if (kind === "penghuni" && penghuniExtract) {
     return {
-      ...baseContent,
-      fileName: uploadedFileName || baseContent.fileName,
+      fileName,
       stats: baseContent.stats.map((stat) =>
         stat.label === "Jumlah Rekod"
           ? { ...stat, value: String(penghuniExtract.recordCount) }
-          : stat,
+          : { ...stat, value: "-" },
       ),
     };
   }
 
-  return baseContent;
+  return {
+    fileName,
+    stats: baseContent.stats.map((stat) => ({ ...stat, value: "-" })),
+  };
 }
 
 function getExtractResult<T extends ExtractResult>(

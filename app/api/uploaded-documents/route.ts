@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  mapUploadedDocumentForReview,
+  mapUploadedDocumentForQueue,
 } from "@/lib/uploaded-document/documents";
 import { prisma } from "@/lib/prisma";
 
@@ -29,7 +29,14 @@ export async function GET(request: Request) {
       orderBy: {
         uploadedAt: "desc",
       },
-      include: {
+      select: {
+        id: true,
+        category: true,
+        fileName: true,
+        originalName: true,
+        fileType: true,
+        fileSize: true,
+        uploadedAt: true,
         uploadedBy: {
           select: {
             fullName: true,
@@ -41,7 +48,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        documents: (await Promise.all(documents.map(mapUploadedDocumentForReview))).filter(
+        documents: documents.map(mapUploadedDocumentForQueue).filter(
           (document) => document !== null,
         ),
       },

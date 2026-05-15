@@ -139,6 +139,7 @@ export function createUploadedDocumentVerifyHandler(kind: VerifyKind) {
         data: {
           remainingExtractResult: result.remainingExtractResult,
           failedMessages: result.failedMessages,
+          verifiedRows: result.verifiedRows,
         },
       });
     } catch (error) {

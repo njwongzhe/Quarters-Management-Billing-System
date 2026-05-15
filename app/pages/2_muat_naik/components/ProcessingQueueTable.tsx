@@ -1,23 +1,23 @@
 import Icon from "../../../components/Icon";
-import type { ProcessingDraft } from "./extract-review-shared";
+import type { ProcessingDraftSummary } from "./extract-review-shared";
 import { formatDraftDateTime } from "./extract-review-shared";
 import type { Category } from "./types";
 
 type ProcessingQueueTableProps = {
   activeCategory: Category;
-  rows: ProcessingDraft[];
+  rows: ProcessingDraftSummary[];
   isLoading: boolean;
-  onContinueDraft: (draft: ProcessingDraft) => void;
+  onContinueDraft: (draft: ProcessingDraftSummary) => void;
   onDeleteDraft: (draftId: string) => void;
 };
 
-function getDraftIcon(draft: ProcessingDraft) {
+function getDraftIcon(draft: ProcessingDraftSummary) {
   return draft.fileName.toLowerCase().endsWith(".pdf")
     ? "picture_as_pdf"
     : "table";
 }
 
-function getDraftTone(draft: ProcessingDraft) {
+function getDraftTone(draft: ProcessingDraftSummary) {
   return draft.fileName.toLowerCase().endsWith(".pdf") ? "red" : "green";
 }
 

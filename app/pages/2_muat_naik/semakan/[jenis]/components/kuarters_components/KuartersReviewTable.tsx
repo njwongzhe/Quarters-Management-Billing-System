@@ -5,6 +5,7 @@ import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFe
 import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 import {
   type ExtractedQuarterRecord,
+  type ExtractedQuarterUnit,
   QUARTER_CATEGORIES_PER_PAGE,
   QUARTER_UNITS_PER_PAGE,
 } from "../../../../components/extract-review-shared";
@@ -85,11 +86,15 @@ export default function KuartersReviewTable({
   const unitDisplayStart = units.length === 0 ? 0 : unitStartIndex + 1;
   const unitDisplayEnd = unitStartIndex + pageUnits.length;
   const selectedKeySet = new Set(selectedKeys);
-  const allCategoryKeys = categories.map(getKuartersRecordKey);
+  const allCategoryKeys = categories
+    .filter(isSelectableCategory)
+    .map(getKuartersRecordKey);
   const isAllCategoriesSelected =
     allCategoryKeys.length > 0 &&
     allCategoryKeys.every((key) => selectedKeySet.has(key));
-  const allSelectedCategoryUnitKeys = units.map(getUnitKey);
+  const allSelectedCategoryUnitKeys = units
+    .filter(isSelectableUnit)
+    .map(getUnitKey);
   const isAllSelectedCategoryUnitsSelected =
     allSelectedCategoryUnitKeys.length > 0 &&
     allSelectedCategoryUnitKeys.every((key) => selectedKeySet.has(key));
@@ -144,17 +149,28 @@ export default function KuartersReviewTable({
     setEditingUnitKey(null);
   };
 
-  const toggleSelectedCategory = (categoryKey: string, checked: boolean) => {
+  const toggleSelectedCategory = (
+    category: ExtractedQuarterRecord,
+    checked: boolean,
+  ) => {
     if (isSaving) {
       return;
     }
 
+    const categoryKey = getKuartersRecordKey(category);
     const nextKeys = new Set(selectedKeys);
+    const unitKeys = category.units.map(getUnitKey);
+    const selectableUnitKeys = category.units.filter(isSelectableUnit).map(getUnitKey);
 
     if (checked) {
-      nextKeys.add(categoryKey);
+      if (isSelectableCategory(category)) {
+        nextKeys.add(categoryKey);
+      }
+      unitKeys.forEach((key) => nextKeys.delete(key));
+      selectableUnitKeys.forEach((key) => nextKeys.add(key));
     } else {
       nextKeys.delete(categoryKey);
+      unitKeys.forEach((key) => nextKeys.delete(key));
     }
 
     onSelectedKeysChange?.([...nextKeys]);
@@ -167,11 +183,22 @@ export default function KuartersReviewTable({
 
     const nextKeys = new Set(selectedKeys);
 
-    allCategoryKeys.forEach((key) => {
+    categories.forEach((category) => {
+      const categoryKey = getKuartersRecordKey(category);
+      const unitKeys = category.units.map(getUnitKey);
+      const selectableUnitKeys = category.units
+        .filter(isSelectableUnit)
+        .map(getUnitKey);
+
       if (checked) {
-        nextKeys.add(key);
+        if (isSelectableCategory(category)) {
+          nextKeys.add(categoryKey);
+        }
+        unitKeys.forEach((key) => nextKeys.delete(key));
+        selectableUnitKeys.forEach((key) => nextKeys.add(key));
       } else {
-        nextKeys.delete(key);
+        nextKeys.delete(categoryKey);
+        unitKeys.forEach((key) => nextKeys.delete(key));
       }
     });
 
@@ -422,4 +449,12 @@ export default function KuartersReviewTable({
       <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
     </>
   );
+}
+
+function isSelectableUnit(unit: ExtractedQuarterUnit) {
+  return !unit.isExisted && !unit.originalUnitId;
+}
+
+function isSelectableCategory(category: ExtractedQuarterRecord) {
+  return !category.categoryIsExisted && !category.originalCategoryId;
 }

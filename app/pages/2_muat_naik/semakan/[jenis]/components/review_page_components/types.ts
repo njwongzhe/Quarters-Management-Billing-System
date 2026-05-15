@@ -8,9 +8,15 @@ export type StatCard = {
   tone: "blue" | "green";
 };
 
+export type StatCardTemplate = Omit<StatCard, "value">;
+
 export type ReviewContent = {
   fileName: string;
   stats: StatCard[];
+};
+
+export type ReviewContentTemplate = {
+  stats: StatCardTemplate[];
 };
 
 export type VerifyingMode = "selected";

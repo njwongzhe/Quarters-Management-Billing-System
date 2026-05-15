@@ -55,10 +55,7 @@ export async function updateUploadedDocumentDraftForKind(
 
       if (kind === "bayaran" && extractResult?.documentType === "bayaran") {
         await updateBayaranDrafts(tx, uploadedDocumentId, extractResult);
-      } else if (
-        kind === "tunggakan" &&
-        extractResult?.documentType === "tunggakan"
-      ) {
+      } else if (kind === "tunggakan" && extractResult?.documentType === "tunggakan") {
         await updateTunggakanDrafts(tx, uploadedDocumentId, extractResult);
       } else if (kind === "penghuni" && extractResult?.documentType === "penghuni") {
         await updatePenghuniDrafts(tx, uploadedDocumentId, extractResult.records);

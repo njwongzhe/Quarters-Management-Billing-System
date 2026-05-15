@@ -16,6 +16,7 @@ import {
 import {
   type ExtractResult,
   type ProcessingDraft,
+  type ProcessingDraftSummary,
 } from "./components/extract-review-shared";
 import type { Category, ParsingMode } from "./components/types";
 
@@ -48,7 +49,7 @@ export default function MuatNaikPage() {
   const [processingError, setProcessingError] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingStage, setProcessingStage] = useState("");
-  const [processingDrafts, setProcessingDrafts] = useState<ProcessingDraft[]>(
+  const [processingDrafts, setProcessingDrafts] = useState<ProcessingDraftSummary[]>(
     [],
   );
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
@@ -98,6 +99,7 @@ export default function MuatNaikPage() {
     void loadProcessingDrafts();
   }, [activeDraftKind]);
 
+  // Cleanup on component unmount - abort any ongoing processing
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
@@ -148,7 +150,7 @@ export default function MuatNaikPage() {
 
     const progressTimer = window.setInterval(() => {
       setProcessingProgress((currentProgress) => {
-        if (currentProgress >= 88) {
+        if (currentProgress >= 99) {
           return currentProgress;
         }
 
@@ -236,7 +238,7 @@ export default function MuatNaikPage() {
     abortControllerRef.current?.abort();
   }
 
-  function handleContinueDraft(draft: ProcessingDraft) {
+  function handleContinueDraft(draft: ProcessingDraftSummary) {
     router.push(
       `${ROUTES.muatNaik}/semakan/${draft.kind}?draftId=${encodeURIComponent(draft.id)}`,
     );

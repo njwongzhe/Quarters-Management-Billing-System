@@ -81,6 +81,8 @@ export default function KuartersUnitPanel({
   onSaveUnit,
   onCancelEdit,
 }: KuartersUnitPanelProps) {
+  const hasSelectableUnits = units.some(isSelectableUnit);
+
   return (
     <div className="border-t border-light-grey/20 bg-white lg:border-l lg:border-t-0">
       <div className="flex items-center justify-between bg-background px-4 py-4 text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
@@ -91,7 +93,7 @@ export default function KuartersUnitPanel({
           type="checkbox"
           aria-label="Pilih semua unit kategori ini"
           checked={isAllSelected}
-          disabled={isSaving || units.length === 0}
+          disabled={isSaving || !hasSelectableUnits}
           className="h-4 w-4 accent-dark-blue"
           onChange={(event) => onToggleAllUnits(event.target.checked)}
         />
@@ -107,6 +109,7 @@ export default function KuartersUnitPanel({
           const unitKey = getUnitKey(unit);
           const isEditing = editingUnitKey === unitKey;
           const isSavingUnit = savingUnitKey === unitKey;
+          const isSelectable = isSelectableUnit(unit);
 
           return (
             <div
@@ -119,8 +122,8 @@ export default function KuartersUnitPanel({
             >
               <input
                 type="checkbox"
-                checked={selectedKeys.has(unitKey)}
-                disabled={isSaving}
+                checked={isSelectable && selectedKeys.has(unitKey)}
+                disabled={isSaving || !isSelectable}
                 className="h-4 w-4 accent-dark-blue"
                 onChange={(event) => onToggleUnit(unitKey, event.target.checked)}
               />
@@ -194,4 +197,8 @@ export default function KuartersUnitPanel({
       />
     </div>
   );
+}
+
+function isSelectableUnit(unit: ExtractedQuarterUnit) {
+  return !unit.isExisted && !unit.originalUnitId;
 }

@@ -386,8 +386,19 @@ export default function ExtractReviewPage({
         const failedMessages = Array.isArray(result?.data?.failedMessages)
           ? result.data.failedMessages
           : [];
+        const verifiedRows =
+          typeof result?.data?.verifiedRows === "number"
+            ? result.data.verifiedRows
+            : 0;
+        const noticeTone =
+          verifiedRows === 0
+            ? "error"
+            : failedMessages.length > 0
+              ? "info"
+              : "success";
+
         showVerificationNotice(
-          failedMessages.length > 0 ? "info" : "success",
+          noticeTone,
           result?.message ?? "Rekod dipilih berjaya disahkan.",
         );
       } else {
@@ -422,7 +433,7 @@ export default function ExtractReviewPage({
           onReviewLater={handleReviewLater}
         />
 
-        <StatCards stats={content.stats} />
+        <StatCards stats={content.stats} isLoading={isLoadingDraft} />
 
         <ReviewPreviewPanel
           kind={kind}

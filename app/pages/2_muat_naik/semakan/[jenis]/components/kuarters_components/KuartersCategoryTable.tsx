@@ -22,7 +22,7 @@ type KuartersCategoryTableProps = {
   displayEnd: number;
   onPageChange: (page: number) => void;
   onSelectCategory: (categoryId: string) => void;
-  onToggleCategory: (categoryKey: string, checked: boolean) => void;
+  onToggleCategory: (category: ExtractedQuarterRecord, checked: boolean) => void;
   onToggleAllCategories: (checked: boolean) => void;
   onStartEdit: (category: ExtractedQuarterRecord) => void;
   onUpdateDraft: (
@@ -160,6 +160,8 @@ export default function KuartersCategoryTable({
               const isEditing = editingCategoryId === category.id;
               const isSavingCategory = savingCategoryId === category.id;
               const canEditCategory = true;
+              const isSelectable =
+                !category.categoryIsExisted && !category.originalCategoryId;
 
               return (
                 <tr
@@ -178,12 +180,12 @@ export default function KuartersCategoryTable({
                   <td className="px-3 py-3.5">
                     <input
                       type="checkbox"
-                      checked={selectedKeys.has(selectionKey)}
-                      disabled={isSaving}
+                      checked={isSelectable && selectedKeys.has(selectionKey)}
+                      disabled={isSaving || !isSelectable}
                       className="h-4 w-4 accent-dark-blue"
                       onClick={(event) => event.stopPropagation()}
                       onChange={(event) =>
-                        onToggleCategory(selectionKey, event.target.checked)
+                        onToggleCategory(category, event.target.checked)
                       }
                     />
                   </td>
