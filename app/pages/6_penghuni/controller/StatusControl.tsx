@@ -25,7 +25,7 @@ export function resolveResidentStatusRules(
         };
     }
 
-    if (age === "60") {
+    if (Number(age) >= 60) {
         return {
             options: [{ label: "Tidak Layak", color: "text-x-layak" }],
             state: "inactive",
@@ -34,7 +34,7 @@ export function resolveResidentStatusRules(
         };
     }
 
-    if (age === "59") {
+    if (Number(age) === 59) {
         return {
             options: [
                 { label: "Pencen Mendatang", color: "text-pencen-datang" },
