@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 import {
+  findQuarterCategoryByDetails,
   findQuarterCategoryByNameAddress,
   findUnitByCategoryIdAndCode,
 } from "@/lib/uploaded-document/kuarters/queries";
@@ -28,14 +29,40 @@ export async function verifyKuartersDrafts(
       draft.categoryName,
       draft.address,
     );
+    const exactCategoryId = await findQuarterCategoryByDetails(
+      tx,
+      draft.categoryName,
+      draft.address,
+      draft.rentalPrice.toFixed(2),
+      draft.maintenancePrice.toFixed(2),
+      draft.penaltyPrice.toFixed(2),
+    );
 
     if (categorySelected) {
-      if (categoryId) {
+      if (exactCategoryId) {
         failedMessages.push(`Kategori ${draft.categoryName} telah wujud.`);
+        await tx.quarterCategoryDraft.update({
+          where: { id: draft.id },
+          data: { originalCategoryId: exactCategoryId },
+        });
+        categoryId = exactCategoryId;
+      } else if (categoryId) {
+        await tx.quarterCategory.update({
+          where: { id: categoryId },
+          data: {
+            categoryName: draft.categoryName,
+            address: draft.address,
+            rentalPrice: draft.rentalPrice,
+            maintenancePrice: draft.maintenancePrice,
+            penaltyPrice: draft.penaltyPrice,
+            uploadedDocumentId,
+          },
+        });
         await tx.quarterCategoryDraft.update({
           where: { id: draft.id },
           data: { originalCategoryId: categoryId },
         });
+        verifiedRows += 1;
       } else {
         const category = await tx.quarterCategory.create({
           data: {

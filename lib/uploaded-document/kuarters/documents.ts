@@ -5,6 +5,7 @@ import type {
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 import { prisma } from "@/lib/prisma";
 import {
+  findQuarterCategoryByDetails,
   findQuarterCategoryByNameAddress,
   findUnitByCategoryIdAndCode,
 } from "@/lib/uploaded-document/kuarters/queries";
@@ -31,6 +32,14 @@ export async function buildKuartersExtractResultFromDraftRows(
       category.categoryName,
       address,
     );
+    const exactCategoryId = await findQuarterCategoryByDetails(
+      prisma,
+      category.categoryName,
+      address,
+      category.rentalPrice.toFixed(2),
+      category.maintenancePrice.toFixed(2),
+      category.penaltyPrice.toFixed(2),
+    );
     const units: ExtractedQuarterUnit[] = [];
 
     for (const unit of category.units) {
@@ -50,7 +59,7 @@ export async function buildKuartersExtractResultFromDraftRows(
     records.push({
       id: category.id,
       categoryId: category.id,
-      categoryIsExisted: Boolean(originalCategoryId),
+      categoryIsExisted: Boolean(exactCategoryId),
       originalCategoryId: originalCategoryId || undefined,
       categoryName: category.categoryName,
       address,

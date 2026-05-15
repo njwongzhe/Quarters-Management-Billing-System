@@ -160,8 +160,7 @@ export default function KuartersCategoryTable({
               const isEditing = editingCategoryId === category.id;
               const isSavingCategory = savingCategoryId === category.id;
               const canEditCategory = true;
-              const isSelectable =
-                !category.categoryIsExisted && !category.originalCategoryId;
+              const isSelectable = !category.categoryIsExisted;
 
               return (
                 <tr
@@ -169,7 +168,7 @@ export default function KuartersCategoryTable({
                   data-kuarters-editor={isEditing ? "true" : undefined}
                   className={[
                     "border-t border-light-grey/20 transition-colors",
-                    category.categoryIsExisted || category.units.some((unit) => unit.isExisted)
+                    category.categoryIsExisted
                       ? "bg-amber-50"
                       : isSelected
                         ? "bg-dark-blue/3"

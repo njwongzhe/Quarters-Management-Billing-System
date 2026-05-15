@@ -456,5 +456,5 @@ function isSelectableUnit(unit: ExtractedQuarterUnit) {
 }
 
 function isSelectableCategory(category: ExtractedQuarterRecord) {
-  return !category.categoryIsExisted && !category.originalCategoryId;
+  return !category.categoryIsExisted;
 }
