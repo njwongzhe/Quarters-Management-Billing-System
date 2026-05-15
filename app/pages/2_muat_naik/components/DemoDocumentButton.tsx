@@ -1,10 +1,16 @@
 import Icon from "../../../components/Icon";
 import type { Category } from "./types";
 
-const kuartersSampleDocuments = [
-  "/sample-documents/Quarters_Sample.pdf",
-  "/sample-documents/Quarters_Sample.xlsx",
-];
+const sampleDocumentsByCategory: Partial<Record<Category, string[]>> = {
+  Penghuni: [
+    "/sample-documents/Penghuni_Sample.pdf",
+    "/sample-documents/Penghuni_Sample.xlsx",
+  ],
+  Kuarters: [
+    "/sample-documents/Quarters_Sample.pdf",
+    "/sample-documents/Quarters_Sample.xlsx",
+  ],
+};
 
 type DemoDocumentButtonProps = {
   activeCategory: Category;
@@ -13,14 +19,15 @@ type DemoDocumentButtonProps = {
 export default function DemoDocumentButton({
   activeCategory,
 }: DemoDocumentButtonProps) {
-  const canDownload = activeCategory === "Kuarters";
+  const sampleDocuments = sampleDocumentsByCategory[activeCategory] ?? [];
+  const canDownload = sampleDocuments.length > 0;
 
   function handleDownloadSamples() {
     if (!canDownload) {
       return;
     }
 
-    kuartersSampleDocuments.forEach((href) => {
+    sampleDocuments.forEach((href) => {
       const link = document.createElement("a");
       link.href = href;
       link.download = href.split("/").pop() ?? "";
