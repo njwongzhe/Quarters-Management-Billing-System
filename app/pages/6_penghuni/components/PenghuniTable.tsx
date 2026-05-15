@@ -142,11 +142,13 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     {/* Table Header */}
                     <thead>
                         <tr className="font-bold text-xs text-grey bg-background">
-                            <th className="text-left px-3 py-3">Penghuni</th>
-                            <th className="text-left px-3 py-3">Kuarters</th>
-                            <th className="text-left px-3 py-3">Perhubungan</th>
-                            <th className="text-right px-3 py-3">Tunggakan (RM)</th>
-                            <th className="text-center px-3 py-3">Tindakan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Penghuni</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Perhubungan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Pekerjaan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Taraf Perkhidmatan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Kuarters</th>
+                            <th className="text-right px-3 py-3 w-min whitespace-nowrap">Tunggakan (RM)</th>
+                            <th className="text-center px-3 py-3 w-min whitespace-nowrap">Tindakan</th>
                         </tr>
                     </thead>
                     
@@ -154,65 +156,75 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     <tbody className="bg-white">
                         {isLoading ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={6}>Sedang membaca data penghuni...</td>
+                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Sedang membaca data penghuni...</td>
                             </tr>
                         ) : errorMessage ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-red" colSpan={6}>{errorMessage}</td>
+                                <td className="px-3 py-4 text-center text-red" colSpan={7}>{errorMessage}</td>
                             </tr>
                         ) : residents.length === 0 ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={6}>Tiada data penghuni ditemui.</td>
+                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Tiada data penghuni ditemui.</td>
                             </tr>
                         ) : filteredResidents.length === 0 ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={6}>Tiada hasil mencari dengan penapis yang dipilih.</td>
+                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Tiada hasil mencari dengan penapis yang dipilih.</td>
                             </tr>
                         ) : (
                             // Render residents for the current page.
                             currentResidents.map((resident) => (
                                 <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20`}>
                                     {/* Penghuni */}
-                                    <td className="px-3 py-2 text-left">
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>{resident.fullName}</div>
                                         <div className={`font-extralight ${subTextSize} text-grey`}>
-                                            <PatternFormat value={resident.icNumber} format="######-##-####" disabled />
+                                            <PatternFormat value={resident.icNumber} format="######-##-####" displayType="text" disabled />
                                         </div>
                                     </td>
 
+                                    {/* Perhubungan */}
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                                        <div className={`font-bold ${mainTextSize}`}>
+                                            {resident.phone ? (
+                                                <PatternFormat value={resident.phone} format="###-#### ####" displayType="text" disabled />
+                                            ) : (
+                                                "N/A"
+                                            )}
+                                        </div>
+                                        <div className={`font-extralight ${subTextSize} text-grey w-min whitespace-nowrap`}>{resident.email ?? "N/A"}</div>
+                                    </td>
+
+                                    {/* Pekerjaan */}
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.position ?? "N/A"}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.department ?? "N/A"}</div>
+                                    </td>
+
+                                    {/* Taraf Perkhidmatan */}
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.serviceLevel ?? "N/A"}</div>
+                                    </td>
+
                                     {/* Kuarters */}
-                                    <td className="px-3 py-2 text-left">
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>{resident.quarters?.quarterName ?? "N/A"}</div>
                                         <div className={`font-extralight ${subTextSize} text-grey`}>{
                                             resident.quarters?.unitCode && resident.quarters?.address ? `${resident.quarters?.unitCode}, ${resident.quarters?.address}` : 
                                             resident.quarters?.unitCode ? `${resident.quarters?.unitCode}` :
                                             resident.quarters?.address ? `${resident.quarters?.address}` : 
                                              "N/A"
-                                            // resident.quarters?.address
                                         }</div>
                                     </td>
 
-                                    {/* Perhubungan */}
-                                    <td className="px-3 py-2 text-left">
-                                        <div className={`font-bold ${mainTextSize}`}>
-                                            {resident.phone ? (
-                                                <PatternFormat value={resident.phone} format="###-#### ####" disabled />
-                                            ) : (
-                                                "N/A"
-                                            )}
-                                        </div>
-                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.email ?? "N/A"}</div>
-                                    </td>
-                                    
                                     {/* Tunggakan */}
-                                    <td className="px-3 py-2 text-right">
+                                    <td className="px-3 py-2 text-right w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize} ${getArrearsTextClass(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}`}>
                                             {formatCurrency(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}
                                         </div>
                                     </td>
 
                                     {/* Tindakan */}
-                                    <td className="px-3 py-2 text-center align-middle w-px whitespace-nowrap">
+                                    <td className="px-3 py-2 text-center align-middle w-min whitespace-nowrap">
                                         <div className="flex items-center justify-center">
                                             <button
                                                 aria-label={`Lihat butiran ${resident.fullName}`}
@@ -232,7 +244,7 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     {!isLoading && filteredResidents.length > 0 && (
                         <tfoot>
                             <tr>
-                                <td colSpan={5} className="bg-white border-t border-light-grey/20 px-3 py-4">
+                                <td colSpan={7} className="bg-white border-t border-light-grey/20 px-3 py-4">
                                     <PaginationControls
                                         currentPage={currentPage}
                                         totalPages={totalPages}
