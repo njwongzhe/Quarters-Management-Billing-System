@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from extractor import (
     extract_bayaran_from_pdf,
     extract_kuarters_document,
-    extract_penghuni_from_xlsx,
+    extract_penghuni_document,
     extract_tunggakan_from_xlsx,
 )
 
@@ -76,17 +76,26 @@ def health() -> dict[str, str]:
 @app.post("/extract/penghuni")
 async def extract_penghuni(
     file: UploadFile = File(...),
+    parsing_mode: str = Query(default="strict", pattern="^(strict|assisted)$"),
     limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> dict:
-    if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="Sila muat naik fail .xlsx sahaja.")
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".pdf")):
+        raise HTTPException(
+            status_code=400,
+            detail="Sila muat naik fail .xlsx atau .pdf sahaja.",
+        )
 
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Fail kosong.")
 
     try:
-        return extract_penghuni_from_xlsx(file_bytes, limit=limit)
+        return extract_penghuni_document(
+            file_bytes,
+            file.filename,
+            parsing_mode=parsing_mode,
+            limit=limit,
+        )
     except Exception as error:
         raise HTTPException(
             status_code=422,

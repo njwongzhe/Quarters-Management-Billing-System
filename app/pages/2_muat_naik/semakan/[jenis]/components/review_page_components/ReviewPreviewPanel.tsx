@@ -5,9 +5,11 @@ import type {
   ExtractedQuarterRecord,
   ExtractedTunggakanRecord,
   KuartersExtractResult,
+  PenghuniExtractResult,
 } from "../../../../components/extract-review-shared";
 import ReviewTable from "./ReviewTable";
 import type { ReviewKind } from "./types";
+import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
 type ReviewPreviewPanelProps = {
   kind: ReviewKind;
@@ -19,7 +21,11 @@ type ReviewPreviewPanelProps = {
     totalAmount: string,
   ) => void;
   penghuniRecords: ExtractedPenghuniRecord[];
-  onPenghuniRecordsChange?: (records: ExtractedPenghuniRecord[]) => void;
+  penghuniParsingMode?: PenghuniExtractResult["parsingMode"];
+  onPenghuniRecordsChange?: (
+    records: ExtractedPenghuniRecord[],
+  ) => ExtractedPenghuniRecord | void | Promise<ExtractedPenghuniRecord | void>;
+  onPenghuniRecordDelete?: (record: ExtractedPenghuniRecord) => Promise<void>;
   kuartersRecords: ExtractedQuarterRecord[];
   kuartersParsingMode?: KuartersExtractResult["parsingMode"];
   onKuartersRecordsChange?: (records: ExtractedQuarterRecord[]) => Promise<void>;
@@ -43,6 +49,7 @@ type ReviewPreviewPanelProps = {
   ) => void;
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
+  onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
 };
 
 export default function ReviewPreviewPanel(props: ReviewPreviewPanelProps) {
@@ -57,10 +64,12 @@ export default function ReviewPreviewPanel(props: ReviewPreviewPanelProps) {
             Sila semak maklumat sebelum pengesahan.
           </p>
         </div>
-        {props.kind === "kuarters" ? (
+        {props.kind === "kuarters" || props.kind === "penghuni" ? (
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-extrabold">
             <span className="rounded border border-[#C9D6F2] bg-white px-3 py-1 text-dark-blue">
-              {props.kuartersParsingMode === "assisted"
+              {(props.kind === "kuarters"
+                ? props.kuartersParsingMode
+                : props.penghuniParsingMode) === "assisted"
                 ? "Mod Bantuan AI"
                 : "Mod Ketat"}
             </span>

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { PatternFormat } from "react-number-format";
 
 import Icon from "@/app/components/Icon";
+import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
+import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 import { PaginationControls, usePaginationLogic } from "@/app/pages/6_penghuni/controller/PaginationControl";
 import type { ExtractedPenghuniRecord } from "../../../../components/extract-review-shared";
 import { getPenghuniRecordKey } from "./helpers";
@@ -14,19 +16,26 @@ const subTextSize = "text-[11px]";
 
 type PenghuniReviewTableProps = {
   records: ExtractedPenghuniRecord[];
-  onRecordsChange?: (records: ExtractedPenghuniRecord[]) => void;
+  onRecordsChange?: (
+    records: ExtractedPenghuniRecord[],
+  ) => ExtractedPenghuniRecord | void | Promise<ExtractedPenghuniRecord | void>;
+  onRecordDelete?: (record: ExtractedPenghuniRecord) => void | Promise<void>;
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
+  onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
 };
 
 export default function PenghuniReviewTable({
   records,
   onRecordsChange,
+  onRecordDelete,
   selectedKeys = [],
   onSelectedKeysChange,
+  onNotice,
 }: PenghuniReviewTableProps) {
   const [selectedResident, setSelectedResident] =
     useState<ExtractedPenghuniRecord | null>(null);
+  const [notice, setNotice] = useState<KuartersNotice | null>(null);
   const itemsPerPage = 10;
   const {
     currentPage,
@@ -38,9 +47,25 @@ export default function PenghuniReviewTable({
   } = usePaginationLogic(records.length, itemsPerPage);
   const currentRecords = records.slice(startIndex, endIndex);
   const selectedKeySet = new Set(selectedKeys);
-  const allRecordKeys = records.map(getPenghuniRecordKey);
+  const selectableRecordKeys = records
+    .filter((record) => !record.isExisted)
+    .map(getPenghuniRecordKey);
+  const selectableRecordKeySet = new Set(selectableRecordKeys);
+  const selectedSelectableKeys = selectedKeys.filter((key) =>
+    selectableRecordKeySet.has(key),
+  );
   const isAllSelected =
-    allRecordKeys.length > 0 && allRecordKeys.every((key) => selectedKeySet.has(key));
+    selectableRecordKeys.length > 0 &&
+    selectableRecordKeys.every((key) => selectedKeySet.has(key));
+  const isPartiallySelected =
+    selectedSelectableKeys.length > 0 && !isAllSelected;
+
+  const showNotice = (tone: KuartersNotice["tone"], message: string) => {
+    if (!onNotice) {
+      setNotice({ tone, message });
+    }
+    onNotice?.(tone, message);
+  };
 
   const toggleSelectedRow = (key: string, checked: boolean) => {
     const nextKeys = new Set(selectedKeys);
@@ -57,7 +82,7 @@ export default function PenghuniReviewTable({
   const toggleAllRows = (checked: boolean) => {
     const nextKeys = new Set(selectedKeys);
 
-    allRecordKeys.forEach((key) => {
+    selectableRecordKeys.forEach((key) => {
       if (checked) {
         nextKeys.add(key);
       } else {
@@ -68,15 +93,50 @@ export default function PenghuniReviewTable({
     onSelectedKeysChange?.([...nextKeys]);
   };
 
-  const saveResident = (updatedResident: ExtractedPenghuniRecord) => {
+  const saveResident = async (updatedResident: ExtractedPenghuniRecord) => {
+    const updatedResidentKey = getPenghuniRecordKey(updatedResident);
+    const updatedIc = normalizeIc(updatedResident.noKadPengenalan);
+    const duplicateRecord = records.find(
+      (record) =>
+        getPenghuniRecordKey(record) !== updatedResidentKey &&
+        normalizeIc(record.noKadPengenalan) === updatedIc,
+    );
+
+    if (duplicateRecord) {
+      showNotice(
+        "error",
+        `No. K/P ${updatedResident.noKadPengenalan} telah wujud dalam dokumen ini.`,
+      );
+      throw new Error(`No. K/P ${updatedResident.noKadPengenalan} telah wujud dalam dokumen ini.`);
+    }
+
     const updatedRecords = records.map((record) =>
-      getPenghuniRecordKey(record) === getPenghuniRecordKey(updatedResident)
+      getPenghuniRecordKey(record) === updatedResidentKey
         ? updatedResident
         : record,
     );
 
-    onRecordsChange?.(updatedRecords);
-    setSelectedResident(updatedResident);
+    const savedResident = await onRecordsChange?.(updatedRecords);
+    setSelectedResident(savedResident ?? updatedResident);
+    if (!onNotice) {
+      showNotice("success", "Rekod penghuni berjaya dikemas kini.");
+    }
+  };
+
+  const deleteResident = async (resident: ExtractedPenghuniRecord) => {
+    const residentKey = getPenghuniRecordKey(resident);
+
+    if (onRecordDelete) {
+      await onRecordDelete(resident);
+    } else {
+      const nextRecords = records.filter(
+        (record) => getPenghuniRecordKey(record) !== residentKey,
+      );
+      await onRecordsChange?.(nextRecords);
+      showNotice("success", "Rekod penghuni berjaya dipadam.");
+    }
+
+    onSelectedKeysChange?.(selectedKeys.filter((key) => key !== residentKey));
   };
 
   return (
@@ -90,6 +150,12 @@ export default function PenghuniReviewTable({
                   type="checkbox"
                   aria-label="Pilih semua rekod penghuni"
                   checked={isAllSelected}
+                  ref={(input) => {
+                    if (input) {
+                      input.indeterminate = isPartiallySelected;
+                    }
+                  }}
+                  disabled={selectableRecordKeys.length === 0}
                   className="h-4 w-4 accent-dark-blue"
                   onChange={(event) => toggleAllRows(event.target.checked)}
                 />
@@ -118,19 +184,28 @@ export default function PenghuniReviewTable({
             ) : (
               currentRecords.map((resident) => {
                 const recordKey = getPenghuniRecordKey(resident);
+                const isSelectable = !resident.isExisted;
 
                 return (
                   <tr
                     key={recordKey}
-                    className="text-sm border-l-4 border-transparent border-b border-b-light-grey/20"
+                    className={[
+                      "text-sm border-l-4 border-b border-b-light-grey/20",
+                      resident.isExisted
+                        ? "border-amber-400 bg-amber-50"
+                        : "border-transparent",
+                    ].join(" ")}
                   >
                     <td className="px-3 py-2 text-left w-10 whitespace-nowrap">
                       <input
                         type="checkbox"
-                        checked={selectedKeySet.has(recordKey)}
-                        className="h-4 w-4 accent-dark-blue"
+                        checked={isSelectable && selectedKeySet.has(recordKey)}
+                        disabled={!isSelectable}
+                        className="h-4 w-4 accent-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
                         onChange={(event) =>
-                          toggleSelectedRow(recordKey, event.target.checked)
+                          isSelectable
+                            ? toggleSelectedRow(recordKey, event.target.checked)
+                            : undefined
                         }
                       />
                     </td>
@@ -157,7 +232,7 @@ export default function PenghuniReviewTable({
                         )}
                       </div>
                       <div className={`font-extralight ${subTextSize} text-grey`}>
-                        N/A
+                        {resident.gmail || "N/A"}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-left w-min whitespace-nowrap">
@@ -226,7 +301,12 @@ export default function PenghuniReviewTable({
           resident={selectedResident}
           onClose={() => setSelectedResident(null)}
           onSave={saveResident}
+          onDelete={deleteResident}
+          onNotice={showNotice}
         />
+      ) : null}
+      {!onNotice ? (
+        <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
       ) : null}
     </div>
   );
@@ -238,4 +318,8 @@ function formatQuarterAddress(resident: ExtractedPenghuniRecord) {
   }
 
   return resident.unit || resident.alamatKuarters || "N/A";
+}
+
+function normalizeIc(value: string) {
+  return value.replace(/\D/g, "");
 }

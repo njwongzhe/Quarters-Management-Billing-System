@@ -9,6 +9,7 @@ import KuartersReviewTable from "../kuarters_components";
 import PenghuniReviewTable from "../penghuni_components";
 import TunggakanReviewTable from "../tunggakan_components";
 import type { ReviewKind } from "./types";
+import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
 type ReviewTableProps = {
   kind: ReviewKind;
@@ -19,7 +20,10 @@ type ReviewTableProps = {
     totalAmount: string,
   ) => void;
   penghuniRecords: ExtractedPenghuniRecord[];
-  onPenghuniRecordsChange?: (records: ExtractedPenghuniRecord[]) => void;
+  onPenghuniRecordsChange?: (
+    records: ExtractedPenghuniRecord[],
+  ) => ExtractedPenghuniRecord | void | Promise<ExtractedPenghuniRecord | void>;
+  onPenghuniRecordDelete?: (record: ExtractedPenghuniRecord) => Promise<void>;
   kuartersRecords: ExtractedQuarterRecord[];
   onKuartersRecordsChange?: (records: ExtractedQuarterRecord[]) => Promise<void>;
   onKuartersCategoryChange?: (params: {
@@ -42,6 +46,7 @@ type ReviewTableProps = {
   ) => void;
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
+  onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
 };
 
 export default function ReviewTable({
@@ -51,6 +56,7 @@ export default function ReviewTable({
   onBayaranRecordsChange,
   penghuniRecords,
   onPenghuniRecordsChange,
+  onPenghuniRecordDelete,
   kuartersRecords,
   onKuartersRecordsChange,
   onKuartersCategoryChange,
@@ -59,6 +65,7 @@ export default function ReviewTable({
   onTunggakanRecordsChange,
   selectedKeys,
   onSelectedKeysChange,
+  onNotice,
 }: ReviewTableProps) {
   if (kind === "bayaran") {
     return (
@@ -98,8 +105,10 @@ export default function ReviewTable({
       <PenghuniReviewTable
         records={penghuniRecords}
         onRecordsChange={onPenghuniRecordsChange}
+        onRecordDelete={onPenghuniRecordDelete}
         selectedKeys={selectedKeys}
         onSelectedKeysChange={onSelectedKeysChange}
+        onNotice={onNotice}
       />
     );
   }

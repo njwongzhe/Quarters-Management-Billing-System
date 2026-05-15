@@ -8,6 +8,7 @@ import {
   findResidentByNormalizedIc,
   rawData,
 } from "@/lib/uploaded-document/shared";
+import { findExactPenghuniMatch } from "@/lib/uploaded-document/penghuni/queries";
 
 export async function createPendingPenghuniRows(
   tx: Prisma.TransactionClient,
@@ -25,18 +26,20 @@ export async function createPendingPenghuniRows(
       tx,
       record.noKadPengenalan,
     );
+    const exactMatch = await findExactPenghuniMatch(tx, record);
+    const originalResidentId = exactMatch?.residentId || residentId || null;
     const draft = await tx.residentDraft.create({
       data: {
         fullName: record.nama,
         icNumber: record.noKadPengenalan.trim(),
         phone: record.perhubungan || null,
+        email: record.gmail || null,
         position: record.pekerjaan || null,
         department: record.jabatan || null,
         serviceLevel: record.tarafPerkhidmatan || null,
         description: record.alamatKuarters || null,
         uploadedDocumentId,
-        originalResidentId: residentId || null,
-        isExisted: Boolean(residentId),
+        originalResidentId,
         rawData: rawData(record),
       },
     });
@@ -44,8 +47,8 @@ export async function createPendingPenghuniRows(
     records.push({
       ...record,
       residentId: draft.id,
-      originalResidentId: residentId || undefined,
-      isExisted: draft.isExisted,
+      originalResidentId: originalResidentId ?? undefined,
+      isExisted: Boolean(exactMatch),
     });
   }
 

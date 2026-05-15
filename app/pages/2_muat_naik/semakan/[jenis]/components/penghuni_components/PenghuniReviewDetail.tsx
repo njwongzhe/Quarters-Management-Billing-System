@@ -14,26 +14,23 @@ import type { ExtractedPenghuniRecord } from "../../../../components/extract-rev
 type PenghuniReviewDetailProps = {
   resident: ExtractedPenghuniRecord;
   onClose: () => void;
-  onSave: (resident: ExtractedPenghuniRecord) => void;
-};
-
-type NotificationState = {
-  type: "success" | "error" | null;
-  message: string;
+  onSave: (resident: ExtractedPenghuniRecord) => void | Promise<void>;
+  onDelete: (resident: ExtractedPenghuniRecord) => void | Promise<void>;
+  onNotice?: (tone: "success" | "error" | "info", message: string) => void;
 };
 
 export default function PenghuniReviewDetail({
   resident,
   onClose,
   onSave,
+  onDelete,
+  onNotice,
 }: PenghuniReviewDetailProps) {
   const [kemasKini, setKemasKini] = useState(false);
   const [formData, setFormData] = useState(resident);
   const [originalData, setOriginalData] = useState(resident);
-  const [notification, setNotification] = useState<NotificationState>({
-    type: null,
-    message: "",
-  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const inputState = kemasKini ? "active" : "inactive";
   const isInactive = inputState === "inactive";
 
@@ -45,40 +42,68 @@ export default function PenghuniReviewDetail({
     return value;
   };
 
-  const showNotification = (type: "success" | "error", message: string) => {
-    setNotification({ type, message });
-    window.setTimeout(() => setNotification({ type: null, message: "" }), 3000);
-  };
-
   const updateField = (field: keyof ExtractedPenghuniRecord, value: string) => {
     setFormData((current) => ({ ...current, [field]: value }));
   };
 
-  const handleSave = () => {
-    if (!formData.nama.trim() || !formData.noKadPengenalan.trim()) {
-      showNotification("error", "Nama dan No. K/P perlu diisi.");
+  const showNotice = (tone: "success" | "error" | "info", message: string) => {
+    onNotice?.(tone, message);
+  };
+
+  const handleSave = async () => {
+    if (isSaving) {
       return;
     }
 
-    onSave(formData);
-    setOriginalData(formData);
-    setKemasKini(false);
-    showNotification("success", "Perubahan penghuni berjaya disimpan.");
+    if (!formData.nama.trim() || !formData.noKadPengenalan.trim()) {
+      showNotice("error", "Nama dan No. K/P perlu diisi.");
+      return;
+    }
+
+    if (formData.gmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.gmail)) {
+      showNotice("error", "Format Gmail tidak sah.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await onSave(formData);
+      setOriginalData(formData);
+      setKemasKini(false);
+      showNotice("success", "Perubahan penghuni berjaya disimpan.");
+    } catch (error) {
+      showNotice(
+        "error",
+        error instanceof Error ? error.message : "Gagal menyimpan perubahan penghuni.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      await onDelete(resident);
+      onClose();
+    } catch (error) {
+      showNotice(
+        "error",
+        error instanceof Error ? error.message : "Gagal memadam rekod penghuni.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
     <div>
-      {notification.type ? (
-        <div
-          className={`fixed bottom-8 z-55 px-6 py-3 rounded-lg shadow-lg text-white flex items-center gap-3 animate-in fade-in duration-300 ${
-            notification.type === "success" ? "bg-green" : "bg-red"
-          }`}
-        >
-          <Icon icon={notification.type === "success" ? "check" : "close"} size={18} />
-          <span className="text-sm font-medium">{notification.message}</span>
-        </div>
-      ) : null}
-
       <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
         <div className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full">
           <div className="bg-dark-blue p-6 flex items-center justify-between">
@@ -144,6 +169,13 @@ export default function PenghuniReviewDetail({
                     value={displayValue(formData.perhubungan)}
                     state={inputState}
                     onChange={(value) => updateField("perhubungan", value)}
+                    className="col-span-1"
+                  />
+                  <InputField
+                    label="GMAIL"
+                    value={displayValue(formData.gmail)}
+                    state={inputState}
+                    onChange={(value) => updateField("gmail", value)}
                     className="col-span-1"
                   />
                 </div>
@@ -255,9 +287,21 @@ export default function PenghuniReviewDetail({
                   </div>
                   <div className="flex gap-3 w-xs">
                     <button
-                      className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-dark-blue px-5 py-3 rounded-md hover:bg-dark-blue/90"
+                      className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90 disabled:cursor-not-allowed disabled:opacity-60"
                       type="button"
-                      onClick={() => setKemasKini(true)}
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      <Icon icon="delete" size={16} />
+                      {isDeleting ? "Sedang Padam..." : "Padam Rekod"}
+                    </button>
+                    <button
+                      className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-dark-blue px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={() => {
+                        setKemasKini(true);
+                      }}
                     >
                       <Icon icon="edit" size={16} />
                       Kemas Kini
@@ -274,6 +318,7 @@ export default function PenghuniReviewDetail({
                     <button
                       className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90"
                       type="button"
+                      disabled={isSaving}
                       onClick={() => {
                         setFormData(originalData);
                         setKemasKini(false);
@@ -283,12 +328,13 @@ export default function PenghuniReviewDetail({
                       Batal
                     </button>
                     <button
-                      className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90"
+                      className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
                       type="button"
+                      disabled={isSaving}
                       onClick={handleSave}
                     >
-                      <Icon icon="save" size={16} />
-                      Simpan Rekod
+                      <Icon icon={isSaving ? "progress_activity" : "save"} size={16} />
+                      {isSaving ? "Menyimpan..." : "Simpan Rekod"}
                     </button>
                   </div>
                 </div>

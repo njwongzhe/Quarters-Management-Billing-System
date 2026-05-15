@@ -12,20 +12,19 @@ export type ExtractedPenghuniRecord = {
   unit: string;
   alamatKuarters: string;
   perhubungan: string;
+  gmail?: string;
   pekerjaan: string;
   jabatan: string;
   tarafPerkhidmatan?: string;
   tarikhMasuk?: string;
   tarikhKeluar?: string;
-  sewaBulanan?: string;
   catatan?: string;
-  sourceSheet: string;
-  sourceRow: number;
 };
 
 export type PenghuniExtractResult = {
   documentType: "penghuni";
   recordCount: number;
+  parsingMode?: "strict" | "assisted";
   records: ExtractedPenghuniRecord[];
 };
 

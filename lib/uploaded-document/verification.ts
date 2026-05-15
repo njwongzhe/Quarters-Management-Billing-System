@@ -20,6 +20,7 @@ export type VerifyKind = ExtractResult["documentType"];
 export type VerifyResult = {
   verifiedRows: number;
   failedMessages: string[];
+  successMessages?: string[];
 };
 
 export type UploadedDocumentVerificationResult = VerifyResult & {
@@ -96,15 +97,20 @@ export async function verifyUploadedDocumentForKind(
   );
 
   const remainingDraft = await mapUploadedDocumentForReview(result.document);
+  const successSuffix =
+    result.successMessages && result.successMessages.length > 0
+      ? ` ${result.successMessages.join(" ")}`
+      : "";
   const failedSuffix =
     result.failedMessages.length > 0 ? ` ${result.failedMessages.join(" ")}` : "";
 
   return {
     verifiedRows: result.verifiedRows,
     failedMessages: result.failedMessages,
+    successMessages: result.successMessages,
     message:
       result.verifiedRows > 0
-        ? `Data berjaya disahkan.${failedSuffix}`
+        ? `Data berjaya disahkan.${successSuffix}${failedSuffix}`
         : `Tiada rekod baharu disahkan.${failedSuffix}`,
     remainingExtractResult: remainingDraft?.extractResult ?? null,
   };
@@ -139,6 +145,7 @@ export function createUploadedDocumentVerifyHandler(kind: VerifyKind) {
         data: {
           remainingExtractResult: result.remainingExtractResult,
           failedMessages: result.failedMessages,
+          successMessages: result.successMessages ?? [],
           verifiedRows: result.verifiedRows,
         },
       });

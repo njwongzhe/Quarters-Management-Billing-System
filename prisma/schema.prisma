@@ -428,7 +428,6 @@ model ResidentDraft {
   description        String?
   uploadedDocumentId String         @db.Uuid
   originalResidentId String?        @db.Uuid
-  isExisted          Boolean        @default(false)
   rawData            Json?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
@@ -437,7 +436,6 @@ model ResidentDraft {
 
   @@index([uploadedDocumentId])
   @@index([icNumber])
-  @@index([isExisted])
 }
 
 model QuarterCategoryDraft {

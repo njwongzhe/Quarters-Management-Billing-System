@@ -12,7 +12,11 @@ import {
   updateKuartersDrafts,
   updateKuartersUnitDraft,
 } from "@/lib/uploaded-document/kuarters/draft-updates";
-import { updatePenghuniDrafts } from "@/lib/uploaded-document/penghuni/draft-updates";
+import {
+  deletePenghuniDraft,
+  updatePenghuniDraft,
+  updatePenghuniDrafts,
+} from "@/lib/uploaded-document/penghuni/draft-updates";
 import { updateTunggakanDrafts } from "@/lib/uploaded-document/tunggakan/draft-updates";
 
 const uploadedDocumentTransactionOptions = {
@@ -37,6 +41,7 @@ export async function updateUploadedDocumentDraftForKind(
     action?: string;
     extractResult?: ExtractResult;
   };
+  let updatedPenghuniRecord: unknown = null;
 
   const document = await prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
@@ -57,8 +62,25 @@ export async function updateUploadedDocumentDraftForKind(
         await updateBayaranDrafts(tx, uploadedDocumentId, extractResult);
       } else if (kind === "tunggakan" && extractResult?.documentType === "tunggakan") {
         await updateTunggakanDrafts(tx, uploadedDocumentId, extractResult);
-      } else if (kind === "penghuni" && extractResult?.documentType === "penghuni") {
-        await updatePenghuniDrafts(tx, uploadedDocumentId, extractResult.records);
+      } else if (kind === "penghuni") {
+        if (action === "update-penghuni-record") {
+          const record =
+            "record" in payload ? (payload as { record?: unknown }).record : null;
+
+          if (!record || typeof record !== "object" || Array.isArray(record)) {
+            throw new Error("Data penghuni tidak lengkap.");
+          }
+
+          updatedPenghuniRecord = await updatePenghuniDraft(
+            tx,
+            uploadedDocumentId,
+            record as Parameters<typeof updatePenghuniDraft>[2],
+          );
+        } else if (extractResult?.documentType === "penghuni") {
+          await updatePenghuniDrafts(tx, uploadedDocumentId, extractResult.records);
+        } else {
+          throw new Error("Data ekstrak penghuni tidak lengkap.");
+        }
       } else if (kind === "kuarters") {
         if (action === "update-kuarters-category") {
           await updateKuartersCategoryDraft(tx, uploadedDocumentId, payload);
@@ -86,25 +108,81 @@ export async function updateUploadedDocumentDraftForKind(
     uploadedDocumentTransactionOptions,
   );
 
+  if (updatedPenghuniRecord) {
+    return { record: updatedPenghuniRecord };
+  }
+
   return mapUploadedDocumentForReview(document);
 }
 
 export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) {
   return async function PATCH(request: Request, context: DraftUpdateRouteContext) {
     try {
-      const currentAdmin = await getCurrentAdmin();
       const { id } = await context.params;
       const body = await request.json();
-      const document = await updateUploadedDocumentDraftForKind(
+      const payload = body && typeof body === "object" ? body : {};
+
+      if (
+        kind === "penghuni" &&
+        "action" in payload &&
+        ((payload as { action?: unknown }).action === "update-penghuni-record" ||
+          (payload as { action?: unknown }).action === "delete-penghuni-record")
+      ) {
+        await getCurrentAdmin();
+        const action = (payload as { action?: unknown }).action;
+
+        if (action === "delete-penghuni-record") {
+          const residentId =
+            "residentId" in payload
+              ? (payload as { residentId?: unknown }).residentId
+              : null;
+
+          if (typeof residentId !== "string") {
+            throw new Error("Rekod penghuni tidak ditemui.");
+          }
+
+          await deletePenghuniDraft(prisma, id, residentId);
+
+          return NextResponse.json({
+            success: true,
+            data: { deletedResidentId: residentId },
+          });
+        }
+
+        const record =
+          "record" in payload ? (payload as { record?: unknown }).record : null;
+
+        if (!record || typeof record !== "object" || Array.isArray(record)) {
+          throw new Error("Data penghuni tidak lengkap.");
+        }
+
+        const updatedRecord = await updatePenghuniDraft(
+          prisma,
+          id,
+          record as Parameters<typeof updatePenghuniDraft>[2],
+        );
+
+        return NextResponse.json({
+          success: true,
+          data: { record: updatedRecord },
+        });
+      }
+
+      const currentAdmin = await getCurrentAdmin();
+      const updateResult = await updateUploadedDocumentDraftForKind(
         kind,
         id,
-        body,
+        payload,
         currentAdmin,
       );
+      const data =
+        updateResult && typeof updateResult === "object" && "record" in updateResult
+          ? updateResult
+          : { document: updateResult };
 
       return NextResponse.json({
         success: true,
-        data: { document },
+        data,
       });
     } catch (error) {
       return NextResponse.json(

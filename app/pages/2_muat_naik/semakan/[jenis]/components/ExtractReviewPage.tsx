@@ -227,6 +227,48 @@ export default function ExtractReviewPage({
       return;
     }
 
+    const changedRecord = findSingleChangedPenghuniRecord(
+      penghuniExtract.records,
+      records,
+    );
+
+    if (changedRecord === "unchanged") {
+        showVerificationNotice("success", "Tiada perubahan baharu untuk disimpan.");
+        return;
+      }
+
+    if (changedRecord) {
+      const response = await fetch(draftUpdateRouteByKind.penghuni(draftId), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "update-penghuni-record",
+          record: changedRecord,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && result?.data?.record) {
+        const updatedRecord = result.data.record as ExtractedPenghuniRecord;
+        setExtractResult({
+          ...penghuniExtract,
+          records: penghuniExtract.records.map((record) =>
+            getPenghuniRecordKey(record) === getPenghuniRecordKey(updatedRecord)
+              ? updatedRecord
+              : record,
+          ),
+        });
+        showVerificationNotice("success", "Perubahan penghuni berjaya disimpan.");
+        return updatedRecord;
+      }
+
+      const message = result?.message ?? "Gagal menyimpan perubahan penghuni.";
+      showVerificationNotice("error", message);
+      throw new Error(message);
+    }
+
     const nextExtract = {
       ...penghuniExtract,
       recordCount: records.length,
@@ -246,13 +288,50 @@ export default function ExtractReviewPage({
 
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
+      showVerificationNotice("success", "Perubahan penghuni berjaya disimpan.");
       return;
     }
 
-    showVerificationNotice(
-      "error",
-      result?.message ?? "Gagal menyimpan perubahan penghuni.",
+    const message = result?.message ?? "Gagal menyimpan perubahan penghuni.";
+    showVerificationNotice("error", message);
+    throw new Error(message);
+  };
+
+  const deletePenghuniDraft = async (record: ExtractedPenghuniRecord) => {
+    if (!penghuniExtract || !draftId || !record.residentId) {
+      throw new Error("Rekod penghuni tidak ditemui.");
+    }
+
+    const response = await fetch(draftUpdateRouteByKind.penghuni(draftId), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "delete-penghuni-record",
+        residentId: record.residentId,
+      }),
+    });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message = result?.message ?? "Gagal memadam rekod penghuni.";
+      showVerificationNotice("error", message);
+      throw new Error(message);
+    }
+
+    const recordKey = getPenghuniRecordKey(record);
+    setExtractResult({
+      ...penghuniExtract,
+      recordCount: Math.max(0, penghuniExtract.recordCount - 1),
+      records: penghuniExtract.records.filter(
+        (currentRecord) => getPenghuniRecordKey(currentRecord) !== recordKey,
+      ),
+    });
+    setSelectedRecordKeys((currentKeys) =>
+      currentKeys.filter((key) => key !== recordKey),
     );
+    showVerificationNotice("success", "Rekod penghuni berjaya dipadam.");
   };
 
   const updateCurrentKuartersDraft = async (records: ExtractedQuarterRecord[]) => {
@@ -478,7 +557,9 @@ export default function ExtractReviewPage({
           onBayaranTotalAmountChange={setBayaranEditedTotalAmount}
           onBayaranRecordsChange={updateCurrentBayaranDraft}
           penghuniRecords={penghuniExtract?.records ?? []}
+          penghuniParsingMode={penghuniExtract?.parsingMode}
           onPenghuniRecordsChange={updateCurrentPenghuniDraft}
+          onPenghuniRecordDelete={deletePenghuniDraft}
           kuartersRecords={kuartersExtract?.records ?? []}
           kuartersParsingMode={kuartersExtract?.parsingMode}
           onKuartersRecordsChange={updateCurrentKuartersDraft}
@@ -488,6 +569,7 @@ export default function ExtractReviewPage({
           onTunggakanRecordsChange={updateCurrentTunggakanDraft}
           selectedKeys={selectedRecordKeys}
           onSelectedKeysChange={setSelectedRecordKeys}
+          onNotice={showVerificationNotice}
         />
 
         <ReviewActions
@@ -496,10 +578,41 @@ export default function ExtractReviewPage({
         />
 
         <KuartersFeedbackBanner
-          notice={kind === "kuarters" ? verificationNotice : null}
+          notice={verificationNotice}
           onDismiss={clearVerificationNotice}
         />
       </div>
     </section>
   );
+}
+
+function getPenghuniRecordKey(record: ExtractedPenghuniRecord) {
+  return record.residentId ?? record.noKadPengenalan;
+}
+
+function findSingleChangedPenghuniRecord(
+  currentRecords: ExtractedPenghuniRecord[],
+  nextRecords: ExtractedPenghuniRecord[],
+) {
+  if (currentRecords.length !== nextRecords.length) {
+    return null;
+  }
+
+  const currentByKey = new Map(
+    currentRecords.map((record) => [getPenghuniRecordKey(record), record]),
+  );
+  const changedRecords = nextRecords.filter((record) => {
+    const currentRecord = currentByKey.get(getPenghuniRecordKey(record));
+
+    return (
+      currentRecord &&
+      JSON.stringify(currentRecord) !== JSON.stringify(record)
+    );
+  });
+
+  if (changedRecords.length === 0) {
+    return "unchanged";
+  }
+
+  return changedRecords.length === 1 ? changedRecords[0] : null;
 }
