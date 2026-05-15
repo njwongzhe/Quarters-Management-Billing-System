@@ -464,6 +464,8 @@ def _resident_from_row_with_issues(
 
 
 def _build_response(sheet_names: list[str], residents: list[ExtractedResident]) -> dict:
+    residents = _dedupe_residents(residents)
+
     return {
         "documentType": "penghuni",
         "recordCount": len(residents),
@@ -717,13 +719,20 @@ def _dedupe_residents(residents: list[ExtractedResident]) -> list[ExtractedResid
     seen: set[str] = set()
 
     for resident in residents:
-        key = "|".join(str(value) for value in resident.to_response().values())
+        key = "|".join(
+            _normalize_dedupe_value(str(value))
+            for value in resident.to_response().values()
+        )
         if key in seen:
             continue
         seen.add(key)
         deduped.append(resident)
 
     return deduped
+
+
+def _normalize_dedupe_value(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().upper()
 
 
 def _merge_pdf_continuation_rows(rows: list[list[str]]) -> list[list[str]]:

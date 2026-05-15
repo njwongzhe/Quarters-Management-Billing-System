@@ -322,6 +322,7 @@ def _find_quarter_header_row(rows: list[list[str]]) -> int | None:
 
 
 def _build_quarters_response(categories: list[ExtractedQuarterCategory]) -> dict:
+    categories = _dedupe_quarters_categories(categories)
     total_units = sum(len(category.units) for category in categories)
 
     return {
@@ -369,6 +370,7 @@ def _validate_kuarters_response(response: dict) -> dict:
             errors.append(f"Rekod {index}: sekurang-kurangnya satu unit diperlukan.")
             continue
 
+        unique_units = []
         for unit in units:
             unit_code = str(unit.get("unitCode", "")).strip()
             unit["address"] = _fallback_address(str(unit.get("address", "")).strip() or address)
@@ -383,14 +385,60 @@ def _validate_kuarters_response(response: dict) -> dict:
             if not unit_code:
                 errors.append(f"Rekod {index}: kod unit diperlukan.")
             elif unit_key in seen_units:
-                errors.append(f"Rekod {index}: unit pendua dalam dokumen ({unit_code}).")
+                continue
             else:
                 seen_units.add(unit_key)
+                unique_units.append(unit)
+
+        record["units"] = unique_units
+
+        if len(unique_units) == 0:
+            errors.append(f"Rekod {index}: sekurang-kurangnya satu unit diperlukan.")
 
     if errors:
         raise ValueError(" ".join(errors[:5]))
 
     return response
+
+
+def _dedupe_quarters_categories(
+    categories: list[ExtractedQuarterCategory],
+) -> list[ExtractedQuarterCategory]:
+    deduped_categories: list[ExtractedQuarterCategory] = []
+
+    for category in categories:
+        seen_units: set[str] = set()
+        unique_units: list[ExtractedQuarterUnit] = []
+
+        for unit in category.units:
+            unit_key = "|".join(
+                [
+                    clean_header(category.categoryName),
+                    clean_header(category.address),
+                    clean_header(unit.unitCode),
+                ]
+            )
+
+            if unit_key in seen_units:
+                continue
+
+            seen_units.add(unit_key)
+            unique_units.append(unit)
+
+        if unique_units:
+            deduped_categories.append(
+                ExtractedQuarterCategory(
+                    id=category.id,
+                    categoryName=category.categoryName,
+                    address=category.address,
+                    rentalPrice=category.rentalPrice,
+                    maintenancePrice=category.maintenancePrice,
+                    penaltyPrice=category.penaltyPrice,
+                    units=unique_units,
+                )
+            )
+
+    return deduped_categories
 
 
 def _is_valid_money(value: str) -> bool:

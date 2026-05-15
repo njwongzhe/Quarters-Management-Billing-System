@@ -43,10 +43,11 @@ type ReviewPreviewPanelProps = {
     unitCode: string;
   }) => Promise<void>;
   tunggakanRecords: ExtractedTunggakanRecord[];
+  tunggakanParsingMode?: "strict" | "assisted";
   onTunggakanRecordsChange?: (
     records: ExtractedTunggakanRecord[],
     totalAmount: string,
-  ) => void;
+  ) => ExtractedTunggakanRecord | void | Promise<ExtractedTunggakanRecord | void>;
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
   onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
@@ -64,12 +65,14 @@ export default function ReviewPreviewPanel(props: ReviewPreviewPanelProps) {
             Sila semak maklumat sebelum pengesahan.
           </p>
         </div>
-        {props.kind === "kuarters" || props.kind === "penghuni" ? (
+        {props.kind === "kuarters" || props.kind === "penghuni" || props.kind === "tunggakan" ? (
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-extrabold">
             <span className="rounded border border-[#C9D6F2] bg-white px-3 py-1 text-dark-blue">
               {(props.kind === "kuarters"
                 ? props.kuartersParsingMode
-                : props.penghuniParsingMode) === "assisted"
+                : props.kind === "penghuni"
+                  ? props.penghuniParsingMode
+                  : props.tunggakanParsingMode) === "assisted"
                 ? "Mod Bantuan AI"
                 : "Mod Ketat"}
             </span>

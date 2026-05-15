@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Pagination,
   RESIDENTS_PER_PAGE,
@@ -14,7 +14,7 @@ type TunggakanReviewTableProps = {
   onRecordsChange?: (
     records: ExtractedTunggakanRecord[],
     totalAmount: string,
-  ) => void;
+  ) => ExtractedTunggakanRecord | void | Promise<ExtractedTunggakanRecord | void>;
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
 };
@@ -30,9 +30,12 @@ export default function TunggakanReviewTable({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const selectedKeySet = new Set(selectedKeys);
-  const allRecordKeys = savedRows.map(getTunggakanRowKey);
+  const selectableRecordKeys = savedRows
+    .filter((row) => row.importStatus !== "IGNORED")
+    .map(getTunggakanRowKey);
   const isAllSelected =
-    allRecordKeys.length > 0 && allRecordKeys.every((key) => selectedKeySet.has(key));
+    selectableRecordKeys.length > 0 &&
+    selectableRecordKeys.every((key) => selectedKeySet.has(key));
 
   const totalPages = Math.max(1, Math.ceil(savedRows.length / RESIDENTS_PER_PAGE));
   const paginatedRows = useMemo(
@@ -44,10 +47,51 @@ export default function TunggakanReviewTable({
     [currentPage, savedRows],
   );
 
-  const updateDraftAmount = (key: string, jumlahTunggakan: string) => {
+  useEffect(() => {
+    setSavedRows(records);
+    setDraftRows(records);
+    setEditingKey(null);
+  }, [records]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  useEffect(() => {
+    if (!editingKey) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      if (target.closest("[data-tunggakan-editor='true']")) {
+        return;
+      }
+
+      setDraftRows(savedRows);
+      setEditingKey(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [editingKey, savedRows]);
+
+  const updateDraftField = (
+    key: string,
+    field: "nama" | "noKadPengenalan" | "jumlahTunggakan",
+    value: string,
+  ) => {
     setDraftRows((currentRows) =>
       currentRows.map((row) =>
-        getTunggakanRowKey(row) === key ? { ...row, jumlahTunggakan } : row,
+        getTunggakanRowKey(row) === key ? { ...row, [field]: value } : row,
       ),
     );
   };
@@ -55,13 +99,13 @@ export default function TunggakanReviewTable({
   const persistRows = (rows: ExtractedTunggakanRecord[]) => {
     const totalAmount = rows
       .filter((row) => row.importStatus !== "IGNORED")
-      .reduce((total, row) => total + Number(row.jumlahTunggakan || 0), 0)
+      .reduce((total, row) => total + parseSignedAmount(row.jumlahTunggakan), 0)
       .toFixed(2);
 
-    onRecordsChange?.(rows, totalAmount);
+    return onRecordsChange?.(rows, totalAmount);
   };
 
-  const saveRow = (key: string) => {
+  const saveRow = async (key: string) => {
     const draft = draftRows.find((row) => getTunggakanRowKey(row) === key);
 
     if (!draft) {
@@ -73,9 +117,26 @@ export default function TunggakanReviewTable({
       getTunggakanRowKey(row) === key ? { ...row, ...draft } : row,
     );
 
-    setSavedRows(nextRows);
-    setEditingKey(null);
-    persistRows(nextRows);
+    try {
+      const updatedRecord = await persistRows(nextRows);
+      const committedRows = updatedRecord
+        ? nextRows.map((row) =>
+            getTunggakanRowKey(row) === key ? updatedRecord : row,
+          )
+        : nextRows;
+
+      setSavedRows(committedRows);
+      setDraftRows(committedRows);
+      if (updatedRecord?.importStatus === "IGNORED") {
+        const nextKeys = new Set(selectedKeys);
+        nextKeys.delete(key);
+        nextKeys.delete(getTunggakanRowKey(updatedRecord));
+        onSelectedKeysChange?.([...nextKeys]);
+      }
+      setEditingKey(null);
+    } catch {
+      setEditingKey(key);
+    }
   };
 
   const deleteRow = (key: string) => {
@@ -85,6 +146,9 @@ export default function TunggakanReviewTable({
     setDraftRows((currentRows) =>
       currentRows.filter((row) => getTunggakanRowKey(row) !== key),
     );
+    const nextKeys = new Set(selectedKeys);
+    nextKeys.delete(key);
+    onSelectedKeysChange?.([...nextKeys]);
     setEditingKey(null);
     persistRows(nextRows);
   };
@@ -118,7 +182,7 @@ export default function TunggakanReviewTable({
   const toggleAllRows = (checked: boolean) => {
     const nextKeys = new Set(selectedKeys);
 
-    allRecordKeys.forEach((key) => {
+    selectableRecordKeys.forEach((key) => {
       if (checked) {
         nextKeys.add(key);
       } else {
@@ -131,10 +195,11 @@ export default function TunggakanReviewTable({
 
   return (
     <div className="overflow-hidden rounded-lg border border-[#DCE2F1] bg-white">
-      <table className="w-full table-fixed text-left text-xs">
-        <thead className="bg-[#F7F9FF] text-[10px] font-extrabold uppercase text-[#667085]">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-180 border-collapse text-left">
+          <thead className="bg-background">
           <tr>
-            <th className="w-10 px-5 py-4">
+            <th className="w-10 whitespace-nowrap px-3 py-3 text-left">
               <input
                 type="checkbox"
                 aria-label="Pilih semua rekod tunggakan"
@@ -143,17 +208,26 @@ export default function TunggakanReviewTable({
                 onChange={(event) => toggleAllRows(event.target.checked)}
               />
             </th>
-            <th className="px-4 py-4">Penghuni</th>
-            <th className="w-[18%] px-4 py-4 text-right">Jumlah Tunggakan (RM)</th>
-            <th className="w-[16%] px-4 py-4 text-center">Tindakan</th>
+            <th className="w-min whitespace-nowrap px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+              Nama Penghuni
+            </th>
+            <th className="w-[22%] px-3 py-4 text-left text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+              No. Kad Pengenalan
+            </th>
+            <th className="w-[20%] px-3 py-4 text-center text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+              Jumlah Tunggakan (RM)
+            </th>
+            <th className="w-24 px-3 py-4 text-center text-[10px] font-extrabold uppercase tracking-[0.18em] text-grey">
+              Tindakan
+            </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#EEF1F7]">
+        <tbody>
           {paginatedRows.length === 0 ? (
-            <tr>
+            <tr className="border-t border-light-grey/20">
               <td
-                colSpan={4}
-                className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
+                colSpan={5}
+                className="px-6 py-10 text-center text-xs font-semibold text-grey"
               >
                 Tiada rekod tunggakan ditemui.
               </td>
@@ -174,10 +248,10 @@ export default function TunggakanReviewTable({
                   isEditing={isEditing}
                   isSelected={selectedKeySet.has(key)}
                   onSelectionChange={(checked) => toggleSelectedRow(key, checked)}
-                  onDraftAmountChange={(jumlahTunggakan) =>
-                    updateDraftAmount(key, jumlahTunggakan)
+                  onDraftFieldChange={(field, value) =>
+                    updateDraftField(key, field, value)
                   }
-                  onSave={() => saveRow(key)}
+                  onSave={() => void saveRow(key)}
                   onDelete={() => deleteRow(key)}
                   onEdit={() => startEdit(key)}
                 />
@@ -186,6 +260,7 @@ export default function TunggakanReviewTable({
           )}
         </tbody>
       </table>
+      </div>
       <Pagination
         label={`Memaparkan ${paginatedRows.length} Daripada ${savedRows.length} Rekod`}
         currentPage={currentPage}
@@ -194,4 +269,32 @@ export default function TunggakanReviewTable({
       />
     </div>
   );
+}
+
+function parseSignedAmount(value: string) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return 0;
+  }
+
+  const normalizedSign = normalizedValue.replace(/[−–—]/g, "-");
+  const isParenthesizedNegative = /^\(.*\)$/.test(normalizedSign);
+  const hasNegativeSign = normalizedSign.includes("-");
+  const numericValue = Number(
+    normalizedSign
+      .replace(/RM/gi, "")
+      .replace(/,/g, "")
+      .replace(/\s+/g, "")
+      .replace(/[()]/g, "")
+      .replace(/-/g, ""),
+  );
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return (isParenthesizedNegative || hasNegativeSign) && numericValue > 0
+    ? numericValue * -1
+    : numericValue;
 }

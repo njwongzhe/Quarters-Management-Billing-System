@@ -10,6 +10,10 @@ const sampleDocumentsByCategory: Partial<Record<Category, string[]>> = {
     "/sample-documents/Quarters_Sample.pdf",
     "/sample-documents/Quarters_Sample.xlsx",
   ],
+  Tunggakan: [
+    "/sample-documents/Tunggakan_Sample.pdf",
+    "/sample-documents/Tunggakan_Sample.xlsx",
+  ],
 };
 
 type DemoDocumentButtonProps = {

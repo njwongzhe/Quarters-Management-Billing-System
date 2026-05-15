@@ -6,6 +6,7 @@ from extractors import (
     extract_kuarters_document,
     extract_penghuni_document,
     extract_penghuni_from_xlsx,
+    extract_tunggakan_document,
     extract_tunggakan_from_xlsx,
 )
 
@@ -16,5 +17,6 @@ __all__ = [
     "extract_kuarters_document",
     "extract_penghuni_document",
     "extract_penghuni_from_xlsx",
+    "extract_tunggakan_document",
     "extract_tunggakan_from_xlsx",
 ]

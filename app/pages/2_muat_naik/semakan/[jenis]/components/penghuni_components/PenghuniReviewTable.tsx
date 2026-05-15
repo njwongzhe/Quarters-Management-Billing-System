@@ -190,10 +190,10 @@ export default function PenghuniReviewTable({
                   <tr
                     key={recordKey}
                     className={[
-                      "text-sm border-l-4 border-b border-b-light-grey/20",
+                      "text-sm border-l-4 border-b border-b-light-grey/20 transition-colors",
                       resident.isExisted
                         ? "border-amber-400 bg-amber-50"
-                        : "border-transparent",
+                        : "border-transparent hover:bg-background/60",
                     ].join(" ")}
                   >
                     <td className="px-3 py-2 text-left w-10 whitespace-nowrap">

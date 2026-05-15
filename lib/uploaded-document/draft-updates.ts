@@ -17,7 +17,10 @@ import {
   updatePenghuniDraft,
   updatePenghuniDrafts,
 } from "@/lib/uploaded-document/penghuni/draft-updates";
-import { updateTunggakanDrafts } from "@/lib/uploaded-document/tunggakan/draft-updates";
+import {
+  updateTunggakanDraft,
+  updateTunggakanDrafts,
+} from "@/lib/uploaded-document/tunggakan/draft-updates";
 
 const uploadedDocumentTransactionOptions = {
   maxWait: 30000,
@@ -42,6 +45,7 @@ export async function updateUploadedDocumentDraftForKind(
     extractResult?: ExtractResult;
   };
   let updatedPenghuniRecord: unknown = null;
+  let updatedTunggakanRecord: unknown = null;
 
   const document = await prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
@@ -60,8 +64,25 @@ export async function updateUploadedDocumentDraftForKind(
 
       if (kind === "bayaran" && extractResult?.documentType === "bayaran") {
         await updateBayaranDrafts(tx, uploadedDocumentId, extractResult);
-      } else if (kind === "tunggakan" && extractResult?.documentType === "tunggakan") {
-        await updateTunggakanDrafts(tx, uploadedDocumentId, extractResult);
+      } else if (kind === "tunggakan") {
+        if (action === "update-tunggakan-record") {
+          const record =
+            "record" in payload ? (payload as { record?: unknown }).record : null;
+
+          if (!record || typeof record !== "object" || Array.isArray(record)) {
+            throw new Error("Data tunggakan tidak lengkap.");
+          }
+
+          updatedTunggakanRecord = await updateTunggakanDraft(
+            tx,
+            uploadedDocumentId,
+            record as Parameters<typeof updateTunggakanDraft>[2],
+          );
+        } else if (extractResult?.documentType === "tunggakan") {
+          await updateTunggakanDrafts(tx, uploadedDocumentId, extractResult);
+        } else {
+          throw new Error("Data ekstrak tunggakan tidak lengkap.");
+        }
       } else if (kind === "penghuni") {
         if (action === "update-penghuni-record") {
           const record =
@@ -112,6 +133,10 @@ export async function updateUploadedDocumentDraftForKind(
     return { record: updatedPenghuniRecord };
   }
 
+  if (updatedTunggakanRecord) {
+    return { record: updatedTunggakanRecord };
+  }
+
   return mapUploadedDocumentForReview(document);
 }
 
@@ -123,9 +148,10 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
       const payload = body && typeof body === "object" ? body : {};
 
       if (
-        kind === "penghuni" &&
+        (kind === "penghuni" || kind === "tunggakan") &&
         "action" in payload &&
         ((payload as { action?: unknown }).action === "update-penghuni-record" ||
+          (payload as { action?: unknown }).action === "update-tunggakan-record" ||
           (payload as { action?: unknown }).action === "delete-penghuni-record")
       ) {
         await getCurrentAdmin();
@@ -146,6 +172,26 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
           return NextResponse.json({
             success: true,
             data: { deletedResidentId: residentId },
+          });
+        }
+
+        if (action === "update-tunggakan-record") {
+          const record =
+            "record" in payload ? (payload as { record?: unknown }).record : null;
+
+          if (!record || typeof record !== "object" || Array.isArray(record)) {
+            throw new Error("Data tunggakan tidak lengkap.");
+          }
+
+          const updatedRecord = await updateTunggakanDraft(
+            prisma,
+            id,
+            record as Parameters<typeof updateTunggakanDraft>[2],
+          );
+
+          return NextResponse.json({
+            success: true,
+            data: { record: updatedRecord },
           });
         }
 

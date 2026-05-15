@@ -184,8 +184,60 @@ export default function ExtractReviewPage({
     records: ExtractedTunggakanRecord[],
     totalAmount: string,
   ) => {
-    if (!tunggakanExtract) {
+    if (!tunggakanExtract || !draftId) {
       return;
+    }
+
+    const changedRecord = findSingleChangedTunggakanRecord(
+      tunggakanExtract.records,
+      records,
+    );
+
+    if (changedRecord === "unchanged") {
+      return;
+    }
+
+    if (changedRecord) {
+      const response = await fetch(draftUpdateRouteByKind.tunggakan(draftId), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "update-tunggakan-record",
+          record: changedRecord,
+        }),
+      });
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && result?.data?.record) {
+        const updatedRecord = result.data.record as ExtractedTunggakanRecord;
+        const nextRecords = tunggakanExtract.records.map((record) =>
+          getTunggakanRecordKey(record) === getTunggakanRecordKey(changedRecord)
+            ? updatedRecord
+            : record,
+        );
+        const acceptedRecords = nextRecords.filter(
+          (record) => record.importStatus !== "IGNORED",
+        );
+        setExtractResult({
+          ...tunggakanExtract,
+          recordCount: acceptedRecords.length,
+          totalAmount: acceptedRecords
+            .reduce(
+              (total, record) => total + parseSignedAmount(record.jumlahTunggakan),
+              0,
+            )
+            .toFixed(2),
+          records: nextRecords,
+        });
+        showVerificationNotice("success", "Perubahan tunggakan berjaya disimpan.");
+        return updatedRecord;
+      }
+
+      const message = result?.message ?? "Gagal menyimpan perubahan tunggakan.";
+      showVerificationNotice("error", message);
+      throw new Error(message);
     }
 
     const nextExtract: TunggakanExtractResult = {
@@ -194,9 +246,6 @@ export default function ExtractReviewPage({
       totalAmount,
       records,
     };
-    if (!draftId) {
-      return;
-    }
 
     setExtractResult(nextExtract);
     const response = await fetch(draftUpdateRouteByKind.tunggakan(draftId), {
@@ -213,10 +262,9 @@ export default function ExtractReviewPage({
     if (response.ok && result?.data?.document?.extractResult) {
       setExtractResult(result.data.document.extractResult as ExtractResult);
     } else if (!response.ok) {
-      showVerificationNotice(
-        "error",
-        result?.message ?? "Gagal menyimpan perubahan tunggakan.",
-      );
+      const message = result?.message ?? "Gagal menyimpan perubahan tunggakan.";
+      showVerificationNotice("error", message);
+      throw new Error(message);
     }
   };
 
@@ -566,6 +614,7 @@ export default function ExtractReviewPage({
           onKuartersCategoryChange={updateKuartersCategoryDraft}
           onKuartersUnitChange={updateKuartersUnitDraft}
           tunggakanRecords={tunggakanExtract?.records ?? []}
+          tunggakanParsingMode={tunggakanExtract?.parsingMode}
           onTunggakanRecordsChange={updateCurrentTunggakanDraft}
           selectedKeys={selectedRecordKeys}
           onSelectedKeysChange={setSelectedRecordKeys}
@@ -588,6 +637,10 @@ export default function ExtractReviewPage({
 
 function getPenghuniRecordKey(record: ExtractedPenghuniRecord) {
   return record.residentId ?? record.noKadPengenalan;
+}
+
+function getTunggakanRecordKey(record: ExtractedTunggakanRecord) {
+  return record.arrearsSummaryId ?? `${record.noKadPengenalan}-${record.nama}`;
 }
 
 function findSingleChangedPenghuniRecord(
@@ -615,4 +668,59 @@ function findSingleChangedPenghuniRecord(
   }
 
   return changedRecords.length === 1 ? changedRecords[0] : null;
+}
+
+function findSingleChangedTunggakanRecord(
+  currentRecords: ExtractedTunggakanRecord[],
+  nextRecords: ExtractedTunggakanRecord[],
+) {
+  if (currentRecords.length !== nextRecords.length) {
+    return null;
+  }
+
+  const currentByKey = new Map(
+    currentRecords.map((record) => [getTunggakanRecordKey(record), record]),
+  );
+  const changedRecords = nextRecords.filter((record) => {
+    const currentRecord = currentByKey.get(getTunggakanRecordKey(record));
+
+    return (
+      currentRecord &&
+      JSON.stringify(currentRecord) !== JSON.stringify(record)
+    );
+  });
+
+  if (changedRecords.length === 0) {
+    return "unchanged";
+  }
+
+  return changedRecords.length === 1 ? changedRecords[0] : null;
+}
+
+function parseSignedAmount(value: string) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return 0;
+  }
+
+  const normalizedSign = normalizedValue.replace(/[−–—]/g, "-");
+  const isParenthesizedNegative = /^\(.*\)$/.test(normalizedSign);
+  const hasNegativeSign = normalizedSign.includes("-");
+  const numericValue = Number(
+    normalizedSign
+      .replace(/RM/gi, "")
+      .replace(/,/g, "")
+      .replace(/\s+/g, "")
+      .replace(/[()]/g, "")
+      .replace(/-/g, ""),
+  );
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return (isParenthesizedNegative || hasNegativeSign) && numericValue > 0
+    ? numericValue * -1
+    : numericValue;
 }

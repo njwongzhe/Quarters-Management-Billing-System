@@ -43,7 +43,7 @@ type ReviewTableProps = {
   onTunggakanRecordsChange?: (
     records: ExtractedTunggakanRecord[],
     totalAmount: string,
-  ) => void;
+  ) => ExtractedTunggakanRecord | void | Promise<ExtractedTunggakanRecord | void>;
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
   onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
@@ -90,7 +90,7 @@ export default function ReviewTable({
     return (
       <TunggakanReviewTable
         key={tunggakanRecords
-          .map((record) => record.arrearsSummaryId ?? record.sourceRow)
+          .map((record) => record.arrearsSummaryId ?? `${record.noKadPengenalan}-${record.nama}`)
           .join("|")}
         records={tunggakanRecords}
         onRecordsChange={onTunggakanRecordsChange}

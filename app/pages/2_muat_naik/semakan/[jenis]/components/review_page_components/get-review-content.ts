@@ -159,11 +159,21 @@ export function getReviewContent({
   }
 
   if (kind === "tunggakan" && tunggakanExtract) {
+    const tunggakanTotalAmount = tunggakanExtract.records
+      .filter((record) => record.importStatus !== "IGNORED")
+      .reduce(
+        (total, record) => total + parseSignedAmount(record.jumlahTunggakan),
+        0,
+      );
+
     return {
       fileName,
       stats: baseContent.stats.map((stat) => {
         if (stat.label === "Tarikh Tunggakan") {
-          return { ...stat, value: "-" };
+          return {
+            ...stat,
+            value: formatReviewDate(tunggakanExtract.lastUpdatedMonth),
+          };
         }
 
         if (stat.label === "Jumlah Rekod") {
@@ -173,7 +183,7 @@ export function getReviewContent({
         if (stat.label === "Jumlah Tunggakan (RM)") {
           return {
             ...stat,
-            value: `RM ${Number(tunggakanExtract.totalAmount).toLocaleString(
+            value: `RM ${tunggakanTotalAmount.toLocaleString(
               "ms-MY",
               {
                 minimumFractionDigits: 2,
@@ -205,9 +215,55 @@ export function getReviewContent({
   };
 }
 
+function formatReviewDate(value: string | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ms-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 function getExtractResult<T extends ExtractResult>(
   extractResult: ExtractResult | null,
   documentType: ExtractResult["documentType"],
 ) {
   return extractResult?.documentType === documentType ? (extractResult as T) : null;
+}
+
+function parseSignedAmount(value: string) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return 0;
+  }
+
+  const normalizedSign = normalizedValue.replace(/[−–—]/g, "-");
+  const isParenthesizedNegative = /^\(.*\)$/.test(normalizedSign);
+  const hasNegativeSign = normalizedSign.includes("-");
+  const numericValue = Number(
+    normalizedSign
+      .replace(/RM/gi, "")
+      .replace(/,/g, "")
+      .replace(/\s+/g, "")
+      .replace(/[()]/g, "")
+      .replace(/-/g, ""),
+  );
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return (isParenthesizedNegative || hasNegativeSign) && numericValue > 0
+    ? numericValue * -1
+    : numericValue;
 }
