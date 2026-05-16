@@ -75,6 +75,20 @@ export async function verifyPenghuniDrafts(
     const moveInDate = parsePenghuniMoveInDate(record.tarikhMasuk ?? "");
     const moveOutDate = parseNullablePenghuniDate(record.tarikhKeluar ?? "");
 
+    if (!moveInDate) {
+      failedMessages.push(
+        `Penghunian ${draft.fullName} gagal disahkan kerana tarikh masuk tidak sah.`,
+      );
+      continue;
+    }
+
+    if (moveOutDate && moveOutDate < moveInDate) {
+      failedMessages.push(
+        `Penghunian ${draft.fullName} gagal disahkan kerana tarikh keluar lebih awal daripada tarikh masuk.`,
+      );
+      continue;
+    }
+
     if (unitId) {
       const conflict = await hasOccupancyConflict(
         tx,
@@ -160,28 +174,23 @@ export async function verifyPenghuniDrafts(
 function buildRecordFromDraft(
   draft: Prisma.ResidentDraftGetPayload<Record<string, never>>,
 ): ExtractedPenghuniRecord {
-  const rawRecord =
-    draft.rawData && typeof draft.rawData === "object" && !Array.isArray(draft.rawData)
-      ? draft.rawData
-      : {};
-
   return {
-    ...rawRecord,
     residentId: draft.id,
     originalResidentId: draft.originalResidentId ?? undefined,
     isExisted: false,
     nama: draft.fullName,
     noKadPengenalan: draft.icNumber,
-    kuarters: "kuarters" in rawRecord ? String(rawRecord.kuarters) : "",
-    unit: "unit" in rawRecord ? String(rawRecord.unit) : "",
-    alamatKuarters: draft.description ?? "",
+    kuarters: draft.quarterCategoryName ?? "",
+    unit: draft.unitCode ?? "",
+    alamatKuarters: draft.quarterAddress ?? "",
     perhubungan: draft.phone ?? "",
     gmail: draft.email ?? "",
     pekerjaan: draft.position ?? "",
     jabatan: draft.department ?? "",
     tarafPerkhidmatan: draft.serviceLevel ?? "",
-    tarikhMasuk: "tarikhMasuk" in rawRecord ? String(rawRecord.tarikhMasuk) : "",
-    tarikhKeluar: "tarikhKeluar" in rawRecord ? String(rawRecord.tarikhKeluar) : "",
+    tarikhMasuk: draft.moveInDate?.toISOString() ?? "",
+    tarikhKeluar: draft.moveOutDate?.toISOString() ?? "",
+    catatan: draft.description ?? "",
   };
 }
 
@@ -285,40 +294,79 @@ async function upsertPenghuniOccupancy(
       AND "unitId" <> ${unitId}::uuid
   `;
 
-  await tx.$executeRaw`
-    INSERT INTO "UnitOccupancy"
-      ("id", "residentId", "unitId", "moveInDate", "moveOutDate", "status", "description", "createdAt", "updatedAt")
-    SELECT
-      gen_random_uuid(),
-      ${residentId}::uuid,
-      ${unitId}::uuid,
-      ${moveInDate},
-      ${moveOutDate},
-      ${moveOutDate ? "PAST" : "CURRENT"}::"OccupancyStatus",
-      ${"Dicipta selepas pengesahan dokumen penghuni."},
-      NOW(),
-      NOW()
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM "UnitOccupancy"
-      WHERE "residentId" = ${residentId}::uuid
-        AND "unitId" = ${unitId}::uuid
-        AND "moveInDate" = ${moveInDate}
-        AND COALESCE("moveOutDate", 'infinity'::timestamp) = COALESCE(${moveOutDate}, 'infinity'::timestamp)
-    )
-  `;
+  const existingOccupancy = await findPenghuniOccupancyToUpdate(
+    tx,
+    residentId,
+    unitId,
+  );
+
+  if (existingOccupancy) {
+    await tx.unitOccupancy.update({
+      where: { id: existingOccupancy.id },
+      data: {
+        moveInDate,
+        moveOutDate,
+        status: moveOutDate ? "PAST" : "CURRENT",
+        description: "Dikemas kini selepas pengesahan dokumen penghuni.",
+      },
+    });
+  } else {
+    await tx.unitOccupancy.create({
+      data: {
+        residentId,
+        unitId,
+        moveInDate,
+        moveOutDate,
+        status: moveOutDate ? "PAST" : "CURRENT",
+        description: "Dicipta selepas pengesahan dokumen penghuni.",
+      },
+    });
+  }
+
+  await syncUnitOccupancyStatus(tx, unitId);
+}
+
+async function findPenghuniOccupancyToUpdate(
+  tx: Prisma.TransactionClient,
+  residentId: string,
+  unitId: string,
+) {
+  const currentOccupancy = await tx.unitOccupancy.findFirst({
+    where: { residentId, unitId, status: "CURRENT" },
+    select: { id: true },
+  });
+
+  if (currentOccupancy) {
+    return currentOccupancy;
+  }
+
+  return tx.unitOccupancy.findFirst({
+    where: { residentId, unitId },
+    orderBy: [{ moveInDate: "desc" }, { createdAt: "desc" }],
+    select: { id: true },
+  });
+}
+
+async function syncUnitOccupancyStatus(
+  tx: Prisma.TransactionClient,
+  unitId: string,
+) {
+  const currentOccupancy = await tx.unitOccupancy.findFirst({
+    where: { unitId, status: "CURRENT" },
+    select: { id: true },
+  });
 
   await tx.unit.update({
     where: { id: unitId },
-    data: { status: moveOutDate ? "VACANT" : "OCCUPIED" },
+    data: { status: currentOccupancy ? "OCCUPIED" : "VACANT" },
   });
 }
 
 function parsePenghuniMoveInDate(value: string) {
-  const date = new Date(value);
+  const date = parsePenghuniDateValue(value);
 
   if (Number.isNaN(date.getTime())) {
-    return new Date();
+    return null;
   }
 
   return date;
@@ -329,7 +377,18 @@ function parseNullablePenghuniDate(value: string) {
     return null;
   }
 
-  const date = new Date(value);
+  const date = parsePenghuniDateValue(value);
 
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parsePenghuniDateValue(value: string) {
+  const normalizedValue = value.trim();
+  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  return dayFirstMatch
+    ? new Date(
+        `${dayFirstMatch[3]}-${dayFirstMatch[2]}-${dayFirstMatch[1]}T00:00:00.000Z`,
+      )
+    : new Date(value);
 }

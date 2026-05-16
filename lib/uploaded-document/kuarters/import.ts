@@ -5,7 +5,6 @@ import type {
   ExtractedQuarterUnit,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { rawData } from "@/lib/uploaded-document/shared";
 
 export async function createPendingKuartersRows(
   tx: Prisma.TransactionClient,
@@ -29,7 +28,6 @@ export async function createPendingKuartersRows(
         penaltyPrice: record.penaltyPrice || "0",
         uploadedDocumentId,
         originalCategoryId: null,
-        rawData: rawData(record),
       },
     });
     const units: ExtractedQuarterUnit[] = [];
@@ -41,7 +39,6 @@ export async function createPendingKuartersRows(
           uploadedDocumentId,
           categoryDraftId: categoryDraft.id,
           originalUnitId: null,
-          rawData: rawData(unit),
         },
       });
 

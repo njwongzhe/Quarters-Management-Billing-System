@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
 import type { ExtractedQuarterRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { rawData } from "@/lib/uploaded-document/shared";
 
 function normalizeKuartersText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -177,7 +176,6 @@ export async function updateKuartersDrafts(
         rentalPrice: normalizeKuartersMoney(record.rentalPrice),
         maintenancePrice: normalizeKuartersMoney(record.maintenancePrice),
         penaltyPrice: normalizeKuartersMoney(record.penaltyPrice),
-        rawData: rawData(record),
       },
     });
 
@@ -216,7 +214,7 @@ export async function updateKuartersDrafts(
 
       await tx.unitDraft.updateMany({
         where: { id: unit.unitId, uploadedDocumentId },
-        data: { unitCode: unit.unitCode, rawData: rawData(unit) },
+        data: { unitCode: unit.unitCode },
       });
     }
   }

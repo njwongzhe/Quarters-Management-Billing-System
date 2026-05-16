@@ -33,6 +33,19 @@ function normalizedPositionParamSql(value: string) {
   return Prisma.sql`regexp_replace(regexp_replace(UPPER(COALESCE(${value}::text, '')), '\\s*-?\\s*[A-Z]{1,3}\\d{1,2}\\s*$', ''), '[^A-Z0-9]+', '', 'g')`;
 }
 
+function normalizeDateForExactMatch(value: string | undefined) {
+  const normalizedValue = value?.trim() ?? "";
+  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (dayFirstMatch) {
+    return `${dayFirstMatch[3]}-${dayFirstMatch[2]}-${dayFirstMatch[1]}`;
+  }
+
+  return /^\d{4}-\d{2}-\d{2}/.test(normalizedValue)
+    ? normalizedValue.slice(0, 10)
+    : "";
+}
+
 export async function findExactPenghuniMatch(
   tx: QueryClient,
   record: ExtractedPenghuniRecord,
@@ -42,6 +55,9 @@ export async function findExactPenghuniMatch(
   if (!residentId) {
     return null;
   }
+
+  const moveInDate = normalizeDateForExactMatch(record.tarikhMasuk);
+  const moveOutDate = normalizeDateForExactMatch(record.tarikhKeluar);
 
   const matches = await tx.$queryRaw<ResidentExactMatch[]>`
     SELECT
@@ -76,9 +92,9 @@ export async function findExactPenghuniMatch(
       AND ${normalizedSql('u."unitCode"')} =
         ${normalizedParamSql(record.unit)}
       AND COALESCE(to_char(o."moveInDate", 'YYYY-MM-DD'), '') =
-        COALESCE(${record.tarikhMasuk ?? ""}::text, '')
+        COALESCE(${moveInDate}::text, '')
       AND COALESCE(to_char(o."moveOutDate", 'YYYY-MM-DD'), '') =
-        COALESCE(${record.tarikhKeluar ?? ""}::text, '')
+        COALESCE(${moveOutDate}::text, '')
     LIMIT 1
   `;
 
@@ -105,8 +121,8 @@ export async function findExactPenghuniMatches(
     kuarters: record.kuarters,
     alamatKuarters: record.alamatKuarters,
     unit: record.unit,
-    tarikhMasuk: record.tarikhMasuk ?? "",
-    tarikhKeluar: record.tarikhKeluar ?? "",
+    tarikhMasuk: normalizeDateForExactMatch(record.tarikhMasuk),
+    tarikhKeluar: normalizeDateForExactMatch(record.tarikhKeluar),
   }));
 
   const matches = await tx.$queryRaw<ResidentExactMatchRow[]>`

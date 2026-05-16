@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
 import type { ExtractedPenghuniRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { rawData } from "@/lib/uploaded-document/shared";
 import { findExactPenghuniMatch } from "@/lib/uploaded-document/penghuni/queries";
 
 type PenghuniDraftUpdateClient = Pick<
@@ -41,9 +40,13 @@ export async function updatePenghuniDrafts(
         position: record.pekerjaan || null,
         department: record.jabatan || null,
         serviceLevel: record.tarafPerkhidmatan || null,
-        description: record.alamatKuarters || null,
+        description: record.catatan || null,
+        quarterCategoryName: record.kuarters || null,
+        quarterAddress: record.alamatKuarters || null,
+        unitCode: record.unit || null,
+        moveInDate: parseNullableDate(record.tarikhMasuk),
+        moveOutDate: parseNullableDate(record.tarikhKeluar),
         originalResidentId: exactMatch?.residentId ?? null,
-        rawData: rawData(record),
       },
     });
   }
@@ -82,9 +85,13 @@ export async function updatePenghuniDraft(
       position: record.pekerjaan || null,
       department: record.jabatan || null,
       serviceLevel: record.tarafPerkhidmatan || null,
-      description: record.alamatKuarters || null,
+      description: record.catatan || null,
+      quarterCategoryName: record.kuarters || null,
+      quarterAddress: record.alamatKuarters || null,
+      unitCode: record.unit || null,
+      moveInDate: parseNullableDate(record.tarikhMasuk),
+      moveOutDate: parseNullableDate(record.tarikhKeluar),
       originalResidentId: exactMatch?.residentId ?? null,
-      rawData: rawData(record),
     },
   });
 
@@ -139,4 +146,20 @@ async function findDuplicatePenghuniDraftByIc(
   `;
 
   return duplicates[0] ?? null;
+}
+
+function parseNullableDate(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const date = dayFirstMatch
+    ? new Date(
+        `${dayFirstMatch[3]}-${dayFirstMatch[2]}-${dayFirstMatch[1]}T00:00:00.000Z`,
+      )
+    : new Date(`${normalizedValue.slice(0, 10)}T00:00:00.000Z`);
+
+  return Number.isNaN(date.getTime()) ? null : date;
 }

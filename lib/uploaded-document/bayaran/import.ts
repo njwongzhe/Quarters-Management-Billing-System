@@ -5,10 +5,7 @@ import type {
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 import { getBayaranPaymentDate } from "@/lib/uploaded-document/bayaran/documents";
-import {
-  findResidentByNormalizedIc,
-  rawData,
-} from "@/lib/uploaded-document/shared";
+import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 export async function createPendingBayaranRows(
   tx: Prisma.TransactionClient,
@@ -52,7 +49,6 @@ export async function createPendingBayaranRows(
         description: normalizedRecord.catatan || "bayaran",
         uploadedDocumentId,
         originalResidentId: residentId || null,
-        rawData: rawData(normalizedRecord),
       },
     });
 

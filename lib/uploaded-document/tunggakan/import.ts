@@ -4,10 +4,7 @@ import type {
   ExtractedTunggakanRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import {
-  findResidentByNormalizedIc,
-  rawData,
-} from "@/lib/uploaded-document/shared";
+import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 function tunggakanIdentityKey(name: string, icNumber: string) {
   return [normalizeExtractText(name), icNumber.replace(/\D/g, "")].join("|");
@@ -54,7 +51,6 @@ export async function createPendingTunggakanRows(
         uploadedDocumentId,
         originalResidentId: residentId || null,
         originalSummaryId: existingSummary?.id ?? null,
-        rawData: rawData(normalizedRecord),
       },
     });
 

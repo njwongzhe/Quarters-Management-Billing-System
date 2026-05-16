@@ -2,16 +2,6 @@ import type { Prisma } from "@prisma/client";
 
 export type QueryClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 
-export function jsonRecord<T>(value: Prisma.JsonValue | null, fallback: T): T {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? ({ ...fallback, ...value } as T)
-    : fallback;
-}
-
-export function rawData(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value ?? {}));
-}
-
 export async function findResidentByNormalizedIc(
   tx: QueryClient,
   icNumber: string,

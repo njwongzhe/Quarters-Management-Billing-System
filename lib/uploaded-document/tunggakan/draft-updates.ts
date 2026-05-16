@@ -4,7 +4,7 @@ import type {
   ExtractedTunggakanRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { findResidentByNormalizedIc, rawData } from "@/lib/uploaded-document/shared";
+import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 type TunggakanDraftUpdateClient = Pick<
   Prisma.TransactionClient,
@@ -51,7 +51,6 @@ export async function updateTunggakanDrafts(
         description: "tunggakan",
         originalResidentId: residentId,
         originalSummaryId: existingSummary?.id ?? null,
-        rawData: rawData(normalizedRecord),
       },
     });
   }
@@ -105,7 +104,6 @@ export async function updateTunggakanDraft(
       description: "tunggakan",
       originalResidentId: residentId,
       originalSummaryId: existingSummary?.id ?? null,
-      rawData: rawData(normalizedRecord),
     },
   });
 

@@ -364,6 +364,7 @@ function DatePickerField({
     initialDate ?? startOfDay(new Date()),
   );
   const days = buildCalendarDays(visibleMonth);
+  const selectedDateValue = initialDate ? formatDateInput(initialDate) : "";
 
   return (
     <label className={`block tracking-widest ${className}`}>
@@ -431,7 +432,7 @@ function DatePickerField({
             <div className="mt-1 grid grid-cols-7 gap-1">
               {days.map((day) => {
                 const dateValue = formatDateInput(day.date);
-                const isSelected = dateValue === value;
+                const isSelected = dateValue === selectedDateValue;
                 const isVisibleMonth =
                   day.date.getMonth() === visibleMonth.getMonth();
 
@@ -477,13 +478,29 @@ function DatePickerField({
 }
 
 function parseDateInput(value: string | undefined) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (!value) {
     return null;
   }
 
-  const date = new Date(`${value}T00:00:00`);
+  const normalizedValue = value.trim();
+  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const isoDateMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
 
-  return Number.isNaN(date.getTime()) ? null : date;
+  const date = dayFirstMatch
+    ? new Date(
+        Number(dayFirstMatch[3]),
+        Number(dayFirstMatch[2]) - 1,
+        Number(dayFirstMatch[1]),
+      )
+    : isoDateMatch
+      ? new Date(
+          Number(isoDateMatch[1]),
+          Number(isoDateMatch[2]) - 1,
+          Number(isoDateMatch[3]),
+        )
+      : null;
+
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
 function startOfDay(date: Date) {

@@ -4,10 +4,7 @@ import type {
   ExtractedPenghuniRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import {
-  findResidentByNormalizedIc,
-  rawData,
-} from "@/lib/uploaded-document/shared";
+import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 import { findExactPenghuniMatch } from "@/lib/uploaded-document/penghuni/queries";
 
 export async function createPendingPenghuniRows(
@@ -37,10 +34,14 @@ export async function createPendingPenghuniRows(
         position: record.pekerjaan || null,
         department: record.jabatan || null,
         serviceLevel: record.tarafPerkhidmatan || null,
-        description: record.alamatKuarters || null,
+        description: record.catatan || null,
+        quarterCategoryName: record.kuarters || null,
+        quarterAddress: record.alamatKuarters || null,
+        unitCode: record.unit || null,
+        moveInDate: parseNullableDate(record.tarikhMasuk),
+        moveOutDate: parseNullableDate(record.tarikhKeluar),
         uploadedDocumentId,
         originalResidentId,
-        rawData: rawData(record),
       },
     });
 
@@ -53,4 +54,20 @@ export async function createPendingPenghuniRows(
   }
 
   return { ...extractResult, recordCount: records.length, records };
+}
+
+function parseNullableDate(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const date = dayFirstMatch
+    ? new Date(
+        `${dayFirstMatch[3]}-${dayFirstMatch[2]}-${dayFirstMatch[1]}T00:00:00.000Z`,
+      )
+    : new Date(`${normalizedValue.slice(0, 10)}T00:00:00.000Z`);
+
+  return Number.isNaN(date.getTime()) ? null : date;
 }

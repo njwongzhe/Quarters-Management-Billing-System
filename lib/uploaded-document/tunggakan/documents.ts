@@ -1,6 +1,6 @@
 import type { ExtractedTunggakanRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 import { prisma } from "@/lib/prisma";
-import { findResidentByNormalizedIc, jsonRecord } from "@/lib/uploaded-document/shared";
+import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 export async function buildTunggakanExtractResultFromDraftRows(
   uploadedDocumentId: string,
@@ -42,24 +42,12 @@ export async function buildTunggakanExtractResultFromDraftRows(
         });
       }
 
-      const fallback = buildTunggakanRecord(
+      const record = buildTunggakanRecord(
         row,
         residentId,
         isBlocked,
         importMessage,
       );
-
-      const storedRecord = jsonRecord<ExtractedTunggakanRecord>(row.rawData, fallback);
-      const record: ExtractedTunggakanRecord = {
-        arrearsSummaryId: fallback.arrearsSummaryId,
-        nama: storedRecord.nama,
-        noKadPengenalan: storedRecord.noKadPengenalan,
-        jumlahTunggakan: fallback.jumlahTunggakan,
-        residentId: residentId ?? undefined,
-        isExisted: isBlocked,
-        importStatus: isBlocked ? "IGNORED" : "PENDING",
-        importMessage,
-      };
 
       return record;
     }),

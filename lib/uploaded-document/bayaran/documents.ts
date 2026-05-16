@@ -1,6 +1,6 @@
 import type { ExtractedBayaranRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 import { prisma } from "@/lib/prisma";
-import { findResidentByNormalizedIc, jsonRecord } from "@/lib/uploaded-document/shared";
+import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 export function getBayaranPaymentDate(paymentMonth: string) {
   if (/^\d{4}-\d{2}-\d{2}/.test(paymentMonth)) {
@@ -67,14 +67,7 @@ export async function buildBayaranExtractResultFromDraftRows(
         });
       }
 
-      const fallback = buildBayaranRecord(row, residentId, isNewResident);
-      const storedRecord = jsonRecord<ExtractedBayaranRecord>(row.rawData, fallback);
-
-      return {
-        ...fallback,
-        page: storedRecord.page,
-        bil: storedRecord.bil,
-      } satisfies ExtractedBayaranRecord;
+      return buildBayaranRecord(row, residentId, isNewResident);
     }),
   );
 

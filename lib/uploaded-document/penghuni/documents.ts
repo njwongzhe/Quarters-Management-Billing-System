@@ -1,6 +1,5 @@
 import type { ExtractedPenghuniRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 import { prisma } from "@/lib/prisma";
-import { jsonRecord } from "@/lib/uploaded-document/shared";
 import {
   findExactPenghuniMatches,
   type PenghuniExactMatchInput,
@@ -21,21 +20,24 @@ export async function buildPenghuniExtractResultFromDraftRows(
   const records: PenghuniExactMatchInput[] = [];
 
   for (const row of rows) {
-    const record = jsonRecord<ExtractedPenghuniRecord>(row.rawData, {
+    const record: ExtractedPenghuniRecord = {
       residentId: row.id,
       originalResidentId: row.originalResidentId ?? undefined,
       isExisted: false,
       nama: row.fullName,
       noKadPengenalan: row.icNumber,
-      kuarters: "",
-      unit: "",
-      alamatKuarters: row.description ?? "",
+      kuarters: row.quarterCategoryName ?? "",
+      unit: row.unitCode ?? "",
+      alamatKuarters: row.quarterAddress ?? "",
       perhubungan: row.phone ?? "",
       gmail: row.email ?? "",
       pekerjaan: row.position ?? "",
       jabatan: row.department ?? "",
       tarafPerkhidmatan: row.serviceLevel ?? "",
-    });
+      tarikhMasuk: row.moveInDate?.toISOString() ?? "",
+      tarikhKeluar: row.moveOutDate?.toISOString() ?? "",
+      catatan: row.description ?? "",
+    };
     records.push({
       ...record,
       residentId: row.id,

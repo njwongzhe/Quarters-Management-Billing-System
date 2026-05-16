@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from io import BytesIO
 import json
 import os
@@ -439,12 +440,8 @@ def _resident_from_row_with_issues(
 
     raw_tarikh_masuk = get_cell(row, header_map, "tarikhMasuk")
     raw_tarikh_keluar = get_cell(row, header_map, "tarikhKeluar")
-    tarikh_masuk = normalize_date(raw_tarikh_masuk)
-    tarikh_keluar = normalize_date(raw_tarikh_keluar)
-    if raw_tarikh_masuk.strip() and not _is_iso_date(tarikh_masuk):
-        issues.append("tarikhMasuk invalid")
-    if raw_tarikh_keluar.strip() and not _is_iso_date(tarikh_keluar):
-        issues.append("tarikhKeluar invalid")
+    tarikh_masuk = _normalize_optional_date(raw_tarikh_masuk)
+    tarikh_keluar = _normalize_optional_date(raw_tarikh_keluar)
 
     return ExtractedResident(
         nama=nama,
@@ -507,8 +504,29 @@ def _normalize_email(value: str) -> str:
     return email if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) else ""
 
 
+def _normalize_optional_date(value: str) -> str:
+    raw_value = value.strip()
+
+    if not raw_value or raw_value.lower() in {"-", "n/a", "na", "tiada", "null"}:
+        return ""
+
+    normalized = normalize_date(raw_value)
+
+    if not _is_iso_date(normalized):
+        return ""
+
+    return date.fromisoformat(normalized).strftime("%d/%m/%Y")
+
+
 def _is_iso_date(value: str) -> bool:
-    return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", value))
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return False
+
+    try:
+        date.fromisoformat(value)
+        return True
+    except ValueError:
+        return False
 
 
 def _normalize_jawatan(value: str) -> str:
@@ -566,7 +584,7 @@ def _repair_penghuni_with_gemini(candidates: list[dict]) -> list[ExtractedReside
                             "tarikhKeluar, and catatan. Rules: noKadPengenalan must contain "
                             "12 digits only, removing dashes and spaces. Phone numbers should "
                             "remove dashes and spaces. Email must be a valid email or empty. "
-                            "Dates must be ISO yyyy-mm-dd or empty. Do not invent extra rows. "
+                            "Dates must be DD/MM/YYYY or empty. Do not invent extra rows. "
                             "If a required nama or noKadPengenalan cannot be confidently repaired, "
                             "omit that row.\n\n"
                             f"Rows JSON:\n{json.dumps(candidates, ensure_ascii=False)}"
@@ -674,13 +692,8 @@ def _resident_from_ai_record(record: dict) -> ExtractedResident | None:
     if not nama or not _looks_like_ic_number(no_kad_pengenalan):
         return None
 
-    tarikh_masuk = normalize_date(str(record.get("tarikhMasuk", "")).strip())
-    tarikh_keluar = normalize_date(str(record.get("tarikhKeluar", "")).strip())
-
-    if tarikh_masuk and not _is_iso_date(tarikh_masuk):
-        tarikh_masuk = ""
-    if tarikh_keluar and not _is_iso_date(tarikh_keluar):
-        tarikh_keluar = ""
+    tarikh_masuk = _normalize_optional_date(str(record.get("tarikhMasuk", "")))
+    tarikh_keluar = _normalize_optional_date(str(record.get("tarikhKeluar", "")))
 
     return ExtractedResident(
         nama=nama,
