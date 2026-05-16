@@ -14,6 +14,8 @@ type BaseFieldStyleProps = {
     placeholder?: string;
     activeBackgroundClass?: string;
     inactiveBackgroundClass?: string;
+    error?: boolean;
+    errorMessage?: string;
 };
 
 // Topic section header component for grouping related form fields.
@@ -35,24 +37,27 @@ export function InputField({
     inputMinHeight,
     placeholder = "",
     activeBackgroundClass = "bg-white",
-    inactiveBackgroundClass = "bg-transparent"
+    inactiveBackgroundClass = "bg-transparent", 
+    error = false, 
+    errorMessage = ""
 }: {
     label: string;
     value: string;
     state: FieldState;
     onChange?: (value: string) => void;
 } & BaseFieldStyleProps) {
+    const isDisabled = state === "inactive";
+
     return (
         <div className={`flex flex-col gap-2 tracking-widest ${className || ""}`}>
             <label className="font-bold text-gray-500 pl-1" style={{ fontSize: labelFontSize }}>{label}</label>
             <input
                 type="text"
                 value={value}
-                disabled={state === "inactive"}
+                disabled={isDisabled}
                 onChange={(e) => onChange && onChange(e.target.value)}
                 placeholder={placeholder}
-                className={`
-                    rounded-md border border-light-grey/40 p-3 text-sm min-h-12
+                className={`rounded-md p-3 text-sm min-h-12 border outline-none ${error ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
                     ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
                 }`}
                 style={{
@@ -60,6 +65,9 @@ export function InputField({
                     minHeight: inputMinHeight,
                 }}
             />
+            {error && errorMessage && (
+                <p className="text-red text-xs pl-1">{errorMessage}</p>
+            )}
         </div>
     );
 }
@@ -77,7 +85,9 @@ export function InputFieldFormat({
     inputMinHeight,
     placeholder = "",
     activeBackgroundClass = "bg-white",
-    inactiveBackgroundClass = "bg-transparent"
+    inactiveBackgroundClass = "bg-transparent", 
+    error = false, 
+    errorMessage = ""
 }: {
     label: string;
     format: string;
@@ -85,6 +95,7 @@ export function InputFieldFormat({
     state: FieldState;
     onChange?: (value: string) => void;
 } & BaseFieldStyleProps) {
+    const showError = !!error;
     return (
         <div className={`flex flex-col gap-2 tracking-widest ${className || ""}`}>
             <label className="font-bold text-gray-500 pl-1" style={{ fontSize: labelFontSize }}>{label}</label>
@@ -94,7 +105,7 @@ export function InputFieldFormat({
                     value={value}
                     disabled
                     placeholder={placeholder}
-                    className={`rounded-md border border-light-grey/40 p-3 text-sm min-h-12 ${inactiveBackgroundClass}`}
+                    className={`rounded-md p-3 text-sm min-h-12 border outline-none ${showError ? 'border-red focus-within:border-red' : 'border border-light-grey/40'} ${inactiveBackgroundClass}`}
                     style={{ fontSize: inputFontSize, minHeight: inputMinHeight }}
                 />
             ) : (
@@ -104,8 +115,7 @@ export function InputFieldFormat({
                     disabled={state === "inactive"}
                     onValueChange={(values) => onChange && onChange(values.value)}
                     placeholder={placeholder}
-                    className={`
-                        rounded-md border border-light-grey/40 p-3 text-sm min-h-12 
+                    className={`rounded-md p-3 text-sm min-h-12 border outline-none ${showError ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
                         ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
                     }`}
                     style={{
@@ -113,6 +123,9 @@ export function InputFieldFormat({
                         minHeight: inputMinHeight,
                     }}
                 />
+            )}
+            {showError && errorMessage && (
+                <p className="text-red text-xs pl-1">{errorMessage}</p>
             )}
         </div>
     );
@@ -130,13 +143,16 @@ export function InputBox({
     inputMinHeight,
     placeholder = "",
     activeBackgroundClass = "bg-white",
-    inactiveBackgroundClass = "bg-transparent"
+    inactiveBackgroundClass = "bg-transparent", 
+    error = false, 
+    errorMessage = ""
 }: {
     label: string;
     value: string;
     state: FieldState;
     onChange?: (value: string) => void;
 } & BaseFieldStyleProps) {
+    const showError = !!error;
     return (
         <div className={`flex flex-col gap-2 tracking-widest ${className || ""}`}>
             <label className="font-bold text-gray-500 pl-1" style={{ fontSize: labelFontSize }}>{label}</label>
@@ -145,8 +161,7 @@ export function InputBox({
                 disabled={state === "inactive"}
                 onChange={(e) => onChange && onChange(e.target.value)}
                 placeholder={placeholder}
-                className={`
-                    rounded-md border border-light-grey/40 p-3 text-sm min-h-24
+                className={`rounded-md p-3 text-sm min-h-24 border outline-none ${showError ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
                     ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
                 }`}
                 style={{
@@ -154,6 +169,9 @@ export function InputBox({
                     minHeight: inputMinHeight,
                 }}
             />
+            {showError && errorMessage && (
+                <p className="text-red text-xs pl-1">{errorMessage}</p>
+            )}
         </div>
     );
 }
@@ -177,7 +195,9 @@ export function DropdownField({
     inputMinHeight,
     placeholder = "",
     activeBackgroundClass = "bg-white",
-    inactiveBackgroundClass = "bg-transparent"
+    inactiveBackgroundClass = "bg-transparent", 
+    error = false, 
+    errorMessage = ""
 }: {
     label: string;
     options: (string | DropdownOption)[];
@@ -186,6 +206,7 @@ export function DropdownField({
     onChange?: (value: string) => void;
 } & BaseFieldStyleProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const showError = !!error;
     
     const normalizedOptions = options.map(opt => 
         typeof opt === 'string' ? { label: opt } : opt
@@ -201,8 +222,8 @@ export function DropdownField({
                 <button
                     onClick={() => state === "active" && setIsOpen(!isOpen)}
                     disabled={state === "inactive"}
-                    className={`
-                        flex flex-row items-center justify-between w-full rounded-md border border-light-grey/40 p-3 text-sm text-left min-h-12
+                    className={`flex flex-row items-center justify-between w-full rounded-md p-3 text-sm text-left min-h-12
+                        ${showError ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
                         ${state === "active" ? `${activeBackgroundClass} cursor-pointer` : `${inactiveBackgroundClass} cursor-not-allowed`}
                     `}
                     style={{
@@ -220,6 +241,9 @@ export function DropdownField({
                         </div>
                     )}
                 </button>
+                {showError && errorMessage && (
+                    <p className="text-red text-xs pl-1">{errorMessage}</p>
+                )}
 
                 {/* Dropdown Menu */}
                 {isOpen && state === "active" && (

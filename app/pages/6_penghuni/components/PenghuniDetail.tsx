@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { calculateAgeByIc } from "@/app/utils/resident";
 import type { ResidentRecord } from "../page";
 import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "./InputField";
-import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave } from "../controller/DatabaseControl";
+import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave, stripResidentFormatting } from "../controller/DatabaseControl";
 import PenghuniDetailHistory from "./PenghuniDetailHistory";
 import { resolveResidentStatusRules } from "../controller/StatusControl";
 
@@ -21,14 +21,19 @@ type NotificationState = {
     message: string;
 };
 
+// Helper function for displaying arrears amount
 function getArrearsTextClass(amount: number) {
-    if (amount < 0) 
-        return "text-green";
-
-    if (amount > 0)
-        return "text-red";
-
+    if (amount < 0) return "text-green";
+    if (amount > 0) return "text-red";
     return "";
+}
+
+// Helper function to format date for display
+function formatDateForDisplay(dateString: string | null | undefined) {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("ms-MY", { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").join("/");
 }
 
 export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
@@ -109,6 +114,13 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         setTimeout(() => setNotification({ type: null, message: "" }), 3000);
     };
 
+    // Helper function to format date for display.
+    const formatDate = (dateString: string) => {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        return date.toLocaleDateString("ms-MY", { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").join("/");
+    };
+
     const statusRules = resolveResidentStatusRules(
         originalData.status as string,
         formData.icNumber,
@@ -141,6 +153,11 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
 
     // Validate status transition rules before saving.
     const validateAndSave = () => {
+        if (!isFormValid) {
+            showNotification("error", "Sila semak medan NAMA dan NO. KP.");
+            return;
+        }
+
         if (!statusRules.allowedStatuses.includes(formData.status as string)) {
             showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
             return;
@@ -158,13 +175,6 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         onClose,
     });
 
-    // Helper functions to format date and time for display.
-    const formatDate = (dateString: string) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleDateString("ms-MY", { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").join("/");
-    };
-
     // Helper function to format time for display.
     const formatTime = (dateString: string) => {
         if (!dateString) return "";
@@ -174,6 +184,13 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
 
     const statusFieldOptions = statusRules.options;
     const statusFieldState = statusRules.state;
+
+    // Form Status
+    const nameValue = formData.fullName ?? "";
+    const icValue = formData.icNumber ?? "";
+    const isNameValid = nameValue.trim() !== "";
+    const isIcValid = stripResidentFormatting(icValue).length === 12;
+    const isFormValid = isNameValid && isIcValid;
 
     return (
         <div>
@@ -232,9 +249,26 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                 <section className="flex flex-col gap-4">
                                     <Topic content="MAKLUMAT PERIBADI" />
                                     <div className="grid grid-cols-2 gap-4">
-                                        <InputField label="NAMA" value={displayValue(formData.fullName)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "fullName")} className="col-span-1"/>
+                                        <InputField
+                                            label="NAMA"
+                                            value={displayValue(formData.fullName)}
+                                            state={inputState}
+                                            onChange={handleFieldChange.bind(null, setFormData, "fullName")}
+                                            className="col-span-1"
+                                            error={kemasKini && !isNameValid}
+                                            errorMessage={kemasKini && !isNameValid ? "Sila masukkan nama." : ""}
+                                        />
                                         <div className="col-span-1 grid grid-cols-2 gap-4">
-                                            <InputFieldFormat label="NO. K/P" format="######-##-####" value={displayValue(formData.icNumber)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "icNumber")} className="col-span-1"/>
+                                            <InputFieldFormat
+                                                label="NO. K/P"
+                                                format="######-##-####"
+                                                value={displayValue(formData.icNumber)}
+                                                state={inputState}
+                                                onChange={handleFieldChange.bind(null, setFormData, "icNumber")}
+                                                className="col-span-1"
+                                                error={kemasKini && !isIcValid}
+                                                errorMessage={kemasKini && !isIcValid ? "No. KP mesti mengandungi 12 digit." : ""}
+                                            />
                                             <InputField label="UMUR" value={displayValue(formData.icNumber ? calculateAgeByIc(formData.icNumber) : "") } state="inactive" className="col-span-1" />
                                         </div>
                                     </div>
@@ -291,14 +325,14 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                 <section className="flex flex-col gap-4">
                                     <Topic content="MAKLUMAT KUARTERS" />
                                     <div className="grid grid-cols-2 gap-4">
-                                        <InputField label="KATEGORI" value={displayValue(formData.quarters?.quarterName)} state="inactive" className="col-span-1"/>
-                                        <InputField label="UNIT KUARTERS" value={displayValue(formData.quarters?.unitCode)} state="inactive" className="col-span-1"/>
-                                        <InputField label="ALAMAT KUARTERS" value={displayValue(formData.quarters?.address)} state="inactive" className="col-span-2"/>
+                                        <InputField label="KATEGORI" value={formData.quarters?.quarterName ?? (isInactive ? "N/A" : "")} state="inactive" className="col-span-1"/>
+                                        <InputField label="UNIT KUARTERS" value={formData.quarters?.unitCode ?? (isInactive ? "N/A" : "")} state="inactive" className="col-span-1"/>
+                                        <InputField label="ALAMAT KUARTERS" value={formData.quarters?.address ?? (isInactive ? "N/A" : "")} state="inactive" className="col-span-2"/>
                                         <div className="col-span-1 grid grid-cols-2 gap-4">
-                                            <InputField label="TARIKH MASUK" value={displayValue(formatDate(formData.quarters?.moveInDate ?? ""))} state="inactive" className="col-span-1"/>
-                                            <InputField label="TARIKH KELUAR" value={displayValue(formData.quarters?.moveOutDate ? formatDate(formData.quarters.moveOutDate) : "")} state="inactive" className="col-span-1"/>
+                                            <InputField label="TARIKH MASUK" value={formatDateForDisplay(formData.quarters?.moveInDate)} state="inactive" className="col-span-1"/>
+                                            <InputField label="TARIKH KELUAR" value={formatDateForDisplay(formData.quarters?.moveOutDate)} state="inactive" className="col-span-1"/>
                                         </div>
-                                        <InputField label="TUNGGAKAN (RM)" value={formData.totalArrearsAmount?.totalArrearsAmount != null ? `${Number(formData.totalArrearsAmount.totalArrearsAmount).toFixed(2).toString()}` : displayValue("")} state="inactive" className={`col-span-1 ${formData.totalArrearsAmount?.totalArrearsAmount != null ? getArrearsTextClass(Number(formData.totalArrearsAmount.totalArrearsAmount)) : ""}`}/>
+                                        <InputField label="TUNGGAKAN (RM)" value={formData.totalArrearsAmount?.totalArrearsAmount != null ? `${Number(formData.totalArrearsAmount.totalArrearsAmount).toFixed(2).toString()}` : (isInactive ? "N/A" : "")} state="inactive" className={`col-span-1 ${formData.totalArrearsAmount?.totalArrearsAmount != null ? getArrearsTextClass(Number(formData.totalArrearsAmount.totalArrearsAmount)) : ""}`}/>
                                     </div>
                                 </section>
 
@@ -361,7 +395,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                                 className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 type="button"
                                                 onClick={validateAndSave}
-                                                disabled={isSaving}
+                                                disabled={isSaving || !isFormValid}
                                             >
                                                 <Icon icon="save" size={16} />
                                                 {isSaving ? "Sedang Simpan..." : "Simpan Rekod"}

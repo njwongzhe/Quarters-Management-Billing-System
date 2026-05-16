@@ -13,6 +13,8 @@ export type ResidentsQuarterInfo = {
     address: string | null;
     moveInDate: string | null;
     moveOutDate: string | null;
+    unitId?: string;
+    categoryId?: string;
 };
 
 export type ResidentsArrearsInfo = {
