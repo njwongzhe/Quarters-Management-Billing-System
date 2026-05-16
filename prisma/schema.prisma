@@ -339,10 +339,10 @@ model Payment {
 }
 
 model Transaction {
-  id            String  @id @default(uuid()) @db.Uuid
-  transactionNo String? @unique
-  residentId    String? @db.Uuid
-  paymentId     String? @unique @db.Uuid
+  id                   String             @id @default(uuid()) @db.Uuid
+  transactionNo        String?            @unique 
+  residentId           String?            @db.Uuid  
+  paymentId            String?            @unique @db.Uuid
 
   transactionDate DateTime
   category        TransactionCategory
@@ -554,3 +554,4 @@ model BillingCycle {
 
   @@index([billingMonth])
 }
+
