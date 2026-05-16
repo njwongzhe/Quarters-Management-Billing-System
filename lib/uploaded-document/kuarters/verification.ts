@@ -14,7 +14,13 @@ export async function verifyKuartersDrafts(
 ): Promise<VerifyResult> {
   const selectedKeySet = new Set(selectedKeys);
   const categoryDrafts = await tx.quarterCategoryDraft.findMany({
-    where: { uploadedDocumentId },
+    where: {
+      uploadedDocumentId,
+      OR: [
+        { id: { in: selectedKeys } },
+        { units: { some: { id: { in: selectedKeys } } } },
+      ],
+    },
     include: { units: true },
     orderBy: { createdAt: "asc" },
   });

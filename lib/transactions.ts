@@ -242,6 +242,19 @@ export async function adjustTransaction(
  * We pass the `txClient` so it works safely inside Prisma $transactions.
  */
 export async function generateTransactionNo(txClient: any = prisma): Promise<string> {
+  return (await generateTransactionNos(txClient, 1))[0];
+}
+
+export async function generateTransactionNos(
+  txClient: any = prisma,
+  count = 1,
+): Promise<string[]> {
+  const totalCount = Math.max(0, Math.floor(count));
+
+  if (totalCount === 0) {
+    return [];
+  }
+
   const today = new Date();
   
   // Format date as YYYYMMDD
@@ -275,8 +288,10 @@ export async function generateTransactionNo(txClient: any = prisma): Promise<str
     }
   }
 
-  // Pad the sequence with zeros to ensure it is 8 digits long
-  const sequenceStr = String(nextSequence).padStart(8, '0');
-  
-  return `${datePrefix}-${sequenceStr}`;
+  return Array.from({ length: totalCount }, (_value, index) => {
+    // Pad the sequence with zeros to ensure it is 8 digits long
+    const sequenceStr = String(nextSequence + index).padStart(8, '0');
+
+    return `${datePrefix}-${sequenceStr}`;
+  });
 }

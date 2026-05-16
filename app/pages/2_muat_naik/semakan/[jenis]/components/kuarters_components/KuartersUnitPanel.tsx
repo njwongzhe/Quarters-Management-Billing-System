@@ -24,6 +24,7 @@ type KuartersUnitPanelProps = {
   onToggleAllUnits: (checked: boolean) => void;
   onStartEdit: (unitKey: string, unitCode: string) => void;
   onSaveUnit: (unitKey: string) => Promise<void>;
+  onDeleteUnit: (unitKey: string) => Promise<void>;
   onCancelEdit: () => void;
 };
 
@@ -79,6 +80,7 @@ export default function KuartersUnitPanel({
   onToggleAllUnits,
   onStartEdit,
   onSaveUnit,
+  onDeleteUnit,
   onCancelEdit,
 }: KuartersUnitPanelProps) {
   const hasSelectableUnits = units.some(isSelectableUnit);
@@ -167,10 +169,12 @@ export default function KuartersUnitPanel({
                     />
                     <ActionButton
                       icon="delete"
-                      label="Batal edit unit"
+                      label="Padam unit"
                       textClass="text-red"
                       disabled={isSaving}
-                      onClick={onCancelEdit}
+                      onClick={() => {
+                        void onDeleteUnit(unitKey);
+                      }}
                     />
                   </>
                 ) : (

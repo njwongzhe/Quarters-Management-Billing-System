@@ -552,6 +552,113 @@ export default function ExtractReviewPage({
     throw new Error(message);
   };
 
+  const deleteKuartersCategoryDraft = async ({
+    categoryId,
+  }: {
+    categoryId: string;
+  }) => {
+    if (!draftId || !kuartersExtract) {
+      throw new Error("Dokumen semakan tidak ditemui.");
+    }
+
+    const response = await fetch(draftUpdateRouteByKind.kuarters(draftId), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "delete-kuarters-category",
+        categoryId,
+      }),
+    });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message = result?.message ?? "Gagal memadam kategori kuarters.";
+      showVerificationNotice("error", message);
+      throw new Error(message);
+    }
+
+    const deletedCategory = kuartersExtract.records.find(
+      (record) => record.categoryId === categoryId || record.id === categoryId,
+    );
+    const removedKeys = new Set<string>([
+      categoryId,
+      ...(deletedCategory?.units.map((unit) => unit.unitId ?? unit.unitCode) ?? []),
+    ]);
+    const nextRecords = kuartersExtract.records.filter(
+      (record) => record.categoryId !== categoryId && record.id !== categoryId,
+    );
+
+    setExtractResult({
+      ...kuartersExtract,
+      recordCount: nextRecords.length,
+      totalUnits: nextRecords.reduce(
+        (total, record) => total + record.units.length,
+        0,
+      ),
+      records: nextRecords,
+    });
+    setSelectedRecordKeys((currentKeys) =>
+      currentKeys.filter((key) => !removedKeys.has(key)),
+    );
+    clearVerificationNotice();
+  };
+
+  const deleteKuartersUnitDraft = async ({
+    categoryId,
+    unitId,
+  }: {
+    categoryId: string;
+    unitId: string;
+  }) => {
+    if (!draftId || !kuartersExtract) {
+      throw new Error("Dokumen semakan tidak ditemui.");
+    }
+
+    const response = await fetch(draftUpdateRouteByKind.kuarters(draftId), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "delete-kuarters-unit",
+        categoryId,
+        unitId,
+      }),
+    });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message = result?.message ?? "Gagal memadam unit kuarters.";
+      showVerificationNotice("error", message);
+      throw new Error(message);
+    }
+
+    const nextRecords = kuartersExtract.records.map((record) => {
+      if (record.categoryId !== categoryId && record.id !== categoryId) {
+        return record;
+      }
+
+      const nextUnits = record.units.filter((unit) => unit.unitId !== unitId);
+
+      return { ...record, units: nextUnits, unitCount: nextUnits.length };
+    });
+
+    setExtractResult({
+      ...kuartersExtract,
+      totalUnits: nextRecords.reduce(
+        (total, record) => total + record.units.length,
+        0,
+      ),
+      records: nextRecords,
+    });
+    setSelectedRecordKeys((currentKeys) =>
+      currentKeys.filter((key) => key !== unitId),
+    );
+    clearVerificationNotice();
+  };
+
   const handleReviewLater = () => {
     router.push(`${ROUTES.muatNaik}?kategori=${encodeURIComponent(kind)}`);
   };
@@ -662,6 +769,8 @@ export default function ExtractReviewPage({
           onKuartersRecordsChange={updateCurrentKuartersDraft}
           onKuartersCategoryChange={updateKuartersCategoryDraft}
           onKuartersUnitChange={updateKuartersUnitDraft}
+          onKuartersCategoryDelete={deleteKuartersCategoryDraft}
+          onKuartersUnitDelete={deleteKuartersUnitDraft}
           tunggakanRecords={tunggakanExtract?.records ?? []}
           tunggakanParsingMode={tunggakanExtract?.parsingMode}
           onTunggakanRecordsChange={updateCurrentTunggakanDraft}

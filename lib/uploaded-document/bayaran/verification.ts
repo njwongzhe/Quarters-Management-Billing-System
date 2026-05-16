@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import { generateTransactionNo } from "@/lib/transactions";
+import { generateTransactionNos } from "@/lib/transactions";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
@@ -13,6 +13,8 @@ export async function verifyBayaranDrafts(
     where: { uploadedDocumentId, id: { in: selectedKeys } },
   });
   const failedMessages: string[] = [];
+  const transactionNos = await generateTransactionNos(tx, drafts.length);
+  let transactionNoIndex = 0;
   let verifiedRows = 0;
 
   for (const draft of drafts) {
@@ -51,7 +53,7 @@ export async function verifyBayaranDrafts(
       },
       select: { id: true },
     });
-    const transactionNo = await generateTransactionNo(tx);
+    const transactionNo = transactionNos[transactionNoIndex++];
 
     await tx.transaction.create({
       data: {

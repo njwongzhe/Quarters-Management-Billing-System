@@ -12,7 +12,14 @@ import { verifyTunggakanDrafts } from "@/lib/uploaded-document/tunggakan/verific
 
 const uploadedDocumentTransactionOptions = {
   maxWait: 30000,
-  timeout: 300000,
+  timeout: 120000,
+};
+
+const verifyChunkSizeByKind: Record<VerifyKind, number> = {
+  bayaran: 50,
+  tunggakan: 50,
+  penghuni: 20,
+  kuarters: Number.MAX_SAFE_INTEGER,
 };
 
 export type VerifyKind = ExtractResult["documentType"];
@@ -26,6 +33,10 @@ export type VerifyResult = {
 export type UploadedDocumentVerificationResult = VerifyResult & {
   message: string;
   remainingExtractResult: ExtractResult | null;
+};
+
+type VerificationAccumulator = VerifyResult & {
+  document: Awaited<ReturnType<typeof findUploadedDocumentForVerification>> | null;
 };
 
 export function parseSelectedKeys(body: unknown) {
@@ -48,55 +59,47 @@ export async function verifyUploadedDocumentForKind(
     throw new Error("Sila pilih sekurang-kurangnya satu rekod untuk disahkan.");
   }
 
-  const result = await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      const document = await tx.uploadedDocument.findUnique({
-        where: { id: uploadedDocumentId },
-        include: { uploadedBy: { select: { fullName: true } } },
-      });
+  const document = await findUploadedDocumentForVerification(uploadedDocumentId);
 
-      if (!document) {
-        throw new Error("Dokumen tidak ditemui.");
-      }
+  if (!document) {
+    throw new Error("Dokumen tidak ditemui.");
+  }
 
-      if (document.category !== kind.toUpperCase()) {
-        throw new Error("Jenis dokumen semakan tidak sepadan.");
-      }
+  if (document.category !== kind.toUpperCase()) {
+    throw new Error("Jenis dokumen semakan tidak sepadan.");
+  }
 
-      let verifyResult: VerifyResult;
+  const result: VerificationAccumulator = {
+    verifiedRows: 0,
+    failedMessages: [],
+    successMessages: [],
+    document,
+  };
 
-      if (kind === "bayaran") {
-        verifyResult = await verifyBayaranDrafts(tx, uploadedDocumentId, selectedKeys);
-      } else if (kind === "tunggakan") {
-        verifyResult = await verifyTunggakanDrafts(
-          tx,
-          uploadedDocumentId,
-          selectedKeys,
-        );
-      } else if (kind === "penghuni") {
-        verifyResult = await verifyPenghuniDrafts(tx, uploadedDocumentId, selectedKeys);
-      } else {
-        verifyResult = await verifyKuartersDrafts(tx, uploadedDocumentId, selectedKeys);
-      }
+  for (const chunk of chunkSelectedKeys(selectedKeys, verifyChunkSizeByKind[kind])) {
+    const chunkResult = await prisma.$transaction(
+      (tx: Prisma.TransactionClient) =>
+        verifyUploadedDocumentChunk(tx, kind, uploadedDocumentId, chunk),
+      uploadedDocumentTransactionOptions,
+    );
 
-      const remainingDocument = await tx.uploadedDocument.findUnique({
-        where: { id: uploadedDocumentId },
-        include: { uploadedBy: { select: { fullName: true } } },
-      });
+    result.verifiedRows += chunkResult.verifiedRows;
+    result.failedMessages.push(...chunkResult.failedMessages);
+    result.successMessages?.push(...(chunkResult.successMessages ?? []));
+  }
 
-      if (!remainingDocument) {
-        throw new Error("Dokumen tidak ditemui.");
-      }
+  const hasRemainingDrafts = await hasRemainingDraftRows(kind, uploadedDocumentId);
 
-      return {
-        ...verifyResult,
-        document: remainingDocument,
-      };
-    },
-    uploadedDocumentTransactionOptions,
-  );
+  if (!hasRemainingDrafts) {
+    await prisma.uploadedDocument.delete({ where: { id: uploadedDocumentId } });
+    result.document = null;
+  } else {
+    result.document = await findUploadedDocumentForVerification(uploadedDocumentId);
+  }
 
-  const remainingDraft = await mapUploadedDocumentForReview(result.document);
+  const remainingDraft = result.document
+    ? await mapUploadedDocumentForReview(result.document)
+    : null;
   const successSuffix =
     result.successMessages && result.successMessages.length > 0
       ? ` ${result.successMessages.join(" ")}`
@@ -114,6 +117,67 @@ export async function verifyUploadedDocumentForKind(
         : `Tiada rekod baharu disahkan.${failedSuffix}`,
     remainingExtractResult: remainingDraft?.extractResult ?? null,
   };
+}
+
+async function findUploadedDocumentForVerification(uploadedDocumentId: string) {
+  return prisma.uploadedDocument.findUnique({
+    where: { id: uploadedDocumentId },
+    include: { uploadedBy: { select: { fullName: true } } },
+  });
+}
+
+async function verifyUploadedDocumentChunk(
+  tx: Prisma.TransactionClient,
+  kind: VerifyKind,
+  uploadedDocumentId: string,
+  selectedKeys: string[],
+) {
+  if (kind === "bayaran") {
+    return verifyBayaranDrafts(tx, uploadedDocumentId, selectedKeys);
+  }
+
+  if (kind === "tunggakan") {
+    return verifyTunggakanDrafts(tx, uploadedDocumentId, selectedKeys);
+  }
+
+  if (kind === "penghuni") {
+    return verifyPenghuniDrafts(tx, uploadedDocumentId, selectedKeys);
+  }
+
+  return verifyKuartersDrafts(tx, uploadedDocumentId, selectedKeys);
+}
+
+function chunkSelectedKeys(selectedKeys: string[], chunkSize: number) {
+  const chunks: string[][] = [];
+
+  for (let index = 0; index < selectedKeys.length; index += chunkSize) {
+    chunks.push(selectedKeys.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+async function hasRemainingDraftRows(kind: VerifyKind, uploadedDocumentId: string) {
+  if (kind === "bayaran") {
+    return (await prisma.paymentDraft.count({ where: { uploadedDocumentId } })) > 0;
+  }
+
+  if (kind === "tunggakan") {
+    return (
+      (await prisma.arrearsSummaryDraft.count({ where: { uploadedDocumentId } })) > 0
+    );
+  }
+
+  if (kind === "penghuni") {
+    return (await prisma.residentDraft.count({ where: { uploadedDocumentId } })) > 0;
+  }
+
+  const [categoryCount, unitCount] = await Promise.all([
+    prisma.quarterCategoryDraft.count({ where: { uploadedDocumentId } }),
+    prisma.unitDraft.count({ where: { uploadedDocumentId } }),
+  ]);
+
+  return categoryCount + unitCount > 0;
 }
 
 type VerifyRouteContext = {

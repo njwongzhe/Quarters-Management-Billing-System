@@ -2,6 +2,11 @@ import type { Prisma } from "@prisma/client";
 
 import type { ExtractedQuarterRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
 
+type KuartersDeleteClient = Pick<
+  Prisma.TransactionClient,
+  "quarterCategoryDraft" | "unitDraft"
+>;
+
 function normalizeKuartersText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -217,5 +222,48 @@ export async function updateKuartersDrafts(
         data: { unitCode: unit.unitCode },
       });
     }
+  }
+}
+
+export async function deleteKuartersUnitDraft(
+  tx: KuartersDeleteClient,
+  uploadedDocumentId: string,
+  payload: object,
+) {
+  const body = payload as Record<string, unknown>;
+  const unitId = normalizeKuartersText(body.unitId);
+  const categoryId = normalizeKuartersText(body.categoryId);
+
+  if (!unitId || !categoryId) {
+    throw new Error("Data unit kuarters tidak lengkap.");
+  }
+
+  const deleteResult = await tx.unitDraft.deleteMany({
+    where: { id: unitId, uploadedDocumentId, categoryDraftId: categoryId },
+  });
+
+  if (deleteResult.count === 0) {
+    throw new Error("Unit kuarters tidak ditemui dalam draf semakan.");
+  }
+}
+
+export async function deleteKuartersCategoryDraft(
+  tx: KuartersDeleteClient,
+  uploadedDocumentId: string,
+  payload: object,
+) {
+  const body = payload as Record<string, unknown>;
+  const categoryId = normalizeKuartersText(body.categoryId);
+
+  if (!categoryId) {
+    throw new Error("Data kategori kuarters tidak lengkap.");
+  }
+
+  const deleteResult = await tx.quarterCategoryDraft.deleteMany({
+    where: { id: categoryId, uploadedDocumentId },
+  });
+
+  if (deleteResult.count === 0) {
+    throw new Error("Kategori kuarters tidak ditemui dalam draf semakan.");
   }
 }

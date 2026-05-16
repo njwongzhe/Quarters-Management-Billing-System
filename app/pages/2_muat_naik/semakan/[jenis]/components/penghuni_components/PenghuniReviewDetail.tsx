@@ -314,11 +314,20 @@ export default function PenghuniReviewDetail({
                     <Icon icon="edit" size={13} />
                     <div className="text-xs">Sedang menyunting rekod ini...</div>
                   </div>
-                  <div className="flex gap-3 w-xs">
+                  <div className="flex gap-3 w-[28rem]">
+                    <button
+                      className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90 disabled:cursor-not-allowed disabled:opacity-60"
+                      type="button"
+                      disabled={isSaving || isDeleting}
+                      onClick={handleDelete}
+                    >
+                      <Icon icon="delete" size={16} />
+                      {isDeleting ? "Sedang Padam..." : "Padam Rekod"}
+                    </button>
                     <button
                       className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90"
                       type="button"
-                      disabled={isSaving}
+                      disabled={isSaving || isDeleting}
                       onClick={() => {
                         setFormData(originalData);
                         setKemasKini(false);
@@ -330,7 +339,7 @@ export default function PenghuniReviewDetail({
                     <button
                       className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
                       type="button"
-                      disabled={isSaving}
+                      disabled={isSaving || isDeleting}
                       onClick={handleSave}
                     >
                       <Icon icon={isSaving ? "progress_activity" : "save"} size={16} />

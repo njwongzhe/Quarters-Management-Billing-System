@@ -31,6 +31,7 @@ type KuartersCategoryTableProps = {
     value: string,
   ) => void;
   onSaveCategory: (categoryId: string) => Promise<void>;
+  onDeleteCategory: (categoryId: string) => Promise<void>;
   onCancelEdit: () => void;
 };
 
@@ -109,6 +110,7 @@ export default function KuartersCategoryTable({
   onStartEdit,
   onUpdateDraft,
   onSaveCategory,
+  onDeleteCategory,
   onCancelEdit,
 }: KuartersCategoryTableProps) {
   return (
@@ -268,7 +270,10 @@ export default function KuartersCategoryTable({
                             label="Padam kategori"
                             textClass="text-red"
                             disabled={isSaving}
-                            onClick={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void onDeleteCategory(category.id);
+                            }}
                           />
                           <ActionButton
                             icon="chevron_left"

@@ -30,6 +30,11 @@ type KuartersReviewTableProps = {
     unitId: string;
     unitCode: string;
   }) => Promise<void>;
+  onCategoryDelete?: (params: { categoryId: string }) => Promise<void>;
+  onUnitDelete?: (params: {
+    categoryId: string;
+    unitId: string;
+  }) => Promise<void>;
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
 };
@@ -39,6 +44,8 @@ export default function KuartersReviewTable({
   onRecordsChange,
   onCategoryChange,
   onUnitChange,
+  onCategoryDelete,
+  onUnitDelete,
   selectedKeys = [],
   onSelectedKeysChange,
 }: KuartersReviewTableProps) {
@@ -322,6 +329,60 @@ export default function KuartersReviewTable({
     }
   };
 
+  const deleteCategory = async (categoryId: string) => {
+    if (isSaving) {
+      return;
+    }
+
+    const targetCategory = categories.find((category) => category.id === categoryId);
+
+    if (!targetCategory) {
+      setEditingCategoryId(null);
+      return;
+    }
+
+    const unitKeys = new Set(targetCategory.units.map(getUnitKey));
+    const categoryKey = getKuartersRecordKey(targetCategory);
+    const nextCategories = categories.filter((category) => category.id !== categoryId);
+
+    setSavingTarget(`category:${categoryId}`);
+    try {
+      if (onCategoryDelete && targetCategory.categoryId) {
+        await onCategoryDelete({ categoryId: targetCategory.categoryId });
+      } else {
+        await onRecordsChange?.(nextCategories);
+      }
+      setCategoryDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts };
+        delete nextDrafts[categoryId];
+        return nextDrafts;
+      });
+      setUnitDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts };
+        unitKeys.forEach((unitKey) => {
+          delete nextDrafts[unitKey];
+        });
+        return nextDrafts;
+      });
+      setEditingCategoryId(null);
+      setEditingUnitKey(null);
+      if (selectedCategoryId === categoryId) {
+        setSelectedCategoryId(nextCategories[0]?.id ?? "");
+      }
+      onSelectedKeysChange?.(
+        selectedKeys.filter((key) => key !== categoryKey && !unitKeys.has(key)),
+      );
+      showNotice("success", "Kategori kuarters berjaya dipadam.");
+    } catch (error) {
+      showNotice(
+        "error",
+        getSaveErrorMessage(error, "Gagal memadam kategori kuarters."),
+      );
+    } finally {
+      setSavingTarget(null);
+    }
+  };
+
   const cancelEditing = () => {
     if (isSaving) {
       return;
@@ -383,6 +444,59 @@ export default function KuartersReviewTable({
     }
   };
 
+  const deleteUnit = async (unitKey: string) => {
+    if (isSaving || !selectedCategory) {
+      return;
+    }
+
+    const targetUnit = selectedCategory.units.find(
+      (unit) => getUnitKey(unit) === unitKey,
+    );
+
+    if (!targetUnit) {
+      setEditingUnitKey(null);
+      return;
+    }
+
+    const nextCategories = categories.map((category) => {
+      if (category.id !== selectedCategory.id) {
+        return category;
+      }
+
+      const nextUnits = category.units.filter((unit) => getUnitKey(unit) !== unitKey);
+
+      return {
+        ...category,
+        units: nextUnits,
+        unitCount: nextUnits.length,
+      };
+    });
+
+    setSavingTarget(`unit:${unitKey}`);
+    try {
+      if (onUnitDelete && selectedCategory.categoryId && targetUnit.unitId) {
+        await onUnitDelete({
+          categoryId: selectedCategory.categoryId,
+          unitId: targetUnit.unitId,
+        });
+      } else {
+        await onRecordsChange?.(nextCategories);
+      }
+      setUnitDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts };
+        delete nextDrafts[unitKey];
+        return nextDrafts;
+      });
+      setEditingUnitKey(null);
+      onSelectedKeysChange?.(selectedKeys.filter((key) => key !== unitKey));
+      showNotice("success", "Unit kuarters berjaya dipadam.");
+    } catch (error) {
+      showNotice("error", getSaveErrorMessage(error, "Gagal memadam unit kuarters."));
+    } finally {
+      setSavingTarget(null);
+    }
+  };
+
   return (
     <>
       <div
@@ -415,6 +529,7 @@ export default function KuartersReviewTable({
           onStartEdit={startCategoryEdit}
           onUpdateDraft={updateCategoryDraft}
           onSaveCategory={saveCategory}
+          onDeleteCategory={deleteCategory}
           onCancelEdit={cancelEditing}
         />
 
@@ -443,6 +558,7 @@ export default function KuartersReviewTable({
           onToggleAllUnits={toggleAllSelectedCategoryUnits}
           onStartEdit={startUnitEdit}
           onSaveUnit={saveUnit}
+          onDeleteUnit={deleteUnit}
           onCancelEdit={cancelEditing}
         />
       </div>

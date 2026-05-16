@@ -39,6 +39,11 @@ type ReviewTableProps = {
     unitId: string;
     unitCode: string;
   }) => Promise<void>;
+  onKuartersCategoryDelete?: (params: { categoryId: string }) => Promise<void>;
+  onKuartersUnitDelete?: (params: {
+    categoryId: string;
+    unitId: string;
+  }) => Promise<void>;
   tunggakanRecords: ExtractedTunggakanRecord[];
   onTunggakanRecordsChange?: (
     records: ExtractedTunggakanRecord[],
@@ -61,6 +66,8 @@ export default function ReviewTable({
   onKuartersRecordsChange,
   onKuartersCategoryChange,
   onKuartersUnitChange,
+  onKuartersCategoryDelete,
+  onKuartersUnitDelete,
   tunggakanRecords,
   onTunggakanRecordsChange,
   selectedKeys,
@@ -120,6 +127,8 @@ export default function ReviewTable({
       onRecordsChange={onKuartersRecordsChange}
       onCategoryChange={onKuartersCategoryChange}
       onUnitChange={onKuartersUnitChange}
+      onCategoryDelete={onKuartersCategoryDelete}
+      onUnitDelete={onKuartersUnitDelete}
       selectedKeys={selectedKeys}
       onSelectedKeysChange={onSelectedKeysChange}
     />

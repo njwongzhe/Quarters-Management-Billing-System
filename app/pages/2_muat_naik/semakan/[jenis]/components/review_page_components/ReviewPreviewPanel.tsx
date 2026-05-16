@@ -44,6 +44,11 @@ type ReviewPreviewPanelProps = {
     unitId: string;
     unitCode: string;
   }) => Promise<void>;
+  onKuartersCategoryDelete?: (params: { categoryId: string }) => Promise<void>;
+  onKuartersUnitDelete?: (params: {
+    categoryId: string;
+    unitId: string;
+  }) => Promise<void>;
   tunggakanRecords: ExtractedTunggakanRecord[];
   tunggakanParsingMode?: "strict" | "assisted";
   onTunggakanRecordsChange?: (

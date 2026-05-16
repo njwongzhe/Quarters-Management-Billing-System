@@ -20,8 +20,21 @@ export async function verifyPenghuniDrafts(
   const selectedKeySet = new Set(
     selectedKeys.flatMap((key) => [normalizeSelectedKey(key), normalizeIc(key)]),
   );
+  const selectedDraftIds = selectedKeys.filter(isUuid);
+  const selectedIcNumbers = selectedKeys
+    .map(normalizeIc)
+    .filter((key) => key.length === 12);
+  const draftSelectionFilters = [
+    ...(selectedDraftIds.length > 0 ? [{ id: { in: selectedDraftIds } }] : []),
+    ...(selectedIcNumbers.length > 0
+      ? [{ icNumber: { in: selectedIcNumbers } }]
+      : []),
+  ];
   const drafts = await tx.residentDraft.findMany({
-    where: { uploadedDocumentId },
+    where: {
+      uploadedDocumentId,
+      ...(draftSelectionFilters.length > 0 ? { OR: draftSelectionFilters } : {}),
+    },
   });
   const selectedDrafts = drafts.filter((draft) => {
     const draftKeys = [
@@ -34,6 +47,7 @@ export async function verifyPenghuniDrafts(
   });
   const failedMessages: string[] = [];
   const successMessages: string[] = [];
+  const touchedUnitIds = new Set<string>();
   let createdResidents = 0;
   let updatedResidents = 0;
   let verifiedRows = 0;
@@ -49,7 +63,16 @@ export async function verifyPenghuniDrafts(
 
   for (const draft of selectedDrafts) {
     const record = buildRecordFromDraft(draft);
-    let residentId = await findResidentByNormalizedIc(tx, draft.icNumber);
+    const normalizedDraftIc = normalizeIc(draft.icNumber);
+
+    if (normalizedDraftIc.length !== 12) {
+      failedMessages.push(
+        `Penghuni ${draft.fullName} gagal disahkan kerana No. K/P tidak sah.`,
+      );
+      continue;
+    }
+
+    let residentId = await findResidentByNormalizedIc(tx, normalizedDraftIc);
     const unitResult = await resolvePenghuniUnit(
       tx,
       uploadedDocumentId,
@@ -111,7 +134,7 @@ export async function verifyPenghuniDrafts(
         where: { id: residentId },
         data: {
           fullName: draft.fullName,
-          icNumber: draft.icNumber,
+          icNumber: normalizedDraftIc,
           phone: draft.phone,
           email: draft.email,
           position: draft.position,
@@ -124,10 +147,22 @@ export async function verifyPenghuniDrafts(
       });
       updatedResidents += 1;
     } else {
-      const resident = await tx.resident.create({
-        data: {
+      const resident = await tx.resident.upsert({
+        where: { icNumber: normalizedDraftIc },
+        update: {
           fullName: draft.fullName,
-          icNumber: draft.icNumber,
+          phone: draft.phone,
+          email: draft.email,
+          position: draft.position,
+          department: draft.department,
+          serviceLevel: draft.serviceLevel,
+          status: draft.status,
+          description: draft.description,
+          uploadedDocumentId,
+        },
+        create: {
+          fullName: draft.fullName,
+          icNumber: normalizedDraftIc,
           phone: draft.phone,
           email: draft.email,
           position: draft.position,
@@ -151,10 +186,15 @@ export async function verifyPenghuniDrafts(
         moveInDate,
         moveOutDate,
       );
+      touchedUnitIds.add(unitId);
     }
 
     await tx.residentDraft.delete({ where: { id: draft.id } });
     verifiedRows += 1;
+  }
+
+  for (const unitId of touchedUnitIds) {
+    await syncUnitOccupancyStatus(tx, unitId);
   }
 
   const summaryMessages = [
@@ -279,6 +319,12 @@ function normalizeIc(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 async function upsertPenghuniOccupancy(
   tx: Prisma.TransactionClient,
   residentId: string,
@@ -323,7 +369,6 @@ async function upsertPenghuniOccupancy(
     });
   }
 
-  await syncUnitOccupancyStatus(tx, unitId);
 }
 
 async function findPenghuniOccupancyToUpdate(

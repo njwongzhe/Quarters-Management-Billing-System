@@ -11,6 +11,8 @@ import {
 } from "@/lib/uploaded-document/bayaran/draft-updates";
 import { mapUploadedDocumentForReview } from "@/lib/uploaded-document/documents";
 import {
+  deleteKuartersCategoryDraft,
+  deleteKuartersUnitDraft,
   updateKuartersCategoryDraft,
   updateKuartersDrafts,
   updateKuartersUnitDraft,
@@ -172,16 +174,49 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
       const body = await request.json();
       const payload = body && typeof body === "object" ? body : {};
 
+      const action =
+        "action" in payload ? (payload as { action?: unknown }).action : undefined;
+
       if (
-        (kind === "bayaran" || kind === "penghuni" || kind === "tunggakan") &&
-        "action" in payload &&
-        ((payload as { action?: unknown }).action === "update-bayaran-record" ||
-          (payload as { action?: unknown }).action === "update-penghuni-record" ||
-          (payload as { action?: unknown }).action === "update-tunggakan-record" ||
-          (payload as { action?: unknown }).action === "delete-penghuni-record")
+        kind === "kuarters" &&
+        (action === "delete-kuarters-unit" ||
+          action === "delete-kuarters-category")
       ) {
         await getCurrentAdmin();
-        const action = (payload as { action?: unknown }).action;
+
+        if (action === "delete-kuarters-unit") {
+          await deleteKuartersUnitDraft(prisma, id, payload);
+
+          return NextResponse.json({
+            success: true,
+            data: {
+              deletedUnitId:
+                "unitId" in payload ? (payload as { unitId?: unknown }).unitId : null,
+            },
+          });
+        }
+
+        await deleteKuartersCategoryDraft(prisma, id, payload);
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            deletedCategoryId:
+              "categoryId" in payload
+                ? (payload as { categoryId?: unknown }).categoryId
+                : null,
+          },
+        });
+      }
+
+      if (
+        (kind === "bayaran" || kind === "penghuni" || kind === "tunggakan") &&
+        (action === "update-bayaran-record" ||
+          action === "update-penghuni-record" ||
+          action === "update-tunggakan-record" ||
+          action === "delete-penghuni-record")
+      ) {
+        await getCurrentAdmin();
 
         if (action === "delete-penghuni-record") {
           const residentId =

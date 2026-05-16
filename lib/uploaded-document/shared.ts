@@ -6,6 +6,21 @@ export async function findResidentByNormalizedIc(
   tx: QueryClient,
   icNumber: string,
 ) {
+  const normalizedIc = icNumber.replace(/\D/g, "");
+
+  if (normalizedIc) {
+    const exactResidents = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id"
+      FROM "Resident"
+      WHERE "icNumber" = ${normalizedIc}
+      LIMIT 1
+    `;
+
+    if (exactResidents[0]?.id) {
+      return exactResidents[0].id;
+    }
+  }
+
   const residents = await tx.$queryRaw<{ id: string }[]>`
     SELECT "id"
     FROM "Resident"
