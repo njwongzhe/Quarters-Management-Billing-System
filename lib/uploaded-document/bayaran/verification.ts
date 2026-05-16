@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { generateTransactionNo } from "@/lib/transactions";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
@@ -50,8 +51,11 @@ export async function verifyBayaranDrafts(
       },
       select: { id: true },
     });
+    const transactionNo = await generateTransactionNo(tx);
+
     await tx.transaction.create({
       data: {
+        transactionNo,
         residentId,
         paymentId: payment.id,
         transactionDate: draft.paymentDate,

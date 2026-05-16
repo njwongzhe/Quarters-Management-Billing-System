@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { generateTransactionNo } from "@/lib/transactions";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 import { ensureResidentFromDraft } from "@/lib/uploaded-document/shared";
 
@@ -57,8 +58,11 @@ export async function verifyTunggakanDrafts(
         description: draft.description,
       },
     });
+    const transactionNo = await generateTransactionNo(tx);
+
     await tx.transaction.create({
       data: {
+        transactionNo,
         residentId,
         transactionDate,
         category: "BAKI_AWAL",
