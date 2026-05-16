@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { downloadXlsxFile } from "@/lib/xlsx-export";import TunggakanFilterPanel from "./TunggakanFilterPanel";
+import { downloadXlsxFile } from "@/lib/xlsx-export";
+import TunggakanFilterPanel from "./TunggakanFilterPanel";
 import { defaultFilter, type TunggakanFilter } from "@/lib/arrears";import Icon from "../../../components/Icon";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears"; // Make sure this path is correct!
@@ -14,6 +15,11 @@ export default function TunggakanPageClient() {
   const [data, setData] = useState<TunggakanListItem[]>([]);
   const [summary, setSummary] = useState<TunggakanSummary>({ jumlahRekod: 0, jumlahTunggakan: 0 });
   const [isLoading, setIsLoading] = useState(true);
+
+  // NEW: Billing Automation States
+  const [isBilledThisMonth, setIsBilledThisMonth] = useState(false);
+  const [lastBilledDate, setLastBilledDate] = useState<string | null>(null);
+  const [isBillingRunning, setIsBillingRunning] = useState(false);
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isKemasKiniModalOpen, setIsKemasKiniModalOpen] = useState(false);
@@ -24,6 +30,18 @@ export default function TunggakanPageClient() {
   const [pageInput, setPageInput] = useState("");
   const ITEMS_PER_PAGE = 5;
 
+  const fetchBillingStatus = async () => {
+    try {
+      const response = await fetch("/api/billing/status");
+      const result = await response.json();
+      if (result.ok) {
+        setIsBilledThisMonth(result.isBilledThisMonth);
+        setLastBilledDate(result.lastBilledDate);
+      }
+    } catch (error) {
+      console.error("Failed to fetch billing status:", error);
+    }
+  };
   // --- DATA FETCHING ---
   const fetchTunggakanData = async () => {
     console.log(">>> fetch started");
@@ -53,6 +71,7 @@ export default function TunggakanPageClient() {
   // Fetch on page load
   useEffect(() => {
     fetchTunggakanData();
+    fetchBillingStatus();
   }, []);
 
   // Reset to page 1 whenever a filter changes
@@ -203,6 +222,31 @@ export default function TunggakanPageClient() {
     );
   };
 
+  const handleManualRun = async () => {
+    if (!confirm("Adakah anda pasti mahu menjana caj bulanan dan penalti sekarang?")) return;
+    
+    setIsBillingRunning(true);
+    try {
+      const response = await fetch("/api/cron/billing");
+      const result = await response.json();
+      
+      alert(result.message); // You can change this to a nice Toast notification later!
+      
+      if (result.ok) {
+        fetchBillingStatus(); // Refresh the status lock
+        fetchTunggakanData(); // Refresh the table to show new charges
+      }
+    } catch (error) {
+      alert("Ralat sistem berlaku semasa menjana bil.");
+    } finally {
+      setIsBillingRunning(false);
+    }
+  };
+
+  const today = new Date();
+  const isFirstDayOfMonth = today.getDate() === 1;
+  const isManualButtonDisabled = isFirstDayOfMonth || isBilledThisMonth || isBillingRunning;
+
   return (
     <div className="flex flex-col gap-8 pb-20 relative">
       {/* --- HEADER SECTION --- */}
@@ -243,29 +287,69 @@ export default function TunggakanPageClient() {
       {/* --- DATA TABLE SECTION --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Table Header Controls */}
-        <div className="p-6 flex justify-between items-center bg-[#F8FAFC]">
+        <div className="p-6 flex justify-between items-start bg-[#F8FAFC]">
           <div>
             <h3 className="text-lg font-bold text-dark-blue">Senarai Tunggakan</h3>
             <p className="text-sm text-grey mt-1">Klik pada ikon kemaskini untuk mengubah maklumat unit.</p>
           </div>
-          <div className="flex gap-4">
-            <ToolbarButton
-              icon="download"
-              label={
-                activeFilterCount > 0
-                  ? `Eksport ${filteredData.length} rekod ditapis`
-                  : `Eksport semua ${data.length} rekod`
-              }
-              onClick={handleExport}
-              disabled={isLoading || data.length === 0}
-            />
-            <ToolbarButton
-              icon="filter"
-              label="Tapis rekod tunggakan"
-              onClick={() => setIsFilterPanelOpen(true)}
-              isActive={activeFilterCount > 0}
-              activeBadge={activeFilterCount}
-            />
+          
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex gap-4">
+              {/* NEW: Manual Run Button */}
+              <button 
+                onClick={handleManualRun}
+                disabled={isManualButtonDisabled}
+                className={`px-4 py-2 text-sm font-bold rounded shadow-sm transition-colors flex items-center gap-2
+                  ${isManualButtonDisabled 
+                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed' 
+                    : 'bg-white border border-dark-blue text-dark-blue hover:bg-blue-50'
+                  }`}
+              >
+                <Icon icon={isBillingRunning ? "progress_activity" : "autorenew"} size={18} className={isBillingRunning ? "animate-spin" : ""} />
+                {isBilledThisMonth ? "Caj Bulan Ini Selesai" : isBillingRunning ? "Sedang Menjana..." : "Jana Bil Manual"}
+              </button>
+
+              <ToolbarButton
+                icon="download"
+                label={
+                  activeFilterCount > 0
+                    ? `Eksport ${filteredData.length} rekod ditapis`
+                    : `Eksport semua ${data.length} rekod`
+                }
+                onClick={handleExport}
+                disabled={isLoading || data.length === 0}
+              />
+              <ToolbarButton
+                icon="filter"
+                label="Tapis rekod tunggakan"
+                onClick={() => setIsFilterPanelOpen(true)}
+                isActive={activeFilterCount > 0}
+                activeBadge={activeFilterCount}
+              />
+            </div>
+
+            {/* NEW: Automated Billing Status Text */}
+            <div className="text-xs text-right">
+              <span className="text-grey">Status Caj Automatik: </span>
+              <span className={`font-bold ${isBilledThisMonth ? "text-(--color-green)" : "text-yellow-600"}`}>
+                {isBilledThisMonth ? "Selesai" : "Belum Dijana"}
+              </span>
+              
+              {lastBilledDate && (
+                <span className="text-grey ml-1">
+                  (Terakhir dijana pada {new Date(lastBilledDate).toLocaleString("en-GB", { 
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                  })})
+                </span>
+              )}
+
+              {/* Safety Lock Warning - Only shows on the 1st of the month if not billed yet */}
+              {isFirstDayOfMonth && !isBilledThisMonth && (
+                <p className="text-red-500 italic mt-1">
+                  Sistem automatik sedang berjalan hari ini. Butang manual dikunci sehingga 2 haribulan.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
