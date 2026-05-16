@@ -1,0 +1,85 @@
+import type { ExtractedBayaranRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import { prisma } from "@/lib/prisma";
+import { jsonRecord } from "@/lib/uploaded-document/shared";
+
+export function getBayaranPaymentDate(paymentMonth: string) {
+  const [monthName, yearText] = paymentMonth.split(/\s+/);
+  const monthIndexByName: Record<string, number> = {
+    januari: 0,
+    january: 0,
+    februari: 1,
+    february: 1,
+    mac: 2,
+    march: 2,
+    april: 3,
+    mei: 4,
+    may: 4,
+    jun: 5,
+    june: 5,
+    julai: 6,
+    july: 6,
+    ogos: 7,
+    august: 7,
+    september: 8,
+    oktober: 9,
+    october: 9,
+    november: 10,
+    disember: 11,
+    december: 11,
+  };
+  const monthIndex = monthIndexByName[monthName?.toLowerCase() ?? ""] ?? 0;
+  const year = Number(yearText) || new Date().getFullYear();
+
+  return new Date(Date.UTC(year, monthIndex, 1));
+}
+
+export async function buildBayaranExtractResultFromDraftRows(
+  uploadedDocumentId: string,
+) {
+  const rows = await prisma.paymentDraft.findMany({
+    where: { uploadedDocumentId },
+    orderBy: [{ createdAt: "asc" }],
+  });
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const records = rows.map((row) =>
+    jsonRecord<ExtractedBayaranRecord>(row.rawData, {
+      paymentId: row.id,
+      residentId: row.originalResidentId ?? undefined,
+      isExisted: row.isExisted,
+      page: 0,
+      jabatanCode: "",
+      jabatanName: "",
+      ptjpkCode: "",
+      ptjpkName: row.department ?? "",
+      bil: "",
+      noRujukan: row.referenceNo ?? row.receiptNo ?? "",
+      noGajiNoKp: row.residentIcNumber,
+      nama: row.residentName,
+      amaunRm: row.amount.toFixed(2),
+      tarikh: row.paymentDate.toISOString(),
+      noResit: row.receiptNo ?? "",
+      catatan: row.description ?? "",
+    }),
+  );
+
+  const totalAmount = records
+    .reduce((total, record) => total + Number(record.amaunRm || 0), 0)
+    .toFixed(2);
+
+  return {
+    documentType: "bayaran" as const,
+    recordCount: records.length,
+    totalAmount,
+    paymentMonth:
+      rows[0]?.paymentDate.toLocaleDateString("ms-MY", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }) ?? "",
+    records,
+  };
+}

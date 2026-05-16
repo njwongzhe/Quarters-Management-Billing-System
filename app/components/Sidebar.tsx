@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { buildDiceBearAvatarUrl } from "@/lib/avatar";
 
-import { PROFILE_ROUTES, SIDEBAR_ROUTES } from "../constants/routes"; 
+import { PROFILE_ROUTES, ROUTES, SIDEBAR_ROUTES } from "../constants/routes"; 
 
 type SidebarProfile = {
     fullName: string;
@@ -62,14 +62,14 @@ export default function Sidebar() {
             <nav className="flex h-full flex-col gap-4">
                 <div className="flex flex-col gap-6">
                     {/* Logo */}
-                    <div className="flex flex-row gap-2 justify-center items-center">
+                    <Link href={ROUTES.lamanUtama} className="flex flex-row gap-2 justify-center items-center hover:opacity-80 transition-opacity cursor-pointer">
                         <img src="/favicon.ico" alt="logo" className="w-10 h-10" />
                         <div className="flex flex-col">
                             <span className="text-sm font-bold text-white tracking-wider">KERAJAAN</span>
                             <span className="text-sm font-bold text-white tracking-wider">NEGERI JOHOR</span>
                             <span className="text-[8.5px] text-light-grey">System Pengurusan Kuarters</span>
                         </div>
-                    </div>
+                    </Link>
 
                     {/* Normal Routes */}
                     <div className="flex flex-col gap-1">
@@ -110,7 +110,7 @@ export default function Sidebar() {
                                 <Link
                                     key={route.href}
                                     href={route.href}
-                                    className={`group flex min-w-0 items-center gap-3 px-3 py-2 text-sm transition-colors ${
+                                    className={`group flex min-w-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                                         active
                                             ? "bg-white/10 text-white"
                                             : "text-light-grey hover:bg-white/10 hover:text-white"
@@ -124,7 +124,8 @@ export default function Sidebar() {
                                     />
                                     <div className="flex min-w-0 flex-col">
                                         <span className="truncate text-xs font-bold text-white">{profileName}</span>
-                                        <span className="text-light-grey/80 font-extralight text-[10px]">Log Masuk: {loginTime}</span>
+                                        <span className="text-light-grey/80 font-extralight text-[10px]">Log Masuk:</span>
+                                        <span className="text-light-grey/80 font-extralight text-[10px]">{loginTime}</span>
                                     </div>
                                 </Link>
                             );

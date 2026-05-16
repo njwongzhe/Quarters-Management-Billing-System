@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { PenghuniHeader } from "./components/PenghuniHeader";
 import PenghuniTable from "./components/PenghuniTable";
 import PenghuniCreate from "./components/PenghuniCreate";
 import Icon from "@/app/components/Icon";
+import { handleCreateSuccess } from "./controller/DatabaseControl";
 
 export type ResidentsQuarterInfo = {
     unitCode: string;
     quarterName: string;
+    address: string | null;
     moveInDate: string | null;
     moveOutDate: string | null;
 };
@@ -41,7 +43,7 @@ export type PenghuniTableProps = {
     residents: ResidentRecord[];
     isLoading: boolean;
     errorMessage: string | null;
-    setResidents: (residents: ResidentRecord[]) => void;
+    setResidents: Dispatch<SetStateAction<ResidentRecord[]>>;
 };
 
 type ResidentsResponse = {
@@ -107,9 +109,7 @@ export default function PenghuniPage() {
     }, []);
 
     // Apabila rekod berjaya dicipta, tambahkannya ke senarai hadapan
-    const handleCreateSuccess = (newResident: ResidentRecord) => {
-        setResidents(prev => [newResident, ...prev]);
-    };
+    const onCreateSuccess = handleCreateSuccess.bind(null, setResidents);
 
     return (
         <div className="flex flex-col gap-6">
@@ -138,7 +138,7 @@ export default function PenghuniPage() {
             {isCreateOpen && (
                 <PenghuniCreate
                     onClose={() => setIsCreateOpen(false)}
-                    onCreateSuccess={handleCreateSuccess}
+                    onCreateSuccess={onCreateSuccess}
                 />
             )}
         </div>

@@ -39,10 +39,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const quarterCategory = await prisma.quarterCategory.findFirst({
-      where: {
-        id,
-        recordStatus: "VERIFIED",
-      },
+      where: { id },
       include: buildQuarterCategoryUnitsDetailInclude(),
     });
 

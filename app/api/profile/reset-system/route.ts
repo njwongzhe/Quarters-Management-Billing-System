@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
+import { createAuditLog } from "@/lib/audit-logs";
 import { getCurrentAdmin } from "@/lib/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -56,19 +57,13 @@ export async function POST(request: Request) {
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        INSERT INTO "AuditLog"
-          ("userId", "userName", "moduleName", "targetData", "actionType", "description")
-        VALUES
-          (
-            ${currentAdmin.profile.id}::uuid,
-            ${currentAdmin.profile.fullName},
-            ${"Profil"},
-            ${"Data operasi sistem"},
-            ${"DELETE"}::"AuditActionType",
-            ${"Admin menjalankan set semula sistem."}
-          )
-      `;
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Profil",
+        targetData: "Data operasi sistem",
+        actionType: "DELETE",
+        description: "Admin menjalankan set semula sistem.",
+      });
 
       await tx.$executeRawUnsafe(
         `TRUNCATE TABLE ${resetTables

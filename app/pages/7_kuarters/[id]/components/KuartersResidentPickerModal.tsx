@@ -251,7 +251,6 @@ function getResidentStatusBadgeClass(status: AvailableResidentRecord["status"]) 
     PENCEN_MENDATANG:
       "border-pencen-datang/25 bg-pencen-datang/10 text-pencen-datang",
     DATA_TIDAK_LENGKAP: "border-x-lengkap/20 bg-x-lengkap/10 text-x-lengkap",
-    KELUAR: "border-light-grey/25 bg-background text-grey",
   };
 
   return statusClasses[status];

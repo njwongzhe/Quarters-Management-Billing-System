@@ -3,13 +3,18 @@
 import { useState, useMemo } from "react";
 
 import Icon from "@/app/components/Icon";
-import { mainTextSize, subTextSize } from "@/app/constants/table";
-import { usePaginationLogic, PaginationControls } from "./PaginationControl";
+import { usePaginationLogic, PaginationControls } from "../controller/PaginationControl";
 import PenghuniDetail from "./PenghuniDetail";
 import { PatternFormat } from "react-number-format";
 import type { ResidentRecord, PenghuniTableProps } from "../page";
 import { PenghuniFilter, type PenghuniFilterState } from "./PenghuniFilter";
+import { handleFilterReset, handleFilterSearch, handleResidentDelete, handleResidentUpdate } from "../controller/DatabaseControl";
 
+// Text size constants for table display
+const mainTextSize = "text-[12px]";
+const subTextSize = "text-[11px]";
+
+// Helper function to format currency values in Malaysian Ringgit format.
 function formatCurrency(value: number) {
     return value.toLocaleString("ms-MY", {
         minimumFractionDigits: 2,
@@ -17,6 +22,7 @@ function formatCurrency(value: number) {
     });
 }
 
+// Helper function to determine text color class based on arrears amount.
 function getArrearsTextClass(amount: number) {
     if (amount < 0) 
         return "text-green";
@@ -27,6 +33,7 @@ function getArrearsTextClass(amount: number) {
     return "";
 }
 
+// Helper function to determine badge color class based on resident status. (Left Border Color)
 function getStatusBadgeColor(status: string) {
     switch (status) {
         case "AKTIF":
@@ -37,21 +44,14 @@ function getStatusBadgeColor(status: string) {
             return "border-pencen-datang";
         case "DATA_TIDAK_LENGKAP":
             return "border-x-lengkap";
-        case "KELUAR":
-            return "border-keluar";
         default:
             return "border-transparent";
     }
 }
 
-export default function PenghuniTable({
-    residents,
-    isLoading,
-    errorMessage,
-    setResidents,
-}: PenghuniTableProps) {
+export default function PenghuniTable({ residents, isLoading, errorMessage, setResidents }: PenghuniTableProps) {
+    // Filter State
     const [filterOpen, setFilterOpen] = useState(false);
-    const [selectedResident, setSelectedResident] = useState<ResidentRecord | null>(null);
     const [filterState, setFilterState] = useState<PenghuniFilterState>({
         nama: "",
         noKp: "",
@@ -69,21 +69,17 @@ export default function PenghuniTable({
     // Filter logic
     const filteredResidents = useMemo(() => {
         return residents.filter(resident => {
-            // Check text filters (case-insensitive)
-            if (filterState.nama && !resident.fullName.toLowerCase().includes(filterState.nama.toLowerCase())) {
+            // Check text filters. (Case-Insensitive)
+            if (filterState.nama && !resident.fullName.toLowerCase().includes(filterState.nama.toLowerCase())) 
                 return false;
-            }
-            if (filterState.noKp && !resident.icNumber.includes(filterState.noKp)) {
+            if (filterState.noKp && !resident.icNumber.includes(filterState.noKp)) 
                 return false;
-            }
-            if (filterState.noTel && !resident.phone?.includes(filterState.noTel)) {
+            if (filterState.noTel && !resident.phone?.includes(filterState.noTel))
                 return false;
-            }
-            if (filterState.emel && !resident.email?.toLowerCase().includes(filterState.emel.toLowerCase())) {
+            if (filterState.emel && !resident.email?.toLowerCase().includes(filterState.emel.toLowerCase()))
                 return false;
-            }
 
-            // Check status filters
+            // Check status filters.
             const statusMapping: Record<string, keyof typeof filterState.statuses> = {
                 AKTIF: "aktif",
                 TIDAK_LAYAK: "tidakLayak",
@@ -93,90 +89,29 @@ export default function PenghuniTable({
             };
 
             const residentsStatus = statusMapping[resident.status];
-            if (!residentsStatus || !filterState.statuses[residentsStatus]) {
+
+            if (!residentsStatus || !filterState.statuses[residentsStatus])
                 return false;
-            }
 
             return true;
         });
     }, [residents, filterState]);
     
+    // Pagination Logic
     const itemsPerPage = 10;
     const { currentPage, totalPages, startIndex, endIndex, handlePageChange, paginationItems } = usePaginationLogic(filteredResidents.length, itemsPerPage);
+    const currentResidents = filteredResidents.slice(startIndex, endIndex); // Residents to display on the current page.
 
-    const currentResidents = filteredResidents.slice(startIndex, endIndex);
+    // Selected Resident for Detail View
+    const [selectedResident, setSelectedResident] = useState<ResidentRecord | null>(null);
 
-    // Handlers for updating and deleting residents in the local state after successful API calls in PenghuniDetail.
-    const handleResidentUpdate = (updatedData: any) => {
-        if (!selectedResident) return;
-
-        // Update the resident in the residents array.
-        setResidents(
-            residents.map(resident =>
-                resident.id === selectedResident.id
-                    ? {
-                        ...resident,
-                        fullName: updatedData.fullName ?? resident.fullName,
-                        icNumber: updatedData.icNumber ?? resident.icNumber,
-                        phone: updatedData.phone ?? resident.phone,
-                        email: updatedData.email ?? resident.email,
-                        position: updatedData.position ?? resident.position,
-                        department: updatedData.department ?? resident.department,
-                        serviceLevel: updatedData.serviceLevel ?? resident.serviceLevel,
-                        status: updatedData.status ?? resident.status,
-                        description: updatedData.description ?? resident.description,
-                      }
-                    : resident
-            )
-        );
-
-        // Update selected resident to reflect changes.
-        setSelectedResident(prev =>
-            prev ? {
-                ...prev,
-                fullName: updatedData.fullName ?? prev.fullName,
-                icNumber: updatedData.icNumber ?? prev.icNumber,
-                phone: updatedData.phone ?? prev.phone,
-                email: updatedData.email ?? prev.email,
-                position: updatedData.position ?? prev.position,
-                department: updatedData.department ?? prev.department,
-                serviceLevel: updatedData.serviceLevel ?? prev.serviceLevel,
-                status: updatedData.status ?? prev.status,
-                description: updatedData.description ?? prev.description,
-            } : null
-        );
-    };
-
-    // Handler to remove resident from the list after successful deletion in PenghuniDetail.
-    const handleResidentDelete = (residentId: string) => {
-        // Remove the deleted resident from the list
-        setResidents(residents.filter(resident => resident.id !== residentId));
-    };
-
-    // Filter handlers
-    function handleFilterSearch(filters: PenghuniFilterState) {
-        setFilterState(filters);
-    }
-
-    function handleFilterReset() {
-        setFilterState({
-            nama: "",
-            noKp: "",
-            noTel: "",
-            emel: "",
-            statuses: {
-                aktif: true,
-                tidakLayak: true,
-                pencenDatang: true,
-                tidakLengkap: true,
-                keluar: true,
-            },
-        });
-    }
+    // Handlers for Updating & Deleting Residents (Passed Down to the Detail Component)
+    const onResidentUpdate = handleResidentUpdate.bind(null, setResidents, setSelectedResident, selectedResident?.id ?? null);
+    const onResidentDelete = handleResidentDelete.bind(null, setResidents);
 
     return (
         <div className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
-            {/* Header */}
+            {/* Header of Table Section */}
             <div className="flex flex-row justify-between px-3 pt-3">
                 <div>   
                     <div className="text-lg font-bold">Senarai Penghuni</div>
@@ -197,78 +132,99 @@ export default function PenghuniTable({
             {/* Filter */}
             {filterOpen && 
                 <div className="px-3">
-                    <PenghuniFilter onSearch={handleFilterSearch} onReset={handleFilterReset} />
+                    <PenghuniFilter onSearch={handleFilterSearch.bind(null, setFilterState)} onReset={handleFilterReset.bind(null, setFilterState)} />
                 </div>
             }
 
             {/* Table */}
-            <div className="rounded-lg overflow-y-auto">
-                <table className="w-full overflow-x-auto">
+            <div className="rounded-lg overflow-x-auto overflow-y-auto">
+                <table className="w-full">
+                    {/* Table Header */}
                     <thead>
                         <tr className="font-bold text-xs text-grey bg-background">
-                            <th className="text-left px-3 py-3">Penghuni</th>
-                            <th className="text-left px-3 py-3">Kuarters</th>
-                            <th className="text-left px-3 py-3">Perhubungan</th>
-                            <th className="text-right px-3 py-3">Tunggakan (RM)</th>
-                            <th className="text-center px-3 py-3">Tindakan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Penghuni</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Perhubungan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Pekerjaan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Taraf Perkhidmatan</th>
+                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Kuarters</th>
+                            <th className="text-right px-3 py-3 w-min whitespace-nowrap">Tunggakan (RM)</th>
+                            <th className="text-center px-3 py-3 w-min whitespace-nowrap">Tindakan</th>
                         </tr>
                     </thead>
                     
+                    {/* Table Body */}
                     <tbody className="bg-white">
                         {isLoading ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={5}>Sedang membaca data penghuni...</td>
+                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Sedang membaca data penghuni...</td>
                             </tr>
                         ) : errorMessage ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-red" colSpan={5}>{errorMessage}</td>
+                                <td className="px-3 py-4 text-center text-red" colSpan={7}>{errorMessage}</td>
                             </tr>
                         ) : residents.length === 0 ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={5}>Tiada data penghuni ditemui.</td>
+                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Tiada data penghuni ditemui.</td>
                             </tr>
                         ) : filteredResidents.length === 0 ? (
                             <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={5}>Tiada hasil mencari dengan penapis yang dipilih.</td>
+                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Tiada hasil mencari dengan penapis yang dipilih.</td>
                             </tr>
                         ) : (
+                            // Render residents for the current page.
                             currentResidents.map((resident) => (
                                 <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20`}>
                                     {/* Penghuni */}
-                                    <td className="px-3 py-2 text-left">
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>{resident.fullName}</div>
                                         <div className={`font-extralight ${subTextSize} text-grey`}>
-                                            <PatternFormat value={resident.icNumber} format="######-##-####" disabled />
+                                            <PatternFormat value={resident.icNumber} format="######-##-####" displayType="text" disabled />
                                         </div>
                                     </td>
 
-                                    {/* Kuarters */}
-                                    <td className="px-3 py-2 text-left">
-                                        <div className={`font-bold ${mainTextSize}`}>{resident.quarters?.quarterName ?? "N/A"}</div>
-                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.quarters?.unitCode ?? "N/A"}</div>
-                                    </td>
-
                                     {/* Perhubungan */}
-                                    <td className="px-3 py-2 text-left">
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>
                                             {resident.phone ? (
-                                                <PatternFormat value={resident.phone} format="###-#### ####" disabled />
+                                                <PatternFormat value={resident.phone} format="###-#### ####" displayType="text" disabled />
                                             ) : (
                                                 "N/A"
                                             )}
                                         </div>
-                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.email ?? "N/A"}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey w-min whitespace-nowrap`}>{resident.email ?? "N/A"}</div>
                                     </td>
-                                    
+
+                                    {/* Pekerjaan */}
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.position ?? "N/A"}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey`}>{resident.department ?? "N/A"}</div>
+                                    </td>
+
+                                    {/* Taraf Perkhidmatan */}
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.serviceLevel ?? "N/A"}</div>
+                                    </td>
+
+                                    {/* Kuarters */}
+                                    <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                                        <div className={`font-bold ${mainTextSize}`}>{resident.quarters?.quarterName ?? "N/A"}</div>
+                                        <div className={`font-extralight ${subTextSize} text-grey`}>{
+                                            resident.quarters?.unitCode && resident.quarters?.address ? `${resident.quarters?.unitCode}, ${resident.quarters?.address}` : 
+                                            resident.quarters?.unitCode ? `${resident.quarters?.unitCode}` :
+                                            resident.quarters?.address ? `${resident.quarters?.address}` : 
+                                             "N/A"
+                                        }</div>
+                                    </td>
+
                                     {/* Tunggakan */}
-                                    <td className="px-3 py-2 text-right">
+                                    <td className="px-3 py-2 text-right w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize} ${getArrearsTextClass(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}`}>
                                             {formatCurrency(resident.totalArrearsAmount?.totalArrearsAmount ?? 0)}
                                         </div>
                                     </td>
 
                                     {/* Tindakan */}
-                                    <td className="px-3 py-2 text-center align-middle w-px whitespace-nowrap">
+                                    <td className="px-3 py-2 text-center align-middle w-min whitespace-nowrap">
                                         <div className="flex items-center justify-center">
                                             <button
                                                 aria-label={`Lihat butiran ${resident.fullName}`}
@@ -288,7 +244,7 @@ export default function PenghuniTable({
                     {!isLoading && filteredResidents.length > 0 && (
                         <tfoot>
                             <tr>
-                                <td colSpan={5} className="bg-white border-t border-light-grey/20 px-3 py-4">
+                                <td colSpan={7} className="bg-white border-t border-light-grey/20 px-3 py-4">
                                     <PaginationControls
                                         currentPage={currentPage}
                                         totalPages={totalPages}
@@ -305,12 +261,13 @@ export default function PenghuniTable({
                 </table>
             </div>
 
+            {/* Overlay Window (Resident Detail) */}
             {selectedResident && (
                 <PenghuniDetail
                     {...selectedResident}
                     onClose={() => setSelectedResident(null)}
-                    onSaveSuccess={handleResidentUpdate}
-                    onDeleteSuccess={handleResidentDelete}
+                    onSaveSuccess={onResidentUpdate}
+                    onDeleteSuccess={onResidentDelete}
                 />
             )}
         </div>

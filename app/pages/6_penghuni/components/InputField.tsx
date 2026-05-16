@@ -16,6 +16,14 @@ type BaseFieldStyleProps = {
     inactiveBackgroundClass?: string;
 };
 
+// Topic section header component for grouping related form fields.
+export function Topic({ content, className }: { content: string, className?: string }) {
+    return (
+        <span className={`border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest ${className || ""}`}>{content}</span>
+    );
+}
+
+// Reusable input field component with customizable styling and state management.
 export function InputField({
     label,
     value,
@@ -56,6 +64,7 @@ export function InputField({
     );
 }
 
+// Reusable input field component with formatting capabilities (e.g., for phone numbers, IC numbers, etc.).
 export function InputFieldFormat({
     label,
     format,
@@ -79,25 +88,37 @@ export function InputFieldFormat({
     return (
         <div className={`flex flex-col gap-2 tracking-widest ${className || ""}`}>
             <label className="font-bold text-gray-500 pl-1" style={{ fontSize: labelFontSize }}>{label}</label>
-            <PatternFormat
-                format={format}
-                value={value}
-                disabled={state === "inactive"}
-                onValueChange={(values) => onChange && onChange(values.value)}
-                placeholder={placeholder}
-                className={`
-                    rounded-md border border-light-grey/40 p-3 text-sm min-h-12 
-                    ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
-                }`}
-                style={{
-                    fontSize: inputFontSize,
-                    minHeight: inputMinHeight,
-                }}
-            />
+            {state === "inactive" && typeof value === "string" && /[^0-9]/.test(value) ? (
+                <input
+                    type="text"
+                    value={value}
+                    disabled
+                    placeholder={placeholder}
+                    className={`rounded-md border border-light-grey/40 p-3 text-sm min-h-12 ${inactiveBackgroundClass}`}
+                    style={{ fontSize: inputFontSize, minHeight: inputMinHeight }}
+                />
+            ) : (
+                <PatternFormat
+                    format={format}
+                    value={value}
+                    disabled={state === "inactive"}
+                    onValueChange={(values) => onChange && onChange(values.value)}
+                    placeholder={placeholder}
+                    className={`
+                        rounded-md border border-light-grey/40 p-3 text-sm min-h-12 
+                        ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass
+                    }`}
+                    style={{
+                        fontSize: inputFontSize,
+                        minHeight: inputMinHeight,
+                    }}
+                />
+            )}
         </div>
     );
 }
 
+// Reusable textarea field component for longer text inputs, with customizable styling and state management.
 export function InputBox({
     label,
     value,
@@ -137,11 +158,13 @@ export function InputBox({
     );
 }
 
+// Reusable dropdown field component with customizable styling, options and state management.
 export type DropdownOption = {
     label: string;
     color?: string; // e.g., "text-aktif", "text-x-layak", etc.
 };
 
+// Reusable dropdown field component with customizable styling, options and state management.
 export function DropdownField({
     label,
     options,

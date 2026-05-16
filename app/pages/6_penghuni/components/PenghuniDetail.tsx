@@ -1,17 +1,14 @@
 "use client";
 
 import Icon from "@/app/components/Icon";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { calculateAgeByIc } from "@/app/utils/resident";
 import type { ResidentRecord } from "../page";
-import { InputField, InputFieldFormat, InputBox, DropdownField, type DropdownOption } from "./InputField";
+import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "./InputField";
+import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave } from "../controller/DatabaseControl";
+import PenghuniDetailHistory from "./PenghuniDetailHistory";
+import { resolveResidentStatusRules } from "../controller/StatusControl";
 
-
-function Topic({ content, className }: { content: string, className?: string }) {
-    return (
-        <span className={`border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest ${className || ""}`}>{content}</span>
-    );
-}
 
 type PenghuniDetailWithCloseProps = ResidentRecord & {
     onClose?: () => void;
@@ -24,44 +21,21 @@ type NotificationState = {
     message: string;
 };
 
-function getResidentApiErrorMessage(errorData: any, fallbackMessage: string) {
-    switch (errorData?.errorCode) {
-        case "RESIDENT_IC_EXISTS":
-            return "No. KP ini sudah wujud dalam sistem.";
-        case "RESIDENT_NOT_FOUND":
-            return "Penghuni tidak ditemui.";
-        case "DELETE_CONFLICT":
-            return "Penghuni ini tidak boleh dipadam kerana masih dirujuk oleh data lain.";
-        case "VALIDATION_ERROR":
-            return errorData?.message ?? fallbackMessage;
-        case "CREATE_FAILED":
-        case "UPDATE_FAILED":
-        case "DELETE_FAILED":
-        case "READ_FAILED":
-            return errorData?.message ?? fallbackMessage;
-        default:
-            return errorData?.message ?? fallbackMessage;
-    }
-}
-
-function stripUploadFormatting(value: string | null | undefined) {
-    return String(value ?? "").replace(/[\s-]/g, "");
-}
-
 function getArrearsTextClass(amount: number) {
-    if (amount < 0) {
+    if (amount < 0) 
         return "text-green";
-    }
 
-    if (amount > 0) {
+    if (amount > 0)
         return "text-red";
-    }
 
     return "";
 }
 
 export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
+    // Tab State
     const [tab, setTab] = useState<"info" | "history">("info");
+
+    // Dropdown options for service level and status fields.
     const tarafPerkhidmatanOptions: DropdownOption[] = [
         { label: "Persekutuan" },
         { label: "Negeri" }
@@ -71,9 +45,9 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         { label: "Tidak Layak", color: "text-x-layak" },
         { label: "Pencen Mendatang", color: "text-pencen-datang" },
         { label: "Data Tidak Lengkap", color: "text-x-lengkap" },
-        { label: "Keluar", color: "text-keluar" }
     ];
 
+    // State for managing edit mode, saving/deleting status and notifications.
     const [kemasKini, setKemasKini] = useState(false);
     const inputState = kemasKini ? "active" : "inactive";
     const [isSaving, setIsSaving] = useState(false);
@@ -81,10 +55,10 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
     const [notification, setNotification] = useState<NotificationState>({ type: null, message: "" });
     const isInactive = inputState === "inactive";
 
+    // Helper function to display field values, showing "N/A" for empty values when in inactive state.
     const displayValue = (value: string | null | undefined) => {
-        if (value == null || value === "") {
+        if (value == null || value === "")
             return isInactive ? "N/A" : "";
-        }
 
         return value;
     };
@@ -123,163 +97,83 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
         totalArrearsAmount: props?.totalArrearsAmount ?? null,
     });
 
+    // Extracted props for easier access and to avoid optional chaining in handlers.
     const onClose = props?.onClose;
     const onSaveSuccess = props?.onSaveSuccess;
     const onDeleteSuccess = props?.onDeleteSuccess;
     const residentId = props?.id;
 
-    const handleFieldChange = (field: keyof typeof formData, value: any) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
-
+    // Function to show notification messages. (Success or Error)
     const showNotification = (type: "success" | "error", message: string) => {
         setNotification({ type, message });
         setTimeout(() => setNotification({ type: null, message: "" }), 3000);
     };
 
-    // Save handler with optimistic UI update, error handling, and data refresh from database.
-    const handleSave = async () => {
-        if (!residentId) {
-            showNotification("error", "ID penghuni tidak ditemui.");
+    const statusRules = resolveResidentStatusRules(
+        originalData.status as string,
+        formData.icNumber,
+        kemasKini,
+        statusOptions,
+    );
+
+    useEffect(() => {
+        if (!statusRules.forcedStatus) {
             return;
         }
 
-        setIsSaving(true);
-        try {
-            // Step 1: Update the resident.
-            const cleanedIcNumber = stripUploadFormatting(formData.icNumber);
-            const cleanedPhone = stripUploadFormatting(formData.phone);
-
-            const updateResponse = await fetch(`/api/residents/${residentId}/update`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    fullName: formData.fullName,
-                    icNumber: cleanedIcNumber,
-                    phone: cleanedPhone,
-                    email: formData.email,
-                    position: formData.position,
-                    department: formData.department,
-                    serviceLevel: formData.serviceLevel,
-                    status: formData.status === "Aktif" ? "AKTIF" : "TIDAK_LAYAK",
-                    description: formData.description,
-                }),
-            });
-
-            if (!updateResponse.ok) {
-                const errorData = await updateResponse.json().catch(() => ({}));
-                console.error("Gagal mengemas kini rekod:", errorData);
-                throw new Error(getResidentApiErrorMessage(errorData, "Gagal menyimpan rekod."));
-            }
-
-            // Step 2: Fetch fresh data from database.
-            const readResponse = await fetch(`/api/residents/${residentId}/read`);
-
-            if (!readResponse.ok) {
-                const errorData = await readResponse.json().catch(() => ({}));
-                console.error("Gagal mendapatkan data terkini:", errorData);
-                throw new Error(getResidentApiErrorMessage(errorData, "Gagal membaca data terkini dari database."));
-            }
-
-            const readData = (await readResponse.json()) as any;
-            const freshData = readData.data;
-
-            // Map fresh database data with proper types. (ResidentRecord Format)
-            const mappedFreshData: ResidentRecord = {
-                id: freshData.id ?? "",
-                fullName: freshData.fullName ?? "",
-                icNumber: freshData.icNumber ?? "",
-                phone: freshData.phone ?? "",
-                email: freshData.email ?? "",
-                position: freshData.position ?? "",
-                department: freshData.department ?? "",
-                serviceLevel: freshData.serviceLevel ?? "",
-                status: freshData.status ?? "AKTIF",
-                description: freshData.description ?? "",
-                updatedAt: freshData.updatedAt ?? "",
-                quarters: freshData.quarters ?? null,
-                totalArrearsAmount: freshData.totalArrearsAmount ?? null,
-            };
-
-            showNotification("success", "Rekod penghuni berjaya disimpan.");
-            setKemasKini(false);
-            
-            // Sync detail modal with fresh database data.
-            setFormData(mappedFreshData);
-            
-            // Update original data with fresh database values.
-            setOriginalData(mappedFreshData);
-            
-            // Step 3: Update table with fresh data from database.
-            if (onSaveSuccess) {
-                onSaveSuccess(mappedFreshData);
-            }
-            
-            setTimeout(() => onClose?.(), 1500);
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Gagal menyimpan rekod.";
-            showNotification("error", errorMessage);
-            console.error("Error saving resident:", error);
-        } finally {
-            setIsSaving(false);
+        if (formData.status !== statusRules.forcedStatus) {
+            setFormData(prev => ({ ...prev, status: statusRules.forcedStatus ?? prev.status }));
         }
+    }, [formData.status, setFormData, statusRules.forcedStatus]);
+
+    // Handlers for Save operation.
+    const handleSaveResident = handleSave.bind(null, {
+        residentId: residentId ?? "",
+        formData,
+        setIsSaving,
+        showNotification,
+        setKemasKini,
+        setFormData,
+        setOriginalData,
+        onSaveSuccess,
+        onClose,
+    });
+
+    // Validate status transition rules before saving.
+    const validateAndSave = () => {
+        if (!statusRules.allowedStatuses.includes(formData.status as string)) {
+            showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
+            return;
+        }
+
+        void handleSaveResident();
     };
 
-    // Delete handler with confirmation and error handling.
-    const handleDelete = async () => {
-        if (!residentId) {
-            showNotification("error", "ID penghuni tidak ditemui.");
-            return;
-        }
+    // Handler for Delete operation.
+    const handleDeleteResident = handleDelete.bind(null, {
+        residentId: residentId ?? "",
+        setIsDeleting,
+        showNotification,
+        onDeleteSuccess,
+        onClose,
+    });
 
-        if (!confirm("Adakah anda pasti ingin memadamkan rekod penghuni ini? Tindakan ini tidak boleh dibatalkan.")) {
-            return;
-        }
-
-        setIsDeleting(true);
-        try {
-            const response = await fetch(`/api/residents/${residentId}/delete`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error("Gagal memadamkan rekod:", errorData);
-                throw new Error(getResidentApiErrorMessage(errorData, "Gagal memadamkan rekod."));
-            }
-
-            showNotification("success", "Rekod penghuni berjaya dipadamkan.");
-            
-            // Call onDeleteSuccess to update parent component.
-            if (onDeleteSuccess && residentId) {
-                onDeleteSuccess(residentId);
-            }
-            
-            setTimeout(() => onClose?.(), 1500);
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Gagal memadamkan rekod.";
-            showNotification("error", errorMessage);
-            console.error("Error deleting resident:", error);
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
+    // Helper functions to format date and time for display.
     const formatDate = (dateString: string) => {
         if (!dateString) return "";
         const date = new Date(dateString);
         return date.toLocaleDateString("ms-MY", { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").join("/");
     };
 
+    // Helper function to format time for display.
     const formatTime = (dateString: string) => {
         if (!dateString) return "";
         const date = new Date(dateString);
         return date.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
     }
+
+    const statusFieldOptions = statusRules.options;
+    const statusFieldState = statusRules.state;
 
     return (
         <div>
@@ -294,8 +188,8 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
             )}
 
             {/* Overlay Window */}
-            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm overflow-auto p-12 flex items-start justify-center">
-                <div className="relative w-full rounded-lg shadow-2xl overflow-hidden">
+            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
+                <div className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full">
                     {/* Header */}
                     <div className="bg-dark-blue p-6 flex items-center justify-between">
                         {/* Title & Subtitle */}
@@ -308,7 +202,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                         <button
                             aria-label="Close"
                             className="hover:scale-96 active:scale-92 text-white"
-                            onClick={() => onClose && onClose()}
+                            onClick={onClose}
                         >
                             <Icon icon="close"></Icon>
                         </button>
@@ -318,52 +212,88 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                     <nav className="flex items-center justify-center gap-6 bg-white">
                         <button
                             onClick={() => setTab("info")}
-                            className={`py-4 text-sm font-medium -mb-px ${tab === "info" ? "border-b-2 border-dark-blue text-dark-blue" : "text-gray-500"}`}
+                            className={`py-4 text-sm font-medium -mb-px ${tab === "info" ? "border-b-4 border-dark-blue text-dark-blue" : "text-gray-500"}`}
                         >
                             <span className="font-bold">MAKLUMAT PENGHUNI</span>
                         </button>
                         <button
                             onClick={() => setTab("history")}
-                            className={`py-4 text-sm font-medium -mb-px ${tab === "history" ? "border-b-2 border-dark-blue text-dark-blue font-bold" : "text-gray-500"}`}
+                            className={`py-4 text-sm font-medium -mb-px ${tab === "history" ? "border-b-4 border-dark-blue text-dark-blue font-bold" : "text-gray-500"}`}
                         >
                             <span className="font-bold">SEJARAH TRANSAKSI</span>
                         </button>
                     </nav>
 
                     {/* Content */}
-                    <div className="p-6 bg-light-blue">
+                    <div className="p-6 bg-light-blue overflow-y-auto">
                         {tab === "info" ? (
                             <div className="flex flex-col gap-8">
+                                {/* Section for Personal Information */}
                                 <section className="flex flex-col gap-4">
                                     <Topic content="MAKLUMAT PERIBADI" />
                                     <div className="grid grid-cols-2 gap-4">
-                                        <InputField label="NAMA" value={displayValue(formData.fullName)} state={inputState} onChange={(value) => handleFieldChange("fullName", value)} className="col-span-1"/>
+                                        <InputField label="NAMA" value={displayValue(formData.fullName)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "fullName")} className="col-span-1"/>
                                         <div className="col-span-1 grid grid-cols-2 gap-4">
-                                            <InputFieldFormat label="NO. K/P" format="######-##-####" value={displayValue(formData.icNumber)} state={inputState} onChange={(value) => handleFieldChange("icNumber", value)} className="col-span-1"/>
+                                            <InputFieldFormat label="NO. K/P" format="######-##-####" value={displayValue(formData.icNumber)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "icNumber")} className="col-span-1"/>
                                             <InputField label="UMUR" value={displayValue(formData.icNumber ? calculateAgeByIc(formData.icNumber) : "") } state="inactive" className="col-span-1" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <InputFieldFormat label="NO. TELEFON" format="###-#### ####" value={displayValue(formData.phone)} state={inputState} onChange={(value) => handleFieldChange("phone", value)} className="col-span-1"/>
-                                        <InputField label="EMEL" value={displayValue(formData.email)} state={inputState} onChange={(value) => handleFieldChange("email", value)} className="col-span-1"/>
+                                        <InputFieldFormat label="NO. TELEFON" format="###-#### ####" value={displayValue(formData.phone)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "phone")} className="col-span-1"/>
+                                        <InputField label="EMEL" value={displayValue(formData.email)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "email")} className="col-span-1"/>
                                     </div>
                                 </section>
 
+                                {/* Section for Employment Information */}
                                 <section className="flex flex-col gap-4">
                                     <Topic content="MAKLUMAT PEKERJAAN" />
                                     <div className="grid grid-cols-2 gap-4">
-                                        <InputField label="JAWATAN" value={displayValue(formData.position)} state={inputState} onChange={(value) => handleFieldChange("position", value)} className="col-span-1" />
-                                        <InputField label="JABATAN" value={displayValue(formData.department)} state={inputState} onChange={(value) => handleFieldChange("department", value)} className="col-span-1" />
-                                        <DropdownField label="TARAF PERKHIDMATAN" options={tarafPerkhidmatanOptions} value={displayValue(formData.serviceLevel as string)} state={inputState} onChange={(value) => handleFieldChange("serviceLevel", value)} className="col-span-1" />
-                                        <DropdownField label="STATUS" options={statusOptions} value={formData.status === "AKTIF" ? "Aktif" : "Tidak Layak"} state={inputState} onChange={(value) => handleFieldChange("status", value === "Aktif" ? "AKTIF" : "TIDAK_LAYAK")} className="col-span-1" />
+                                        <InputField label="JAWATAN" value={displayValue(formData.position)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "position")} className="col-span-1" />
+                                        <InputField label="JABATAN" value={displayValue(formData.department)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "department")} className="col-span-1" />
+                                        <DropdownField label="TARAF PERKHIDMATAN" options={tarafPerkhidmatanOptions} value={displayValue(formData.serviceLevel as string)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "serviceLevel")} className="col-span-1" />
+                                        {/* Status Selection With Restricted Transitions */}
+                                        <DropdownField
+                                            label="STATUS"
+                                            options={statusFieldOptions}
+                                            value={(function() {
+                                                switch (formData.status) {
+                                                    case "AKTIF": return "Aktif";
+                                                    case "TIDAK_LAYAK": return "Tidak Layak";
+                                                    case "PENCEN_MENDATANG": return "Pencen Mendatang";
+                                                    case "DATA_TIDAK_LENGKAP": return "Data Tidak Lengkap";
+                                                    default: return formData.status as string;
+                                                }
+                                            })()}
+                                            state={statusFieldState}
+                                            onChange={(val: string) => {
+                                                const mapping: Record<string, string> = {
+                                                    "Aktif": "AKTIF",
+                                                    "Tidak Layak": "TIDAK_LAYAK",
+                                                    "Pencen Mendatang": "PENCEN_MENDATANG",
+                                                    "Data Tidak Lengkap": "DATA_TIDAK_LENGKAP",
+                                                };
+
+                                                const newStatus = mapping[val] ?? val;
+
+                                                if (!statusRules.allowedStatuses.includes(newStatus)) {
+                                                    showNotification("error", "Perubahan status tidak dibenarkan untuk rekod ini.");
+                                                    return;
+                                                }
+
+                                                handleResidentStatusFieldChange(setFormData, val);
+                                            }}
+                                            className="col-span-1"
+                                            />
                                     </div>
                                 </section>
 
+                                {/* Section for Quarters Information */}
                                 <section className="flex flex-col gap-4">
                                     <Topic content="MAKLUMAT KUARTERS" />
                                     <div className="grid grid-cols-2 gap-4">
                                         <InputField label="KATEGORI" value={displayValue(formData.quarters?.quarterName)} state="inactive" className="col-span-1"/>
                                         <InputField label="UNIT KUARTERS" value={displayValue(formData.quarters?.unitCode)} state="inactive" className="col-span-1"/>
+                                        <InputField label="ALAMAT KUARTERS" value={displayValue(formData.quarters?.address)} state="inactive" className="col-span-2"/>
                                         <div className="col-span-1 grid grid-cols-2 gap-4">
                                             <InputField label="TARIKH MASUK" value={displayValue(formatDate(formData.quarters?.moveInDate ?? ""))} state="inactive" className="col-span-1"/>
                                             <InputField label="TARIKH KELUAR" value={displayValue(formData.quarters?.moveOutDate ? formatDate(formData.quarters.moveOutDate) : "")} state="inactive" className="col-span-1"/>
@@ -372,13 +302,14 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                     </div>
                                 </section>
 
+                                {/* Section for Additional Notes */}
                                 <section className="flex flex-col gap-4">
                                     <Topic content="LAIN-LAIN" />
-                                    <InputBox label="CATATAN" value={displayValue(formData.description)} state={inputState} onChange={(value) => handleFieldChange("description", value)} className="col-span-2" />
+                                    <InputBox label="CATATAN" value={displayValue(formData.description)} state={inputState} onChange={handleFieldChange.bind(null, setFormData, "description")} className="col-span-2" />
                                 </section>
 
                                 {/* Footer */}
-                                        {!kemasKini ? (
+                                {!kemasKini ? (
                                     // Footer View when not in Edit Mode
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-row gap-1 items-center justify-center text-grey/80">
@@ -389,7 +320,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                             <button 
                                                 className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 type="button"
-                                                onClick={handleDelete}
+                                                onClick={handleDeleteResident}
                                                 disabled={isDeleting}
                                             >
                                                 <Icon icon="delete" size={16} />
@@ -429,7 +360,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                             <button 
                                                 className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 type="button"
-                                                onClick={handleSave}
+                                                onClick={validateAndSave}
                                                 disabled={isSaving}
                                             >
                                                 <Icon icon="save" size={16} />
@@ -440,7 +371,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                 )}
                             </div>
                         ) : (
-                            <div className="text-sm text-gray-600">Sejarah transaksi belum ada (placeholder).</div>
+                            <PenghuniDetailHistory residentId={residentId} />
                         )}
                     </div>
                 </div>

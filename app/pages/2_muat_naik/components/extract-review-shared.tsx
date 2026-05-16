@@ -4,49 +4,49 @@ import Icon from "../../../components/Icon";
 
 export type ExtractedPenghuniRecord = {
   residentId?: string;
-  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  originalResidentId?: string;
+  isExisted?: boolean;
   nama: string;
   noKadPengenalan: string;
   kuarters: string;
   unit: string;
   alamatKuarters: string;
   perhubungan: string;
+  gmail?: string;
   pekerjaan: string;
   jabatan: string;
+  tarafPerkhidmatan?: string;
   tarikhMasuk?: string;
   tarikhKeluar?: string;
-  sewaBulanan?: string;
   catatan?: string;
-  sourceSheet: string;
-  sourceRow: number;
 };
 
 export type PenghuniExtractResult = {
   documentType: "penghuni";
   recordCount: number;
+  parsingMode?: "strict" | "assisted";
   records: ExtractedPenghuniRecord[];
 };
 
 export type ExtractedQuarterUnit = {
   unitId?: string;
+  originalUnitId?: string;
+  isExisted?: boolean;
   unitCode: string;
   address: string;
-  sourceSheet: string;
-  sourceRow: number;
 };
 
 export type ExtractedQuarterRecord = {
   id: string;
   categoryId?: string;
+  originalCategoryId?: string;
+  categoryIsExisted?: boolean;
   categoryName: string;
-  kawasan: string;
-  typeLabel: string;
+  address: string;
   rentalPrice: string;
   maintenancePrice: string;
   penaltyPrice: string;
   unitCount: number;
-  sourceSheet: string;
-  sourceRow: number;
   units: ExtractedQuarterUnit[];
 };
 
@@ -54,13 +54,14 @@ export type KuartersExtractResult = {
   documentType: "kuarters";
   recordCount: number;
   totalUnits: number;
+  parsingMode?: "strict" | "assisted";
   records: ExtractedQuarterRecord[];
 };
 
 export type ExtractedBayaranRecord = {
   paymentId?: string;
   residentId?: string;
-  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  isExisted?: boolean;
   page: number;
   jabatanCode: string;
   jabatanName: string;
@@ -87,20 +88,20 @@ export type BayaranExtractResult = {
 export type ExtractedTunggakanRecord = {
   arrearsSummaryId?: string;
   residentId?: string;
-  residentRecordStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+  isExisted?: boolean;
   importStatus?: "PENDING" | "IGNORED";
   importMessage?: string;
   nama: string;
   noKadPengenalan: string;
   jumlahTunggakan: string;
-  sourceSheet: string;
-  sourceRow: number;
 };
 
 export type TunggakanExtractResult = {
   documentType: "tunggakan";
   recordCount: number;
   totalAmount: string;
+  lastUpdatedMonth?: string;
+  parsingMode?: "strict" | "assisted";
   records: ExtractedTunggakanRecord[];
 };
 
@@ -121,7 +122,7 @@ export type ProcessingDraft = {
   extractResult: ExtractResult;
 };
 
-export const CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY = "currentExtractDraftId";
+export type ProcessingDraftSummary = Omit<ProcessingDraft, "extractResult">;
 
 export function formatDraftDateTime(value: string) {
   const date = new Date(value);
@@ -139,39 +140,6 @@ export function formatDraftDateTime(value: string) {
   });
 }
 
-export const sampleResidents = [
-  {
-    name: "Ahmad Azam bin Sulaiman",
-    ic: "850412-81-5543",
-    date: "12 Julai 2024",
-    receipt: "RES-2024-001",
-    amount: "450.00",
-    quarters: "Kategori C\nUnit 12-A, Blok B",
-    contact: "012-3456789\nazam.sul@gmail.com",
-    job: "Penolong Jurutera\nJA29\nJKR Daerah Johor Bahru",
-  },
-  {
-    name: "Siti Yasmin binti Abdullah",
-    ic: "920115-81-6622",
-    date: "12 Julai 2024",
-    receipt: "RES-2024-002",
-    amount: "320.00",
-    quarters: "Kategori D\nUnit 05-C, Blok E",
-    contact: "019-8765432\nyasmin.abd@moe.gov.my",
-    job: "Guru Siswazah DG41\nSK Taman Universiti",
-  },
-  {
-    name: "Mohd Khairul bin Idris",
-    ic: "780922-81-4431",
-    date: "12 Julai 2024",
-    receipt: "RES-2024-003",
-    amount: "150.00",
-    quarters: "Kategori B\nNo. 22, Jalan Perdana 4",
-    contact: "017-1122334\nkhairul.idris@health.gov.my",
-    job: "Pegawai Perubatan\nUD48\nHospital Sultanah Aminah",
-  },
-];
-
 export const RESIDENTS_PER_PAGE = 10;
 export const QUARTER_CATEGORIES_PER_PAGE = 10;
 export const QUARTER_UNITS_PER_PAGE = 10;
@@ -182,16 +150,19 @@ export function Pagination({
   totalPages = 1,
   onPageChange,
   showLabel = true,
+  size = "default",
 }: {
   label: string;
   currentPage?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
   showLabel?: boolean;
+  size?: "default" | "compact";
 }) {
   const canGoPrevious = currentPage > 1;
   const canGoNext = currentPage < totalPages;
   const visiblePages = getVisiblePages(currentPage, totalPages);
+  const isCompact = size === "compact";
 
   const changePage = (page: number) => {
     if (!onPageChange || page < 1 || page > totalPages || page === currentPage) {
@@ -202,22 +173,34 @@ export function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-[#EEF1F7] px-5 py-3 text-[11px] text-[#4B5567]">
-      <div className="flex items-center gap-1">
+    <div
+      className={[
+        "flex flex-col border-t border-light-grey/20 sm:flex-row sm:items-center sm:justify-between",
+        isCompact ? "gap-2 px-3 py-3" : "gap-3 px-4 py-4 sm:px-5",
+      ].join(" ")}
+    >
+      <div className={["flex flex-wrap items-center", isCompact ? "gap-1" : "gap-2"].join(" ")}>
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded text-[#344054] disabled:cursor-not-allowed disabled:opacity-40"
+          className={[
+            "inline-flex items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40",
+            isCompact ? "min-h-7 min-w-7" : "min-h-8 min-w-8",
+          ].join(" ")}
           onClick={() => changePage(currentPage - 1)}
           disabled={!canGoPrevious}
           aria-label="Halaman sebelumnya"
         >
-          <Icon icon="chevron_left" size={14} />
+          <Icon icon="chevron_left" size={isCompact ? 14 : 18} />
         </button>
         {visiblePages.map((page, index) =>
           page === "ellipsis" ? (
             <span
               key={`ellipsis-${index}`}
-              className="flex h-7 w-7 items-center justify-center text-[#98A2B3]"
+              className={[
+                "px-1 font-semibold text-grey",
+                isCompact ? "text-xs" : "text-sm",
+              ].join(" ")}
+              aria-hidden="true"
             >
               ...
             </span>
@@ -226,9 +209,13 @@ export function Pagination({
               key={page}
               type="button"
               className={[
-                "h-7 w-7 rounded",
-                page === currentPage ? "bg-dark-blue text-white" : "text-[#344054]",
+                "rounded-md border transition-colors",
+                isCompact ? "min-h-7 min-w-7 px-1.5 text-xs" : "min-h-8 min-w-8 px-2 text-sm",
+                page === currentPage
+                  ? "border-dark-blue bg-dark-blue font-bold text-white"
+                  : "border-light-grey/30 bg-white text-grey hover:border-dark-blue hover:text-dark-blue",
               ].join(" ")}
+              aria-current={page === currentPage ? "page" : undefined}
               onClick={() => changePage(page)}
             >
               {page}
@@ -237,15 +224,18 @@ export function Pagination({
         )}
         <button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded text-[#344054] disabled:cursor-not-allowed disabled:opacity-40"
+          className={[
+            "inline-flex items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40",
+            isCompact ? "min-h-7 min-w-7" : "min-h-8 min-w-8",
+          ].join(" ")}
           onClick={() => changePage(currentPage + 1)}
           disabled={!canGoNext}
           aria-label="Halaman seterusnya"
         >
-          <Icon icon="chevron_right" size={14} />
+          <Icon icon="chevron_right" size={isCompact ? 14 : 18} />
         </button>
       </div>
-      {showLabel ? <span className="min-w-0 truncate">{label}</span> : null}
+      {showLabel ? <p className="text-sm text-grey">{label}</p> : null}
     </div>
   );
 }

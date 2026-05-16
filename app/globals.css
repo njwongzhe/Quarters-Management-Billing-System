@@ -14,6 +14,20 @@ body {
   color: var(--color-black);                 /* Default Text Color (Dark Grey) */
 }
 
+@keyframes loading-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  50% {
+    transform: translateX(55%);
+  }
+
+  100% {
+    transform: translateX(210%);
+  }
+}
+
 /* --- Global Theme Variables --- */
 @theme {
   --font--sans: "Inter", sans-serif; /* Default Font (Inter) */
@@ -41,7 +55,6 @@ body {
 
   /* Status Bayaran & Penghuni */
   --color-x-lengkap: #9333EA;
-  --color-keluar: #464651;
 
   /* Status Transaksi */
   --color-normal: #CFFAFE;

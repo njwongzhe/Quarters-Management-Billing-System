@@ -11,9 +11,6 @@ export async function GET() {
     const residents = await prisma.resident.findMany({
       // We only want verified residents. You can adjust this 'where' clause 
       // if you need to filter out people who have completely moved out (KELUAR).
-      where: {
-        recordStatus: "VERIFIED",
-      },
       include: {
         arrearsSummary: true, 
         occupancies: {
@@ -25,10 +22,9 @@ export async function GET() {
           },
         },
         monthlyCharges: {
-          where: { recordStatus: "VERIFIED" },
           include: {
-            additionalCharges: { where: { recordStatus: "VERIFIED" } },
-            rebates: { where: { recordStatus: "VERIFIED" } },
+            additionalCharges: true,
+            rebates: true,
           },
         },
       },

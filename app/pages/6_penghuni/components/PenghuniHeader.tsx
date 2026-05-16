@@ -1,6 +1,7 @@
 import Icon from "@/app/components/Icon";
-import type { ResidentRecord, PenghuniHeaderProps } from "../page";
+import type { PenghuniHeaderProps } from "../page";
 
+// Helper function to create a header card with dynamic content and styling.
 function headerCard(title: string, value: string, statusText: string, statusIcon: string, statusColor?: string) {
     const borderColor = statusColor ? `border-${statusColor.replace("text-", "")}` : "border-transparent";
 
@@ -16,13 +17,13 @@ function headerCard(title: string, value: string, statusText: string, statusIcon
 }
 
 export function PenghuniHeader({ residents }: PenghuniHeaderProps) {
-    // Calculate counts from residents array
+    // Calculate counts from residents array.
     const totalCount = residents.length;
     const aktifCount = residents.filter(r => r.status === "AKTIF").length;
     const tidakLayakCount = residents.filter(r => r.status === "TIDAK_LAYAK").length;
     const pencenMendatangCount = residents.filter(r => r.status === "PENCEN_MENDATANG").length;
     const dataTidakLengkapCount = residents.filter(r => r.status === "DATA_TIDAK_LENGKAP").length;
-    const keluarCount = residents.filter(r => r.status === "KELUAR").length;
+
     return (
         <div className="flex flex-col gap-4">
             {/* Page Header */}
@@ -38,7 +39,6 @@ export function PenghuniHeader({ residents }: PenghuniHeaderProps) {
                 {headerCard("HILANG KELAYAKAN", String(tidakLayakCount), "Tidak Layak", "close", "text-x-layak")}
                 {headerCard("PENCEN MENDATANG", String(pencenMendatangCount), "Tindakan Diperlukan", "warning", "text-pencen-datang")}
                 {headerCard("DATA TIDAK LENGKAP", String(dataTidakLengkapCount), "Kemas Kini Segara", "info", "text-x-lengkap")}
-                {headerCard("KELUAR", String(keluarCount), "Sudah Pindah", "logout", "text-keluar")}
             </div>
         </div>
     );

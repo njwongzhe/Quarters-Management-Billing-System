@@ -1,44 +1,57 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "../../components/Icon";
 import { ROUTES } from "../../constants/routes";
+import CategoryTabs from "./components/CategoryTabs";
+import DemoDocumentButton from "./components/DemoDocumentButton";
+import ParsingModeTabs from "./components/ParsingModeTabs";
+import ProcessingQueueTable from "./components/ProcessingQueueTable";
+import UploadDropzone from "./components/UploadDropzone";
 import {
-  CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY,
+  categoryByDraftKind,
+  draftKindByCategory,
+  reviewRoutes,
+} from "./components/constants";
+import {
   type ExtractResult,
   type ProcessingDraft,
-  formatDraftDateTime,
+  type ProcessingDraftSummary,
 } from "./components/extract-review-shared";
+import type { Category, ParsingMode } from "./components/types";
 
-const categories = ["Bayaran", "Tunggakan", "Penghuni", "Kuarters"] as const;
+function getCategoryFromParam(categoryParam: string | null): Category {
+  if (!categoryParam) {
+    return "Bayaran";
+  }
 
-type Category = (typeof categories)[number];
+  return categoryByDraftKind[categoryParam as ProcessingDraft["kind"]] ?? "Bayaran";
+}
 
-const reviewRoutes: Record<Category, string> = {
-  Bayaran: "bayaran",
-  Tunggakan: "tunggakan",
-  Penghuni: "penghuni",
-  Kuarters: "kuarters",
-};
-
-const draftKindByCategory: Partial<Record<Category, ProcessingDraft["kind"]>> = {
-  Bayaran: "bayaran",
-  Tunggakan: "tunggakan",
-  Penghuni: "penghuni",
-  Kuarters: "kuarters",
+const uploadRouteByKind: Record<ProcessingDraft["kind"], string> = {
+  bayaran: "/api/uploaded-documents/bayaran/upload",
+  tunggakan: "/api/uploaded-documents/tunggakan/upload",
+  penghuni: "/api/uploaded-documents/penghuni/upload",
+  kuarters: "/api/uploaded-documents/kuarters/upload",
 };
 
 export default function MuatNaikPage() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState<Category>("Bayaran");
+  const searchParams = useSearchParams();
+  const [activeCategory, setActiveCategory] = useState<Category>(() =>
+    getCategoryFromParam(searchParams.get("kategori")),
+  );
+  const [parsingMode, setParsingMode] = useState<ParsingMode>("strict");
+  const [tunggakanDate, setTunggakanDate] = useState("");
   const [selectedFileName, setSelectedFileName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStep, setProcessingStep] = useState("");
   const [processingError, setProcessingError] = useState("");
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingStage, setProcessingStage] = useState("");
-  const [processingDrafts, setProcessingDrafts] = useState<ProcessingDraft[]>(
+  const [processingDrafts, setProcessingDrafts] = useState<ProcessingDraftSummary[]>(
     [],
   );
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
@@ -53,6 +66,7 @@ export default function MuatNaikPage() {
     [activeDraftKind, processingDrafts],
   );
 
+  // Load processing drafts when active category changes or on initial mount
   useEffect(() => {
     async function loadProcessingDrafts() {
       if (!activeDraftKind) {
@@ -87,16 +101,19 @@ export default function MuatNaikPage() {
     void loadProcessingDrafts();
   }, [activeDraftKind]);
 
+  // Cleanup on component unmount - abort any ongoing processing
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
     };
   }, []);
 
+  // Handler for file selection button click
   function handleChooseFile() {
     fileInputRef.current?.click();
   }
 
+  // Handler for file input change event
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setSelectedFileName(file?.name ?? "");
@@ -118,7 +135,15 @@ export default function MuatNaikPage() {
     }
   }
 
+  // Handler for upload button click - initiates file processing
   async function handleUploadAction() {
+    const extractKind = reviewRoutes[activeCategory];
+
+    if (extractKind === "tunggakan" && !tunggakanDate) {
+      setProcessingError("Sila pilih tarikh tunggakan sebelum muat naik fail.");
+      return;
+    }
+
     if (!selectedFile) {
       handleChooseFile();
       return;
@@ -127,13 +152,14 @@ export default function MuatNaikPage() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     setIsProcessing(true);
+    setProcessingStep("Mengekstrak data daripada dokumen...");
     setProcessingError("");
     setProcessingProgress(8);
     setProcessingStage("Menyediakan fail untuk kenal pasti...");
 
     const progressTimer = window.setInterval(() => {
       setProcessingProgress((currentProgress) => {
-        if (currentProgress >= 88) {
+        if (currentProgress >= 99) {
           return currentProgress;
         }
 
@@ -144,13 +170,11 @@ export default function MuatNaikPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
+      formData.append("parsingMode", parsingMode);
 
-      const apiBaseUrl =
-        process.env.NEXT_PUBLIC_AI_SERVICE_URL ?? "http://127.0.0.1:8000";
-      const extractKind = reviewRoutes[activeCategory];
       setProcessingProgress(18);
       setProcessingStage(`Mengekstrak data ${extractKind}...`);
-      const response = await fetch(`${apiBaseUrl}/extract/${extractKind}`, {
+      const response = await fetch(`/api/extract/${extractKind}`, {
         method: "POST",
         body: formData,
         signal: abortController.signal,
@@ -159,24 +183,31 @@ export default function MuatNaikPage() {
       if (!response.ok) {
         const errorBody = await response.json().catch(() => null);
         throw new Error(
-          errorBody?.detail ?? `Gagal mengekstrak data ${extractKind}.`,
+          errorBody?.message ?? `Gagal mengekstrak data ${extractKind}.`,
         );
       }
 
-      const extractedData = await response.json();
-      setProcessingProgress(72);
-      setProcessingStage("Menyimpan draf semakan...");
-      const saveResponse = await fetch("/api/uploaded-documents", {
+      const extractionResult = await response.json();
+      const extractedData = extractionResult.data?.extractResult;
+      if (!extractedData) {
+        throw new Error(`Gagal mengekstrak data ${extractKind}.`);
+      }
+
+      const extractResultToSave: ExtractResult =
+        extractKind === "tunggakan" && extractedData.documentType === "tunggakan"
+          ? { ...extractedData, lastUpdatedMonth: tunggakanDate }
+          : (extractedData as ExtractResult);
+
+      const saveResponse = await fetch(uploadRouteByKind[extractKind], {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          kind: extractKind,
           fileName: selectedFile.name,
           fileType: selectedFile.type || selectedFile.name.split(".").pop() || "file",
           fileSize: selectedFile.size,
-          extractResult: extractedData as ExtractResult,
+          extractResult: extractResultToSave,
         }),
         signal: abortController.signal,
       });
@@ -192,13 +223,9 @@ export default function MuatNaikPage() {
       setProcessingProgress(96);
       setProcessingStage("Membuka halaman semakan...");
       setProcessingDrafts((currentDrafts) => [draft, ...currentDrafts]);
-      sessionStorage.setItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY, draft.id);
-      sessionStorage.setItem(
-        `${extractKind}ExtractResult`,
-        JSON.stringify(draft.extractResult),
+      router.push(
+        `${ROUTES.muatNaik}/semakan/${extractKind}?draftId=${encodeURIComponent(draft.id)}`,
       );
-      sessionStorage.setItem(`${extractKind}ExtractFileName`, selectedFile.name);
-      router.push(`${ROUTES.muatNaik}/semakan/${extractKind}`);
     } catch (error) {
       const extractKind = reviewRoutes[activeCategory];
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -217,6 +244,7 @@ export default function MuatNaikPage() {
       window.clearInterval(progressTimer);
       abortControllerRef.current = null;
       setIsProcessing(false);
+      setProcessingStep("");
     }
   }
 
@@ -224,14 +252,10 @@ export default function MuatNaikPage() {
     abortControllerRef.current?.abort();
   }
 
-  function handleContinueDraft(draft: ProcessingDraft) {
-    sessionStorage.setItem(CURRENT_EXTRACT_DRAFT_ID_STORAGE_KEY, draft.id);
-    sessionStorage.setItem(
-      `${draft.kind}ExtractResult`,
-      JSON.stringify(draft.extractResult),
+  function handleContinueDraft(draft: ProcessingDraftSummary) {
+    router.push(
+      `${ROUTES.muatNaik}/semakan/${draft.kind}?draftId=${encodeURIComponent(draft.id)}`,
     );
-    sessionStorage.setItem(`${draft.kind}ExtractFileName`, draft.fileName);
-    router.push(`${ROUTES.muatNaik}/semakan/${draft.kind}`);
   }
 
   async function handleDeleteDraft(draftId: string) {
@@ -250,233 +274,277 @@ export default function MuatNaikPage() {
     );
   }
 
-  function getDraftIcon(draft: ProcessingDraft) {
-    return draft.fileName.toLowerCase().endsWith(".pdf") ? "picture_as_pdf" : "table";
-  }
-
-  function getDraftTone(draft: ProcessingDraft) {
-    return draft.fileName.toLowerCase().endsWith(".pdf") ? "red" : "green";
-  }
-
   return (
     <section className="min-h-full bg-background">
       <div className="flex w-full flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[30px] font-extrabold leading-tight text-[#07162F]">
-            Muat Naik Document
-          </h1>
-          <p className="text-[15px] font-medium text-[#667085]">
-            Sila muat naik fail untuk pemprosesan maklumat sistem.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3">
-          <div className="grid h-12 w-full max-w-132.5 grid-cols-4 rounded-xl bg-light-blue p-1.5 shadow-[inset_0_0_0_1px_rgba(219,226,242,0.45)]">
-            {categories.map((category) => {
-              const isActive = activeCategory === category;
-
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => setActiveCategory(category)}
-                  disabled={isProcessing}
-                  className={[
-                    "rounded-lg text-xs font-extrabold transition-colors",
-                    isActive
-                      ? "bg-white text-dark-blue shadow-[0_2px_8px_rgba(15,23,42,0.08)]"
-                      : "text-[#43506B] hover:bg-white/60 hover:text-dark-blue",
-                    isProcessing ? "cursor-not-allowed opacity-60" : "",
-                  ].join(" ")}
-                >
-                  {category}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#DCE2F1] bg-white px-5 text-xs font-extrabold text-dark-blue shadow-sm transition hover:border-[#C8D2EA] hover:bg-[#FBFCFF]"
-          >
-            <Icon icon="download" size={17} weight={600} />
-            Demo Document
-          </button>
-        </div>
-
-        <div className="flex min-h-82.5 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#C6CDDD] bg-white px-6 text-center">
-          <div className="mb-6 flex h-18 w-18 items-center justify-center rounded-xl bg-light-blue text-dark-blue">
-            <Icon icon="cloud_upload" size={38} weight={700} />
-          </div>
-          <h2 className="text-[22px] font-extrabold leading-tight text-[#07162F]">
-            Seret & Lepas Fail Di Sini
-          </h2>
-          <p className="mt-3 text-sm font-medium leading-6 text-[#667085]">
-            Pastikan fail dalam format PDF atau Excel (.xlsx) sahaja.
-            <br />
-            Saiz fail maksimum adalah 25MB.
-          </p>
-          <button
-            type="button"
-            onClick={handleUploadAction}
-            disabled={isProcessing}
-            className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-dark-blue px-8 text-sm font-extrabold text-white shadow-[0_14px_24px_rgba(21,30,102,0.22)] transition hover:bg-[#202A78] disabled:cursor-not-allowed disabled:bg-[#6B7280]"
-          >
-            <Icon
-              icon={isProcessing ? "progress_activity" : selectedFileName ? "fact_check" : "add"}
-              size={18}
-              weight={700}
-            />
-            {isProcessing
-              ? "Sedang Memproses..."
-              : selectedFileName
-              ? "Kenal Pasti Untuk Proses"
-              : "Pilih Fail Dari Komputer"}
-          </button>
-          {isProcessing ? (
-            <div className="mt-5 w-full max-w-md">
-              <div className="mb-2 flex items-center justify-between gap-4 text-xs font-extrabold text-[#344054]">
-                <span className="min-w-0 truncate">{processingStage}</span>
-                <span>{Math.min(processingProgress, 99)}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-[#E8EEF9]">
-                <div
-                  className="h-full rounded-full bg-green transition-all duration-500"
-                  style={{ width: `${Math.min(processingProgress, 99)}%` }}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleCancelProcessing}
-                className="mt-4 inline-flex h-9 items-center justify-center gap-2 rounded border border-[#F0C7C7] bg-white px-5 text-xs font-extrabold text-red shadow-sm transition hover:bg-[#FFF7F7]"
-              >
-                <Icon icon="cancel" size={16} weight={700} />
-                Batal
-              </button>
-            </div>
-          ) : null}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          {selectedFileName && !isProcessing ? (
-            <div className="mt-4 flex max-w-full flex-wrap items-center justify-center gap-3">
-              <p className="min-w-0 max-w-md truncate text-xs font-bold text-[#43506B]">
-                Fail dipilih: {selectedFileName}
-              </p>
-              <button
-                type="button"
-                onClick={handleClearSelectedFile}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded border border-[#F0C7C7] bg-white px-3 text-[11px] font-extrabold text-red shadow-sm transition hover:bg-[#FFF7F7]"
-              >
-                <Icon icon="close" size={14} weight={700} />
-                Batal
-              </button>
-            </div>
-          ) : null}
-          {processingError ? (
-            <p className="mt-3 max-w-xl text-xs font-bold text-red">
-              {processingError}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-[30px] font-extrabold leading-tight text-[#07162F]">
+              Muat Naik Document
+            </h1>
+            <p className="text-[15px] font-medium text-[#667085]">
+              Sila muat naik fail untuk pemprosesan maklumat sistem.
             </p>
-          ) : null}
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-extrabold text-[#07162F]">
-              Barisan Pemprosesan
-            </h2>
-            <span className="rounded-full bg-[#DDE8FF] px-3 py-1 text-[11px] font-extrabold text-[#2D4A9A]">
-              {activeRows.length} Fail {activeCategory} Sedang Menunggu
-            </span>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-[#DCE2F1] bg-white shadow-sm">
-            <table className="w-full table-fixed border-collapse text-left">
-              <thead className="bg-light-blue text-[10px] font-extrabold uppercase tracking-wide text-[#4B5567]">
-                <tr>
-                  <th className="w-[38%] px-6 py-4">Nama Dokumen</th>
-                  <th className="w-[20%] px-5 py-4">Pemuat Naik</th>
-                  <th className="w-[28%] px-5 py-4">Tarikh & Masa</th>
-                  <th className="w-[14%] px-5 py-4 text-center">Tindakan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EEF1F7] text-xs">
-                {isLoadingQueue ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
-                    >
-                      Memuatkan barisan pemprosesan...
-                    </td>
-                  </tr>
-                ) : activeRows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-6 py-10 text-center text-sm font-semibold text-[#667085]"
-                    >
-                      Tiada fail {activeCategory.toLowerCase()} sedang menunggu.
-                    </td>
-                  </tr>
-                ) : (
-                  activeRows.map((row) => (
-                  <tr key={row.id} className="h-14.5">
-                    <td className="px-6 py-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span
-                          className={[
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded",
-                            getDraftTone(row) === "green"
-                              ? "bg-[#EAF8EF] text-green"
-                              : "bg-[#FFF0F0] text-red",
-                          ].join(" ")}
-                        >
-                          <Icon icon={getDraftIcon(row)} size={16} filled weight={600} />
-                        </span>
-                        <span className="truncate font-extrabold text-[#172033]">
-                          {row.fileName}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 font-medium text-[#3B465A]">
-                      {row.uploadedBy}
-                    </td>
-                    <td className="px-5 py-4 font-medium text-[#3B465A]">
-                      {formatDraftDateTime(row.uploadedAt)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-center gap-5">
-                        <button
-                          type="button"
-                          className="text-dark-blue transition hover:text-[#2D367D]"
-                          title="Lihat"
-                          onClick={() => handleContinueDraft(row)}
-                        >
-                          <Icon icon="visibility" size={18} weight={600} />
-                        </button>
-                        <button
-                          type="button"
-                          className="text-red transition hover:text-[#8F1111]"
-                          title="Padam"
-                          onClick={() => handleDeleteDraft(row.id)}
-                        >
-                          <Icon icon="delete" size={18} weight={600} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-          </div>
+          <DemoDocumentButton activeCategory={activeCategory} />
         </div>
+
+        <CategoryTabs
+          activeCategory={activeCategory}
+          disabled={isProcessing}
+          onCategoryChange={setActiveCategory}
+          rightContent={
+            <ParsingModeTabs
+              value={parsingMode}
+              disabled={isProcessing}
+              onChange={setParsingMode}
+            />
+          }
+        />
+
+        {activeDraftKind === "tunggakan" ? (
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#DCE2F1] bg-white px-5 py-4 shadow-sm">
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-[#07162F]">
+                Tarikh Tunggakan
+              </p>
+              <p className="mt-1 text-xs font-semibold text-[#667085]">
+                Pilih tarikh rujukan tunggakan sebelum memproses fail.
+              </p>
+            </div>
+            <DatePickerField
+              label="Tarikh Tunggakan"
+              value={tunggakanDate}
+              disabled={isProcessing}
+              onChange={(value) => {
+                setTunggakanDate(value);
+                setProcessingError("");
+              }}
+            />
+          </div>
+        ) : null}
+
+        <UploadDropzone
+          fileInputRef={fileInputRef}
+          selectedFileName={selectedFileName}
+          isProcessing={isProcessing}
+          processingStep={processingStep}
+          processingStage={processingStage}
+          processingProgress={processingProgress}
+          processingError={processingError}
+          onFileChange={handleFileChange}
+          onUploadAction={handleUploadAction}
+          onClearSelectedFile={handleClearSelectedFile}
+          onCancelProcessing={handleCancelProcessing}
+        />
+
+        <ProcessingQueueTable
+          activeCategory={activeCategory}
+          rows={activeRows}
+          isLoading={isLoadingQueue}
+          onContinueDraft={handleContinueDraft}
+          onDeleteDraft={handleDeleteDraft}
+        />
       </div>
     </section>
   );
+}
+
+function DatePickerField({
+  label,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const initialDate = parseDateInput(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(
+    initialDate ?? startOfDay(new Date()),
+  );
+  const days = buildCalendarDays(visibleMonth);
+
+  return (
+    <label className="block w-full sm:w-72">
+      <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+        {label}
+      </span>
+      <div className="relative">
+        <button
+          type="button"
+          disabled={disabled}
+          className={`flex min-h-11 w-full items-center gap-3 rounded-2xl border bg-white py-2 pl-3 pr-4 text-left text-sm font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_3px_10px_rgba(15,23,42,0.04)] outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            isOpen
+              ? "border-dark-blue text-dark-blue"
+              : "border-light-grey/25 text-dark-grey hover:border-dark-blue/30"
+          }`}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          onClick={() => setIsOpen((currentState) => !currentState)}
+        >
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-light-blue text-dark-blue">
+            <Icon icon="calendar_month" size={17} />
+          </span>
+          <span className={value ? "truncate" : "truncate text-grey"}>
+            {value ? formatDateLabel(value) : "Pilih tarikh"}
+          </span>
+        </button>
+
+        {isOpen ? (
+          <div
+            className="absolute right-0 top-full z-40 mt-2 w-72 rounded-3xl border border-light-grey/20 bg-white p-3 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+            role="dialog"
+            aria-label={`Pilih ${label}`}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <button
+                type="button"
+                className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
+                aria-label="Bulan sebelumnya"
+                onClick={() =>
+                  setVisibleMonth((currentDate) => addMonths(currentDate, -1))
+                }
+              >
+                <Icon icon="chevron_left" size={20} />
+              </button>
+              <div className="text-sm font-extrabold text-dark-grey">
+                {formatMonthLabel(visibleMonth)}
+              </div>
+              <button
+                type="button"
+                className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
+                aria-label="Bulan seterusnya"
+                onClick={() =>
+                  setVisibleMonth((currentDate) => addMonths(currentDate, 1))
+                }
+              >
+                <Icon icon="chevron_right" size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-grey">
+              {["A", "I", "S", "R", "K", "J", "S"].map((dayLabel, index) => (
+                <div key={`${dayLabel}-${index}`} className="py-1.5">
+                  {dayLabel}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {days.map((day) => {
+                const dayValue = formatDateInput(day.date);
+                const isSelected = dayValue === value;
+                const isVisibleMonth =
+                  day.date.getMonth() === visibleMonth.getMonth();
+
+                return (
+                  <button
+                    key={dayValue}
+                    type="button"
+                    className={`grid h-9 place-items-center rounded-xl text-sm font-bold transition-colors ${
+                      isSelected
+                        ? "bg-dark-blue text-white"
+                        : isVisibleMonth
+                          ? "text-dark-grey hover:bg-light-blue hover:text-dark-blue"
+                          : "text-light-grey hover:bg-light-blue"
+                    }`}
+                    onClick={() => {
+                      onChange(dayValue);
+                      setIsOpen(false);
+                    }}
+                  >
+                    {day.date.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+
+            {value ? (
+              <button
+                type="button"
+                className="mt-3 w-full rounded-xl border border-light-grey/25 px-3 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue"
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                }}
+              >
+                Kosongkan tarikh
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </label>
+  );
+}
+
+function parseDateInput(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function buildCalendarDays(monthDate: Date) {
+  const firstDayOfMonth = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth(),
+    1,
+  );
+  const firstCalendarDate = new Date(firstDayOfMonth);
+  firstCalendarDate.setDate(
+    firstCalendarDate.getDate() - firstCalendarDate.getDay(),
+  );
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(firstCalendarDate);
+    date.setDate(firstCalendarDate.getDate() + index);
+
+    return { date };
+  });
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateLabel(value: string) {
+  const date = parseDateInput(value);
+
+  if (!date) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ms-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat("ms-MY", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }

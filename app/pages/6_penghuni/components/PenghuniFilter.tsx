@@ -32,26 +32,21 @@ type CheckboxFieldProps = {
     onChange?: (checked: boolean) => void;
 };
 
-function CheckboxField({
-    label,
-    borderColor,
-    textColor,
-    accentColor,
-    checked,
-    onChange,
-}: CheckboxFieldProps) {
+function CheckboxField({ label, borderColor, textColor, accentColor, checked, onChange }: CheckboxFieldProps) {
     return (
         <label 
             className="flex items-center gap-2 cursor-pointer group"
             style={{ '--custom-accent': accentColor } as any}
         >
             <div className="relative flex items-center justify-center w-4 h-4">
+                {/* Native Checkbox (Hidden) */}
                 <input
                     type="checkbox"
                     checked={checked}
                     onChange={(e) => onChange?.(e.target.checked)}
                     className={`peer appearance-none m-0 w-4 h-4 border-2 ${borderColor} bg-white rounded cursor-pointer transition-colors checked:bg-(--custom-accent) checked:border-(--custom-accent)`}
                 />
+
                 {/* Custom White Checkmark */}
                 <svg
                     className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100"
@@ -66,12 +61,15 @@ function CheckboxField({
                     <polyline points="20 6 9 17 4 12" />
                 </svg>
             </div>
+
+            {/* Label Text */}
             <span className={`${textColor} text-sm font-medium tracking-wider`}>{label}</span>
         </label>
     );
 }
 
 export function PenghuniFilter({ onSearch, onReset }: PenghuniFilterProps) {
+    // Filter State
     const [filterState, setFilterState] = useState<PenghuniFilterState>({
         nama: "",
         noKp: "",
@@ -86,10 +84,12 @@ export function PenghuniFilter({ onSearch, onReset }: PenghuniFilterProps) {
         },
     });
 
+    // Handlers for Search and Reset
     function handleSearch() {
         onSearch?.(filterState);
     }
 
+    // Reset filter state to default values and call onReset callback.
     function handleReset() {
         const resetState: PenghuniFilterState = {
             nama: "",
@@ -193,14 +193,6 @@ export function PenghuniFilter({ onSearch, onReset }: PenghuniFilterProps) {
                                 accentColor="var(--color-x-lengkap)"
                                 checked={filterState.statuses.tidakLengkap}
                                 onChange={(checked) => setFilterState(prev => ({ ...prev, statuses: { ...prev.statuses, tidakLengkap: checked } }))}
-                            />
-                            <CheckboxField
-                                label="Keluar"
-                                borderColor="border-keluar"
-                                textColor="text-black"
-                                accentColor="var(--color-keluar)"
-                                checked={filterState.statuses.keluar}
-                                onChange={(checked) => setFilterState(prev => ({ ...prev, statuses: { ...prev.statuses, keluar: checked } }))}
                             />
                         </div>
 

@@ -53,10 +53,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const unit = await prisma.unit.findFirst({
-      where: {
-        id: unitId,
-        recordStatus: "VERIFIED",
-      },
+      where: { id: unitId },
       include: quarterUnitDetailsInclude,
     });
 
@@ -130,10 +127,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const existingUnit = await prisma.unit.findUnique({
-      where: {
-        id: unitId,
-      },
+    const existingUnit = await prisma.unit.findFirst({
+      where: { id: unitId },
       include: {
         ...buildQuarterUnitCurrentOccupancyInclude(),
         quarterCategory: {
@@ -679,10 +674,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   try {
     const currentAdmin = await getCurrentAdmin();
-    const existingUnit = await prisma.unit.findUnique({
-      where: {
-        id: unitId,
-      },
+    const existingUnit = await prisma.unit.findFirst({
+      where: { id: unitId },
       include: {
         quarterCategory: {
           select: {

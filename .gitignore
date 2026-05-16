@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!ai_service/.env.example
 
 # vercel
 .vercel
@@ -44,5 +46,6 @@ next-env.d.ts
 
 # python microservice
 ai_service/.venv/
-ai_service/__pycache__/
+__pycache__/
+*.py[cod]
 .pytest_cache/
