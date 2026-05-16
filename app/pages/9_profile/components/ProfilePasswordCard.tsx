@@ -1,4 +1,4 @@
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 
 import { PasswordInput } from "./ProfileFields";
 import type { PasswordForm } from "./profileTypes";

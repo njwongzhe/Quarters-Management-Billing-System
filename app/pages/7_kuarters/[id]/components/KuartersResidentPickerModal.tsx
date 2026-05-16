@@ -2,7 +2,11 @@
 
 import { useEffect } from "react";
 
-import Icon, { commonIcons } from "@/app/components/Icon";
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import {
+  PaginationControls,
+  usePaginationLogic,
+} from "@/app/components/Pagination/Pagination";
 import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
 
 import type { AvailableResidentRecord } from "./kuartersUnitHelpers";
@@ -32,6 +36,17 @@ export default function KuartersResidentPickerModal({
   onDismissError,
   onSearchQueryChange,
 }: KuartersResidentPickerModalProps) {
+  const itemsPerPage = 10;
+  const {
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    handlePageChange,
+    paginationItems,
+  } = usePaginationLogic(residents.length, itemsPerPage);
+  const paginatedResidents = residents.slice(startIndex, endIndex);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -50,13 +65,17 @@ export default function KuartersResidentPickerModal({
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    handlePageChange("goto", 1);
+  }, [searchQuery]);
+
   if (!isOpen) {
     return null;
   }
 
   return (
     <div
-      className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-center justify-center bg-dark-blue/35 p-4 backdrop-blur-[2px] md:p-6"
+      className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="resident-picker-title"
@@ -66,42 +85,42 @@ export default function KuartersResidentPickerModal({
         }
       }}
     >
-      <div className="flex h-[min(48.75rem,calc(100vh-2rem))] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-light-grey/20 bg-white shadow-2xl md:h-[min(48.75rem,calc(100vh-3rem))]">
-        <div className="flex flex-col gap-4 bg-dark-blue px-6 py-5 text-white sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-white/75">
-              Pilih Penghuni
-            </p>
+      <div className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[calc(100vh-6rem)]">
+        {/* Header */}
+        <div className="flex items-center justify-between bg-dark-blue p-6 text-white shrink-0">
+          {/* Title and Description */}
+          <div>
             <h2
               id="resident-picker-title"
-              className="text-2xl font-extrabold tracking-[-0.03em]"
+              className="text-lg font-bold"
             >
-              Senarai Penghuni Tersedia
+              SENARAI PENGHUNI TERSEDIA
             </h2>
-            <p className="max-w-2xl text-sm text-white/80">
-              Penghuni yang telah disahkan akan dipaparkan dalam senarai ini.
+            <p className="text-xs font-extralight text-light-grey">
+              PENGHUNI YANG TELAH DISAHKAN AKAN DIPAPARKAN DALAM SENARAI INI
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-start">
-            <button
-              type="button"
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/15"
-              aria-label="Tutup pilihan penghuni"
-              onClick={onClose}
-            >
-              <Icon icon="close" size={20} />
-            </button>
-          </div>
+          {/* Close Button */}
+          <button
+            type="button"
+            className="text-white transition-transform hover:scale-95 active:scale-90"
+            aria-label="Tutup pilihan penghuni"
+            onClick={onClose}
+          >
+            <Icon icon="close" size={20} />
+          </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-light-blue/10 p-4 sm:p-5">
-          <div className="rounded-2xl border border-light-grey/20 bg-white p-4">
+        {/* Content Area */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-light-blue p-6">
+          {/* Search Input */}
+          <div className="shrink-0 rounded-lg border border-light-grey/20 bg-white p-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <label className="block">
-              <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
+              <span className="mb-2 block text-xs font-bold uppercase text-grey">
                 Carian Mengikut IC atau Nama
               </span>
-              <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
+              <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue focus-within:bg-white">
                 <Icon
                   icon={commonIcons.search}
                   size={18}
@@ -118,7 +137,8 @@ export default function KuartersResidentPickerModal({
             </label>
           </div>
 
-          <div className="mt-4">
+          {/* Error Message Banner */}
+          <div className="mt-4 shrink-0">
             <KuartersFeedbackBanner
               notice={
                 errorMessage
@@ -132,31 +152,24 @@ export default function KuartersResidentPickerModal({
             />
           </div>
 
-          <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
-            <div className="h-full overflow-auto">
-              <table className="w-full min-w-200 table-fixed border-collapse">
-                <thead className="sticky top-0 bg-background">
-                  <tr>
-                    <th className="w-[27%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                      No. Kad Pengenalan Penghuni
-                    </th>
-                    <th className="w-[41%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                      Nama Penghuni
-                    </th>
-                    <th className="w-[18%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                      Status
-                    </th>
-                    <th className="w-[14%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                      Tindakan
-                    </th>
+          {/* Residents Table */}
+          <div>
+            <div className="overflow-hidden rounded-lg border border-light-grey/20">
+              <table className="w-full overflow-x-auto">
+                <thead className="bg-background">
+                  <tr className="text-xs font-bold text-grey">
+                    <th className="px-4 py-3 text-left w-min whitespace-nowrap">No. K/P</th>
+                    <th className="px-4 py-3 text-left w-min whitespace-nowrap">Nama</th>
+                    <th className="px-4 py-3 text-center w-min whitespace-nowrap">Status</th>
+                    <th className="w-[0%] px-4 py-3 text-center whitespace-nowrap">Tindakan</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="bg-white">
                   {isLoading ? (
-                    <tr className="border-t border-light-grey/20">
+                    <tr className="text-sm">
                       <td
                         colSpan={4}
-                        className="px-6 py-10 text-center text-sm font-medium text-grey"
+                        className="px-4 py-4 text-center text-grey"
                       >
                         Memuatkan senarai penghuni...
                       </td>
@@ -164,10 +177,10 @@ export default function KuartersResidentPickerModal({
                   ) : null}
 
                   {!isLoading && residents.length === 0 ? (
-                    <tr className="border-t border-light-grey/20">
+                    <tr className="text-sm">
                       <td
                         colSpan={4}
-                        className="px-6 py-10 text-center text-sm font-medium text-grey"
+                        className="px-4 py-4 text-center text-grey"
                       >
                         Tiada penghuni tersedia yang sepadan dengan carian semasa.
                       </td>
@@ -175,45 +188,51 @@ export default function KuartersResidentPickerModal({
                   ) : null}
 
                   {!isLoading
-                    ? residents.map((resident) => {
+                    ? paginatedResidents.map((resident) => {
                         const isSelected =
                           resident.icNumber === selectedResidentIcNumber;
+                        const hasCurrentUnit = resident.hasCurrentUnit;
+                        const isActionDisabled = isSelected || hasCurrentUnit;
 
                         return (
                           <tr
                             key={resident.id}
-                            className="border-t border-light-grey/20 transition-colors hover:bg-light-blue/25"
+                            className="border-b border-b-light-grey/20 text-sm transition-colors"
                           >
                             <td
-                              className="px-6 py-4 text-sm font-semibold text-dark-grey"
+                              className="px-4 py-3 text-left font-bold text-dark-grey w-min whitespace-nowrap"
                               title={resident.icNumber}
                             >
                               {formatIcNumber(resident.icNumber)}
                             </td>
-                            <td className="px-6 py-4 text-sm font-semibold text-dark-grey">
+                            <td className="px-4 py-3 text-left font-bold text-dark-grey w-min whitespace-nowrap">
                               {resident.fullName}
                             </td>
-                            <td className="px-6 py-4 text-center">
+                            <td className="px-4 py-3 text-center w-min whitespace-nowrap">
                               <span
-                                className={`inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-extrabold uppercase ${getResidentStatusBadgeClass(
+                                className={`inline-flex min-h-8 items-center rounded-full border px-3 text-[11px] font-semibold ${getResidentStatusBadgeClass(
                                   resident.status,
                                 )}`}
                               >
                                 {formatResidentStatus(resident.status)}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-center">
+                            <td className="px-4 py-3 text-center w-min whitespace-nowrap">
                               <button
                                 type="button"
-                                className={`inline-flex min-h-10 items-center rounded-xl px-4 py-2 text-sm font-extrabold transition-colors ${
-                                  isSelected
+                                className={`inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                  isActionDisabled
                                     ? "cursor-not-allowed border border-light-grey/25 bg-background text-grey"
                                     : "bg-dark-blue text-white hover:opacity-90"
                                 }`}
-                                disabled={isSelected}
+                                disabled={isActionDisabled}
                                 onClick={() => onChooseResident(resident)}
                               >
-                                {isSelected ? "Dipilih" : "Pilih"}
+                                {isSelected
+                                  ? "Dipilih"
+                                  : hasCurrentUnit
+                                    ? "Didiami"
+                                    : "Pilih"}
                               </button>
                             </td>
                           </tr>
@@ -221,6 +240,25 @@ export default function KuartersResidentPickerModal({
                       })
                     : null}
                 </tbody>
+
+                <tfoot className="bg-white border-t border-light-grey/20">
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-4 py-4"
+                    >
+                      <PaginationControls
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        startIndex={startIndex}
+                        endIndex={endIndex}
+                        totalRecords={residents.length}
+                        paginationItems={paginationItems}
+                        onPageChange={handlePageChange}
+                      />
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -231,7 +269,10 @@ export default function KuartersResidentPickerModal({
 }
 
 function formatResidentStatus(value: string) {
-  return value.replace(/_/g, " ");
+  return value
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
 function formatIcNumber(value: string) {

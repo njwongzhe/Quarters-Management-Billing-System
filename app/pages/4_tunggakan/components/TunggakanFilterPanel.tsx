@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import Icon from "../../../components/Icon";
+import Icon from "../../../components/Icon/Icon";
 import type { TunggakanListItem, TunggakanFilter } from "@/lib/arrears";
 
 export type { TunggakanFilter };

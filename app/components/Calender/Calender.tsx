@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 
 type CalenderProps = {
     containerRef: RefObject<HTMLElement | null>;
@@ -14,6 +14,7 @@ type CalenderProps = {
     disabledDates?: string[];
     onChange: (value: string) => void;
     onClose: () => void;
+    disableAbsolutePositioning?: boolean;
 };
 
 // Helper function to parse date string in "YYYY-MM-DD" format and return a Date object. Returns null if the input is invalid.
@@ -92,12 +93,12 @@ export default function Calender({
     containerRef,
     isOpen,
     value,
-    required = false,
     minDate,
     maxDate,
     disabledDates = [],
     onChange,
     onClose,
+    disableAbsolutePositioning = false,
 }: CalenderProps) {
     const initialDate = parseDateInput(value);
     const [visibleMonth, setVisibleMonth] = useState(initialDate ?? startOfDay(new Date()));
@@ -134,7 +135,7 @@ export default function Calender({
         return null;
 
     return (
-        <div className="absolute top-full left-0 right-0 z-50 w-full rounded-3xl bg-white p-2 shadow-lg flex flex-col gap-2">
+        <div className={`${disableAbsolutePositioning ? "relative" : "absolute top-full left-0 right-0"} z-50 w-full rounded-3xl bg-white p-2 shadow-lg flex flex-col gap-2`}>
             {/* Header (Month and Year) */}
             <div className="flex items-center justify-between">
                 {/* Previous Month Button */}
@@ -180,8 +181,6 @@ export default function Calender({
                     <Icon icon="chevron_right" size={20} />
                 </button>
             </div>
-
-            <hr />
 
             {/* Weekday Labels */}
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold uppercase text-grey">

@@ -1,6 +1,6 @@
 import type { ChangeEvent, RefObject } from "react";
 
-import Icon from "../../../components/Icon";
+import Icon from "../../../components/Icon/Icon";
 
 type UploadDropzoneProps = {
   fileInputRef: RefObject<HTMLInputElement | null>;

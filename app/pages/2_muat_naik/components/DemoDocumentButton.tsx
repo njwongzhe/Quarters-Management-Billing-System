@@ -1,4 +1,4 @@
-import Icon from "../../../components/Icon";
+import Icon from "../../../components/Icon/Icon";
 import type { Category } from "./types";
 
 const sampleDocumentsByCategory: Partial<Record<Category, string[]>> = {

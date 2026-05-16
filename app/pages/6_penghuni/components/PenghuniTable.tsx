@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 
-import Icon from "@/app/components/Icon";
-import { usePaginationLogic, PaginationControls } from "../controller/PaginationControl";
+import Icon from "@/app/components/Icon/Icon";
+import { usePaginationLogic, PaginationControls } from "@/app/components/Pagination/Pagination";
 import PenghuniDetail from "./PenghuniDetail";
 import { PatternFormat } from "react-number-format";
 import type { ResidentRecord, PenghuniTableProps } from "../page";
@@ -142,13 +142,13 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     {/* Table Header */}
                     <thead>
                         <tr className="font-bold text-xs text-grey bg-background">
-                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Penghuni</th>
-                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Perhubungan</th>
-                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Pekerjaan</th>
-                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Taraf Perkhidmatan</th>
-                            <th className="text-left px-3 py-3 w-min whitespace-nowrap">Kuarters</th>
-                            <th className="text-right px-3 py-3 w-min whitespace-nowrap">Tunggakan (RM)</th>
-                            <th className="text-center px-3 py-3 w-min whitespace-nowrap">Tindakan</th>
+                            <th className="text-left p-3 w-min whitespace-nowrap">Penghuni</th>
+                            <th className="text-left p-3 w-min whitespace-nowrap">Perhubungan</th>
+                            <th className="text-left p-3 w-min whitespace-nowrap">Pekerjaan</th>
+                            <th className="text-left p-3 w-min whitespace-nowrap">Taraf Perkhidmatan</th>
+                            <th className="text-left p-3 w-min whitespace-nowrap">Kuarters</th>
+                            <th className="text-right p-3 w-min whitespace-nowrap">Tunggakan (RM)</th>
+                            <th className="w-[0%] text-center p-3 whitespace-nowrap">Tindakan</th>
                         </tr>
                     </thead>
                     
@@ -241,23 +241,21 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     </tbody>
 
                     {/* Pagination Controls */}
-                    {!isLoading && filteredResidents.length > 0 && (
-                        <tfoot>
-                            <tr>
-                                <td colSpan={7} className="bg-white border-t border-light-grey/20 px-3 py-4">
-                                    <PaginationControls
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        startIndex={startIndex}
-                                        endIndex={endIndex}
-                                        totalRecords={filteredResidents.length}
-                                        paginationItems={paginationItems}
-                                        onPageChange={handlePageChange}
-                                    />
-                                </td>
-                            </tr>
-                        </tfoot>
-                    )}
+                    <tfoot>
+                        <tr>
+                            <td colSpan={7} className="bg-white border-t border-light-grey/20 px-3 py-4">
+                                <PaginationControls
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    startIndex={startIndex}
+                                    endIndex={endIndex}
+                                    totalRecords={filteredResidents.length}
+                                    paginationItems={paginationItems}
+                                    onPageChange={handlePageChange}
+                                />
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
 

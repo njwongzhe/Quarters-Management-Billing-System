@@ -1,5 +1,5 @@
-import Icon from "@/app/components/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
+import Icon from "@/app/components/Icon/Icon";
+import ToolbarButton from "@/app/components/Icon/ToolbarIconButton";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 

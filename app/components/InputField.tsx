@@ -1,6 +1,6 @@
 "use client";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import { PatternFormat } from 'react-number-format';
 import { useState } from "react";
 

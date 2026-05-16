@@ -1,10 +1,10 @@
 "use client";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import { useState, useEffect } from "react";
 import { calculateAgeByIc } from "@/app/utils/resident";
 import type { ResidentRecord } from "../page";
-import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "./InputField";
+import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "../../../components/InputField";
 import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave, stripResidentFormatting } from "../controller/DatabaseControl";
 import PenghuniDetailHistory from "./PenghuniDetailHistory";
 import { resolveResidentStatusRules } from "../controller/StatusControl";

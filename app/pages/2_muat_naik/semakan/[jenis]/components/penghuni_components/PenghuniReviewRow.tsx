@@ -1,4 +1,4 @@
-import Icon from "../../../../../../components/Icon";
+import Icon from "../../../../../../components/Icon/Icon";
 import type { ExtractedPenghuniRecord } from "../../../../components/extract-review-shared";
 import { getPenghuniRecordKey } from "./helpers";
 

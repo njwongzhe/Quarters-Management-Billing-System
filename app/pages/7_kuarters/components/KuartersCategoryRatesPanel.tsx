@@ -2,18 +2,14 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import Icon, { commonIcons } from "@/app/components/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
-import {
-  downloadXlsxFile,
-  type XlsxCell,
-  type XlsxSheet,
-} from "@/lib/xlsx-export";
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { PaginationControls } from "@/app/components/Pagination/Pagination";
+import ToolbarButton from "@/app/components/Icon/ToolbarIconButton";
+import { downloadQuarterCategoryRates } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
 
 import {
   EMPTY_QUARTER_CATEGORY_ID,
   formatMoney,
-  type PaginationItem,
   type KuartersEditorState,
   type QuarterCategoryDraft,
   type QuarterCategoryRecord,
@@ -22,6 +18,7 @@ import {
 type KuartersCategoryRatesPanelProps = {
   rates: QuarterCategoryRecord[];
   exportRates: QuarterCategoryRecord[];
+  isLoading: boolean;
   currentPage: number;
   editor: KuartersEditorState | null;
   filterQuery: string;
@@ -29,8 +26,10 @@ type KuartersCategoryRatesPanelProps = {
   onCancelEdit: () => void;
   pendingAction: "save" | "delete" | null;
   pendingRowId: string | null;
-  pageItems: PaginationItem[];
-  recordSummaryText: string;
+  paginationItems: (number | "ellipsis")[];
+  startIndex: number;
+  endIndex: number;
+  totalRecords: number;
   totalPages: number;
   onAddRow: () => void;
   onClearFilter: () => void;
@@ -70,44 +69,6 @@ function ActionButton({
   );
 }
 
-function PageButton({
-  item,
-  currentPage,
-  disabled = false,
-  onClick,
-}: {
-  item: PaginationItem;
-  currentPage: number;
-  disabled?: boolean;
-  onClick: (page: number) => void;
-}) {
-  if (item === "ellipsis") {
-    return (
-      <span className="px-1 text-sm font-semibold text-grey" aria-hidden="true">
-        ...
-      </span>
-    );
-  }
-
-  const isActive = item === currentPage;
-
-  return (
-    <button
-      type="button"
-      className={`min-h-8 min-w-8 rounded-md border px-2 text-sm transition-colors ${
-        isActive
-          ? "border-dark-blue bg-dark-blue font-bold text-white"
-          : "border-light-grey/30 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
-      } disabled:cursor-not-allowed disabled:opacity-40`}
-      aria-current={isActive ? "page" : undefined}
-      disabled={disabled}
-      onClick={() => onClick(item)}
-    >
-      {item}
-    </button>
-  );
-}
-
 function InputField({
   value,
   placeholder,
@@ -143,6 +104,7 @@ function InputField({
 }
 
 export default function KuartersCategoryRatesPanel({
+  isLoading,
   currentPage,
   editor,
   exportRates,
@@ -160,9 +122,11 @@ export default function KuartersCategoryRatesPanel({
   onViewRow,
   pendingAction,
   pendingRowId,
-  pageItems,
+  paginationItems,
   rates,
-  recordSummaryText,
+  startIndex,
+  endIndex,
+  totalRecords,
   totalPages,
 }: KuartersCategoryRatesPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
@@ -224,38 +188,27 @@ export default function KuartersCategoryRatesPanel({
     setIsSearchOpen(false);
   }
 
-  function handleDownloadRates() {
-    const headers: XlsxCell[] = [
-      { value: "Kategori", style: "header" },
-      { value: "Alamat", style: "header" },
-      { value: "Sewa (RM)", style: "header", align: "right" },
-      { value: "Senggara (RM)", style: "header", align: "right" },
-      { value: "Penalti (RM)", style: "header", align: "right" },
-    ];
-    const rows: XlsxSheet["rows"] = exportRates.map((rate) => [
-      rate.categoryName,
-      rate.address ?? "N/A",
-      { value: rate.rentalPrice, type: "number", align: "right" },
-      { value: rate.maintenancePrice, type: "number", align: "right" },
-      { value: rate.penaltyPrice, type: "number", align: "right" },
-    ]);
+  function handlePaginationChange(
+    action: "prev" | "next" | "goto",
+    pageNum?: number,
+  ) {
+    if (pendingAction) {
+      return;
+    }
 
-    downloadXlsxFile({
-      filename: "senarai-kategori-kuarters",
-      sheets: [
-        {
-          name: "Senarai Kategori",
-          columns: [
-            { width: 24 },
-            { width: 40 },
-            { width: 16 },
-            { width: 18 },
-            { width: 16 },
-          ],
-          rows: [headers, ...rows],
-        },
-      ],
-    });
+    if (action === "prev") {
+      onPageChange(Math.max(currentPage - 1, 1));
+      return;
+    }
+
+    if (action === "next") {
+      onPageChange(Math.min(currentPage + 1, totalPages));
+      return;
+    }
+
+    if (action === "goto" && pageNum !== undefined) {
+      onPageChange(pageNum);
+    }
   }
 
   function renderActionCell(rowId: string, isEditing: boolean) {
@@ -296,7 +249,7 @@ export default function KuartersCategoryRatesPanel({
           textClass="text-dark-blue"
         />
         <ActionButton
-          icon={commonIcons.eye}
+          icon={commonIcons.chevronRight}
           label="Lihat"
           disabled={Boolean(pendingAction)}
           onClick={() => {
@@ -313,18 +266,18 @@ export default function KuartersCategoryRatesPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-light-grey/20 bg-light-blue p-4 sm:p-5">
-      <div className="flex flex-col gap-4 border-b border-light-grey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-1">
-          <h2 className="text-xl font-extrabold tracking-[-0.02em] text-dark-grey">
-            Senarai kategori kuarters
-          </h2>
-          <p className="text-sm text-grey">
+    <section className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
+      <div className="flex flex-row justify-between px-3 pt-3">
+        <div>
+          <div className="text-lg font-bold text-dark-grey">
+            Senarai Kategori Kuarters
+          </div>
+          <div className="text-xs text-grey">
             Kemaskini maklumat yuran dan denda mengikut kategori kuarters.
-          </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 self-start">
+        <div className="flex items-center gap-4">
           <ToolbarButton
             icon={commonIcons.search}
             label="Cari kategori kuarters"
@@ -334,13 +287,14 @@ export default function KuartersCategoryRatesPanel({
           <ToolbarButton
             icon={commonIcons.download}
             label="Muat turun data kategori kuarters"
-            onClick={handleDownloadRates}
+            onClick={() => downloadQuarterCategoryRates(exportRates)}
           />
         </div>
       </div>
 
       {isSearchOpen ? (
-      <div className="mt-4 rounded-2xl border border-light-grey/20 bg-white p-4">
+      <div className="px-3">
+      <div className="rounded-lg bg-white p-4 shadow">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <label className="block flex-1">
@@ -377,73 +331,62 @@ export default function KuartersCategoryRatesPanel({
           </div>
         </div>
       </div>
+      </div>
       ) : null}
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
-        <div className="overflow-x-auto">
+      <div className="rounded-lg overflow-x-auto overflow-y-auto">
+        <div className="rounded-lg overflow-x-auto overflow-y-auto">
           {/* The table stays semantic so the edit and add flows can grow without changing the layout structure. */}
-          <table className="w-full min-w-240 table-fixed border-collapse">
+          <table className="w-full">
             <thead className="bg-background">
-              <tr>
-                <th className="w-[20%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Kategori
-                </th>
-                <th className="w-[24%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Alamat
-                </th>
-                <th className="w-[16%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Sewa (RM)
-                </th>
-                <th className="w-[16%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Senggara (RM)
-                </th>
-                <th className="w-[14%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Penalti (RM)
-                </th>
-                <th className="w-[10%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Tindakan
-                </th>
+              <tr className="font-bold text-xs text-grey bg-background">
+                <th className="p-3 text-left w-min whitespace-nowrap">Kategori</th>
+                <th className="p-3 text-left w-min whitespace-nowrap">Alamat</th>
+                <th className="p-3 text-right w-min whitespace-nowrap">Sewa (RM)</th>
+                <th className="p-3 text-right w-min whitespace-nowrap">Senggara (RM)</th>
+                <th className="p-3 text-right w-min whitespace-nowrap">Penalti (RM)</th>
+                <th className="w-[0%] p-3 text-center whitespace-nowrap">Tindakan</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white">
               {isCreateRowVisible ? (
                 <tr
                   ref={editor?.mode === "create" ? editingRowRef : null}
                   className="border-t border-light-grey/20 bg-dark-blue/3"
                 >
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 w-min whitespace-nowrap">
                     <InputField
                       value={editor.draft.categoryName}
-                      placeholder="Masukkan nama kategori"
+                      placeholder="Masukkan Nama Kategori"
                       align="start"
                       disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("categoryName", value)}
                     />
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 w-min whitespace-nowrap">
                     <InputField
                       value={editor.draft.address}
-                      placeholder="Masukkan alamat"
+                      placeholder="Masukkan Alamat"
                       align="start"
                       disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("address", value)}
                     />
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 w-min whitespace-nowrap">
                     <InputField
                       value={editor.draft.rentalPrice}
                       placeholder="0.00"
-                      align="center"
+                      align="end"
                       inputMode="decimal"
                       disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("rentalPrice", value)}
                     />
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 w-min whitespace-nowrap">
                     <InputField
                       value={editor.draft.maintenancePrice}
                       placeholder="0.00"
-                      align="center"
+                      align="end"
                       inputMode="decimal"
                       disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) =>
@@ -451,17 +394,17 @@ export default function KuartersCategoryRatesPanel({
                       }
                     />
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 w-min whitespace-nowrap">
                     <InputField
                       value={editor.draft.penaltyPrice}
                       placeholder="0.00"
-                      align="center"
+                      align="end"
                       inputMode="decimal"
                       disabled={pendingRowId === EMPTY_QUARTER_CATEGORY_ID}
                       onChange={(value) => onDraftChange("penaltyPrice", value)}
                     />
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 w-min whitespace-nowrap">
                     <div className="flex justify-center">
                       {renderActionCell(EMPTY_QUARTER_CATEGORY_ID, true)}
                     </div>
@@ -473,16 +416,20 @@ export default function KuartersCategoryRatesPanel({
                 <tr className="border-t border-light-grey/20">
                   <td
                     colSpan={6}
-                    className="px-6 py-10 text-center text-sm font-medium text-grey"
+                    className="px-3 py-4 text-center text-sm font-medium text-grey"
                   >
-                    {hasActiveFilters
-                      ? "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
-                      : "Tiada kategori kuarters untuk dipaparkan buat masa ini."}
+                    {isLoading ? (
+                      "Sedang membaca data kategori kuarters..."
+                    ) : hasActiveFilters ? (
+                      "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
+                    ) : (
+                      "Tiada kategori kuarters untuk dipaparkan buat masa ini."
+                    )}
                   </td>
                 </tr>
               ) : null}
 
-              {rates.map((rate) => {
+              {!isLoading && rates.map((rate) => {
                 const isEditing = editor?.mode === "edit" && editor.rowId === rate.id;
                 const isCurrentRowPending = pendingRowId === rate.id;
 
@@ -492,11 +439,11 @@ export default function KuartersCategoryRatesPanel({
                     ref={isEditing ? editingRowRef : null}
                     className="border-t border-light-grey/20"
                   >
-                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <InputField
                           value={editor.draft.categoryName}
-                          placeholder="Masukkan nama kategori"
+                          placeholder="Masukkan Nama Kategori"
                           align="start"
                           disabled={isCurrentRowPending}
                           onChange={(value) =>
@@ -517,11 +464,11 @@ export default function KuartersCategoryRatesPanel({
                         </>
                       )}
                     </td>
-                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <InputField
                           value={editor.draft.address}
-                          placeholder="Masukkan alamat"
+                          placeholder="Masukkan Alamat"
                           align="start"
                           disabled={isCurrentRowPending}
                           onChange={(value) => onDraftChange("address", value)}
@@ -535,12 +482,12 @@ export default function KuartersCategoryRatesPanel({
                         </span>
                       )}
                     </td>
-                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <InputField
                           value={editor.draft.rentalPrice}
                           placeholder="0.00"
-                          align="center"
+                          align="end"
                           inputMode="decimal"
                           disabled={isCurrentRowPending}
                           onChange={(value) =>
@@ -548,17 +495,17 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block truncate text-center">
+                        <span className="block truncate text-right">
                           {formatMoney(rate.rentalPrice)}
                         </span>
                       )}
                     </td>
-                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <InputField
                           value={editor.draft.maintenancePrice}
                           placeholder="0.00"
-                          align="center"
+                          align="end"
                           inputMode="decimal"
                           disabled={isCurrentRowPending}
                           onChange={(value) =>
@@ -566,17 +513,17 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block truncate text-center">
+                        <span className="block truncate text-right">
                           {formatMoney(rate.maintenancePrice)}
                         </span>
                       )}
                     </td>
-                    <td className="overflow-hidden px-6 py-4 text-sm font-semibold text-dark-grey">
+                    <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <InputField
                           value={editor.draft.penaltyPrice}
                           placeholder="0.00"
-                          align="center"
+                          align="end"
                           inputMode="decimal"
                           disabled={isCurrentRowPending}
                           onChange={(value) =>
@@ -584,12 +531,12 @@ export default function KuartersCategoryRatesPanel({
                           }
                         />
                       ) : (
-                        <span className="block truncate text-center">
+                        <span className="block truncate text-right">
                           {formatMoney(rate.penaltyPrice)}
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2 w-min whitespace-nowrap">
                       <div className="flex justify-center">
                         {renderActionCell(rate.id, isEditing)}
                       </div>
@@ -601,51 +548,27 @@ export default function KuartersCategoryRatesPanel({
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-light-grey/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors disabled:opacity-40"
-              aria-label="Halaman sebelumnya"
-              disabled={currentPage <= 1 || Boolean(pendingAction)}
-              onClick={() => onPageChange(currentPage - 1)}
-            >
-              <Icon icon={commonIcons.chevronLeft} size={18} />
-            </button>
-
-            {pageItems.map((item, index) => (
-              <PageButton
-                key={`${item}-${index}`}
-                item={item}
-                currentPage={currentPage}
-                disabled={Boolean(pendingAction)}
-                onClick={onPageChange}
-              />
-            ))}
-
-            <button
-              type="button"
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors disabled:opacity-40"
-              aria-label="Halaman seterusnya"
-              disabled={currentPage >= totalPages || Boolean(pendingAction)}
-              onClick={() => onPageChange(currentPage + 1)}
-            >
-              <Icon icon={commonIcons.chevronRight} size={18} />
-            </button>
-          </div>
-
-          <p className="text-sm text-grey">{recordSummaryText}</p>
+        <div className="flex flex-col gap-3 border-t bg-white border-light-grey/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            totalRecords={totalRecords}
+            paginationItems={paginationItems}
+            onPageChange={handlePaginationChange}
+          />
         </div>
       </div>
 
       <button
         type="button"
-        className="fixed bottom-6 right-6 z-40 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-dark-blue px-5 py-3 text-sm font-extrabold text-white shadow-[0_18px_45px_rgba(13,47,86,0.28)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:bottom-8 sm:right-8"
+        className="fixed bottom-8 right-8 z-40 flex gap-1 p-4 items-center justify-center rounded-lg bg-dark-blue text-white shadow-[0_4px_10px_rgba(0,0,0,0.3)] transition-transform hover:scale-105 active:scale-95"
         disabled={Boolean(pendingAction)}
         onClick={onAddRow}
       >
-        <Icon icon="add" size={20} />
-        Tambah Kategori
+        <Icon icon="add" size={15} />
+        <span className="font-bold text-xs">Tambah Kategori</span>
       </button>
     </section>
   );

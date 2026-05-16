@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Icon from "../../../components/Icon";
+import Icon from "../../../components/Icon/Icon";
 
 type RowItem = {
   id: string; // Unique ID for React rendering

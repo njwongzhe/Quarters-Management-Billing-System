@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { buildDiceBearAvatarUrl } from "@/lib/avatar";
 
-import { PROFILE_ROUTES, ROUTES, SIDEBAR_ROUTES } from "../constants/routes"; 
+import { PROFILE_ROUTES, ROUTES, SIDEBAR_ROUTES } from "../../constants/routes"; 
 
 type SidebarProfile = {
     fullName: string;

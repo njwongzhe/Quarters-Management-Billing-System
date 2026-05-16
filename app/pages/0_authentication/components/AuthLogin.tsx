@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Icon from "@/app/components/Icon";
-import HelpButton from "@/app/components/button-help";
+import Icon from "@/app/components/Icon/Icon";
+import HelpButton from "@/app/components/Layout/ButtonHelp";
 
 type AuthLoginProps = {
     onSwitchToRegister: () => void;

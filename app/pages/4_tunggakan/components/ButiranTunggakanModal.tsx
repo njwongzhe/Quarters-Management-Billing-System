@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Icon from "../../../components/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
+import Icon from "../../../components/Icon/Icon";
+import ToolbarButton from "@/app/components/Icon/ToolbarIconButton";
 
 type ButiranTunggakanModalProps = {
   isOpen: boolean;

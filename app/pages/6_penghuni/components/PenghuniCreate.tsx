@@ -1,8 +1,8 @@
 "use client";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import { useState } from "react";
-import { InputField, InputFieldFormat, InputBox, DropdownField, Topic } from "./InputField";
+import { InputField, InputFieldFormat, InputBox, DropdownField, Topic } from "../../../components/InputField";
 import { handleCreate, handleFieldChange, stripResidentFormatting } from "../controller/DatabaseControl";
 
 type PenghuniCreateProps = {

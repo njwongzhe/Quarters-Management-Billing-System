@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Icon from "@/app/components/Icon";
-import { InputField, InputFieldFormat } from "./InputField";
+import Icon from "@/app/components/Icon/Icon";
+import { InputField, InputFieldFormat } from "../../../components/InputField";
 
 export type PenghuniFilterState = {
     nama: string;

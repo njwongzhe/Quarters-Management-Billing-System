@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import type { AuditLogFilters, AuditLogListItem } from "@/lib/audit-logs";
 import { buildAuditLogQueryString } from "@/lib/audit-logs";
 import AuditActionBadge from "./AuditActionBadge";

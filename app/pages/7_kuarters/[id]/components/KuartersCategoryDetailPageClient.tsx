@@ -81,6 +81,7 @@ export default function KuartersCategoryDetailPageClient({
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingUnitId, setPendingUnitId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [isTableLoading, setIsTableLoading] = useState(false);
   const [residentPicker, setResidentPicker] = useState<ResidentPickerState>({
     isOpen: false,
     isLoading: false,
@@ -364,6 +365,7 @@ export default function KuartersCategoryDetailPageClient({
     try {
       setPendingUnitId(editor.rowId);
       setPendingAction("save");
+      setIsTableLoading(true);
 
       const response =
         editor.mode === "create"
@@ -430,6 +432,7 @@ export default function KuartersCategoryDetailPageClient({
     } finally {
       setPendingUnitId(null);
       setPendingAction(null);
+      setIsTableLoading(false);
     }
   }
 
@@ -476,6 +479,7 @@ export default function KuartersCategoryDetailPageClient({
     try {
       setPendingUnitId(rowId);
       setPendingAction("delete");
+      setIsTableLoading(true);
 
       const response = await fetch(
         `/api/quarter-categories/${initialData.id}/units/${rowId}`,
@@ -519,6 +523,7 @@ export default function KuartersCategoryDetailPageClient({
     } finally {
       setPendingUnitId(null);
       setPendingAction(null);
+      setIsTableLoading(false);
     }
   }
 
@@ -530,7 +535,7 @@ export default function KuartersCategoryDetailPageClient({
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-8">
+    <div className="flex flex-col gap-4">
       <KuartersCategoryDetailHeader
         categoryName={initialData.categoryName}
         address={initialData.address}
@@ -542,6 +547,7 @@ export default function KuartersCategoryDetailPageClient({
       />
       <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
       <KuartersUnitsPanel
+        isLoading={isTableLoading}
         address={initialData.address}
         categoryId={initialData.id}
         categoryName={initialData.categoryName}
@@ -564,10 +570,12 @@ export default function KuartersCategoryDetailPageClient({
         onPageChange={setCurrentPage}
         onSaveUnit={handleSaveUnit}
         onUnavailableFeature={handleUnavailableFeature}
-        pageItems={pagination.pageItems}
+        paginationItems={pagination.pageItems}
         pendingAction={pendingAction}
         pendingUnitId={pendingUnitId}
-        recordSummaryText={pagination.summaryText}
+        startIndex={pagination.startIndex}
+        endIndex={pagination.endIndex}
+        totalRecords={pagination.totalRecords}
         totalPages={pagination.totalPages}
         units={pagination.visibleRecords}
       />

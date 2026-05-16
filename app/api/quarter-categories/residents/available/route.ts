@@ -45,6 +45,15 @@ export async function GET(request: Request) {
         icNumber: true,
         fullName: true,
         status: true,
+        occupancies: {
+          where: {
+            status: "CURRENT",
+          },
+          take: 1,
+          select: {
+            id: true,
+          },
+        },
       },
     });
 

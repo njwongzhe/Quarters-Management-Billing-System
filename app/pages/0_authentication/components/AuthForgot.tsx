@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import Icon from "@/app/components/Icon";
-import HelpButton from "@/app/components/button-help";
+import Icon from "@/app/components/Icon/Icon";
+import HelpButton from "@/app/components/Layout/ButtonHelp";
 
 type AuthForgotProps = {
 	onClose: () => void;

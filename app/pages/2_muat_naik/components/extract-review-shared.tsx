@@ -1,6 +1,6 @@
 "use client";
 
-import Icon from "../../../components/Icon";
+import Icon from "../../../components/Icon/Icon";
 
 export type ExtractedPenghuniRecord = {
   residentId?: string;

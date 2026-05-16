@@ -1,4 +1,4 @@
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 
 export default function ProfileResetCard({
   criticalKey,

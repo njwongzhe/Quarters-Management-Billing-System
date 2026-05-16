@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Icon from "@/app/components/Icon";
-import HelpButton from "../../../components/button-help";
+import Icon from "@/app/components/Icon/Icon";
+import HelpButton from "../../../components/Layout/ButtonHelp";
 import { DOMAIN_RESTRICTION, RESTRICTED_EMAIL_DOMAIN } from "@/app/constants/auth";
 
 type AuthRegisterProps = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import KuartersCategoryRatesPanel from "./KuartersCategoryRatesPanel";
@@ -28,7 +28,7 @@ import {
 
 type PendingAction = "save" | "delete" | null;
 type KuartersPageClientProps = {
-  initialData: KuartersPageInitialData;
+  initialData?: KuartersPageInitialData | null;
   initialNotice?: KuartersNotice | null;
 };
 type ApiResponseShape = {
@@ -44,7 +44,6 @@ async function parseApiResponse<T extends ApiResponseShape>(
 
   if (!response.ok || !payload?.success) {
     const message = payload?.message ?? fallbackMessage;
-
     throw new Error(message);
   }
 
@@ -58,11 +57,21 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
 export default function KuartersPageClient({
   initialData,
   initialNotice = null,
-}: KuartersPageClientProps) {
+}: KuartersPageClientProps = {}) {
   const router = useRouter();
-  const [summary] = useState(initialData.summary);
+  const hasValidInitialData = Boolean(initialData && initialData.quarterCategories);
+
+  const [summary, setSummary] = useState(
+    initialData?.summary ?? {
+      totalCategories: 0,
+      totalUnits: 0,
+      occupiedUnits: 0,
+      vacantUnits: 0,
+      occupancyRate: 0,
+    }
+  );
   const [quarterCategories, setQuarterCategories] = useState<QuarterCategoryRecord[]>(
-    initialData.quarterCategories,
+    initialData?.quarterCategories ?? [],
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [editor, setEditor] = useState<KuartersEditorState | null>(null);
@@ -70,6 +79,8 @@ export default function KuartersPageClient({
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [isTableLoading, setIsTableLoading] = useState(!hasValidInitialData);
+  
   const hasActiveFilters = hasActiveQuarterCategoryFilters(filters);
   const filteredQuarterCategories = filterQuarterCategories(quarterCategories, filters);
   const pagination = buildQuarterCategoryPagination(
@@ -80,6 +91,45 @@ export default function KuartersPageClient({
       totalRecords: quarterCategories.length,
     },
   );
+
+  useEffect(() => {
+    if (hasValidInitialData) return;
+
+    const controller = new AbortController();
+
+    async function loadData() {
+      setIsTableLoading(true);
+      try {
+        const response = await fetch("/api/quarter-categories", {
+          signal: controller.signal,
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.message ?? "Gagal mendapatkan data kategori kuarters.");
+        }
+
+        if (payload.data) {
+          setSummary(payload.data.summary);
+          setQuarterCategories(payload.data.quarterCategories);
+        }
+      } catch (error: any) {
+        if (error.name === "AbortError") return;
+        showNotice({
+          tone: "error",
+          message: getErrorMessage(error, "Ralat semasa mengambil data kuarters."),
+        });
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsTableLoading(false);
+        }
+      }
+    }
+
+    void loadData();
+
+    return () => controller.abort();
+  }, [hasValidInitialData]);
 
   function showNotice(nextNotice: KuartersNotice) {
     setNotice(nextNotice);
@@ -93,15 +143,11 @@ export default function KuartersPageClient({
       });
       return false;
     }
-
     return true;
   }
 
   function handleAddRow() {
-    if (!ensureActionIsAvailable()) {
-      return;
-    }
-
+    if (!ensureActionIsAvailable()) return;
     setCurrentPage(1);
     setEditor({
       mode: "create",
@@ -112,10 +158,7 @@ export default function KuartersPageClient({
   }
 
   function handleEditRow(quarterCategory: QuarterCategoryRecord) {
-    if (!ensureActionIsAvailable()) {
-      return;
-    }
-
+    if (!ensureActionIsAvailable()) return;
     setEditor({
       mode: "edit",
       rowId: quarterCategory.id,
@@ -126,25 +169,16 @@ export default function KuartersPageClient({
 
   function handleDraftChange(field: keyof QuarterCategoryDraft, value: string) {
     setEditor((currentEditor) => {
-      if (!currentEditor) {
-        return currentEditor;
-      }
-
+      if (!currentEditor) return currentEditor;
       return {
         ...currentEditor,
-        draft: {
-          ...currentEditor.draft,
-          [field]: value,
-        },
+        draft: { ...currentEditor.draft, [field]: value },
       };
     });
   }
 
   function handleCancelEdit() {
-    if (pendingAction) {
-      return;
-    }
-
+    if (pendingAction) return;
     setEditor(null);
   }
 
@@ -162,38 +196,24 @@ export default function KuartersPageClient({
   }
 
   async function handleSaveRow() {
-    if (!editor) {
-      return;
-    }
+    if (!editor) return;
 
     const validationMessage = validateQuarterCategoryDraft(editor.draft, {
       requireCategoryName: true,
     });
 
     if (validationMessage) {
-      showNotice({
-        tone: "error",
-        message: validationMessage,
-      });
+      showNotice({ tone: "error", message: validationMessage });
       return;
     }
 
-    const payload =
-      editor.mode === "create"
-        ? {
-            kategori: editor.draft.categoryName.trim(),
-            alamat: editor.draft.address.trim(),
-            sewa: editor.draft.rentalPrice.trim(),
-            senggara: editor.draft.maintenancePrice.trim(),
-            penalti: editor.draft.penaltyPrice.trim(),
-          }
-        : {
-            kategori: editor.draft.categoryName.trim(),
-            alamat: editor.draft.address.trim(),
-            sewa: editor.draft.rentalPrice.trim(),
-            senggara: editor.draft.maintenancePrice.trim(),
-            penalti: editor.draft.penaltyPrice.trim(),
-          };
+    const payload = {
+      kategori: editor.draft.categoryName.trim(),
+      alamat: editor.draft.address.trim(),
+      sewa: editor.draft.rentalPrice.trim(),
+      senggara: editor.draft.maintenancePrice.trim(),
+      penalti: editor.draft.penaltyPrice.trim(),
+    };
 
     try {
       setPendingRowId(editor.rowId);
@@ -203,24 +223,18 @@ export default function KuartersPageClient({
         editor.mode === "create"
           ? await fetch("/api/quarter-categories", {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             })
           : await fetch(`/api/quarter-categories/${editor.rowId}`, {
               method: "PATCH",
-              headers: {
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             });
 
       const result = await parseApiResponse<QuarterCategoryMutationResponse>(
         response,
-        editor.mode === "create"
-          ? "Gagal menambah kategori kuarters."
-          : "Gagal mengemas kini kategori kuarters.",
+        editor.mode === "create" ? "Gagal menambah kategori kuarters." : "Gagal mengemas kini kategori kuarters.",
       );
 
       const updatedQuarterCategory = result.data?.quarterCategory;
@@ -233,28 +247,19 @@ export default function KuartersPageClient({
         editor.mode === "create"
           ? sortQuarterCategories([updatedQuarterCategory, ...quarterCategories])
           : quarterCategories.map((quarterCategory) =>
-              quarterCategory.id === updatedQuarterCategory.id
-                ? updatedQuarterCategory
-                : quarterCategory,
+              quarterCategory.id === updatedQuarterCategory.id ? updatedQuarterCategory : quarterCategory,
             );
 
       setQuarterCategories(nextQuarterCategories);
-      if (editor.mode === "create") {
-        setCurrentPage(1);
-      }
+      if (editor.mode === "create") setCurrentPage(1);
       setEditor(null);
-      showNotice({
-        tone: "success",
-        message: result.message,
-      });
+      showNotice({ tone: "success", message: result.message });
     } catch (error) {
       showNotice({
         tone: "error",
         message: getErrorMessage(
           error,
-          editor.mode === "create"
-            ? "Gagal menambah kategori kuarters."
-            : "Gagal mengemas kini kategori kuarters.",
+          editor.mode === "create" ? "Gagal menambah kategori kuarters." : "Gagal mengemas kini kategori kuarters.",
         ),
       });
     } finally {
@@ -264,86 +269,47 @@ export default function KuartersPageClient({
   }
 
   async function handleDeleteRow(rowId: string) {
-    if (pendingAction) {
-      return;
-    }
+    if (pendingAction) return;
 
     if (rowId === EMPTY_QUARTER_CATEGORY_ID) {
-      const shouldDiscard = window.confirm(
-        "Adakah anda pasti mahu membuang baris kategori baharu ini?",
-      );
-
-      if (!shouldDiscard) {
-        return;
-      }
-
+      const shouldDiscard = window.confirm("Adakah anda pasti mahu membuang baris kategori baharu ini?");
+      if (!shouldDiscard) return;
       setEditor(null);
-      showNotice({
-        tone: "info",
-        message: "Baris kategori baharu telah dibuang.",
-      });
+      showNotice({ tone: "info", message: "Baris kategori baharu telah dibuang." });
       return;
     }
 
     const quarterCategory = quarterCategories.find((item) => item.id === rowId);
-
     if (!quarterCategory) {
-      showNotice({
-        tone: "error",
-        message: "Kategori kuarters tidak ditemui.",
-      });
+      showNotice({ tone: "error", message: "Kategori kuarters tidak ditemui." });
       return;
     }
 
-    const shouldDelete = window.confirm(
-      `Adakah anda pasti mahu memadam ${quarterCategory.categoryName}? Tindakan ini tidak boleh dibatalkan.`,
-    );
-
-    if (!shouldDelete) {
-      return;
-    }
+    const shouldDelete = window.confirm(`Adakah anda pasti mahu memadam ${quarterCategory.categoryName}? Tindakan ini tidak boleh dibatalkan.`);
+    if (!shouldDelete) return;
 
     try {
       setPendingRowId(rowId);
       setPendingAction("delete");
 
-      const response = await fetch(`/api/quarter-categories/${rowId}`, {
-        method: "DELETE",
-      });
-      const result = await parseApiResponse<QuarterCategoryMutationResponse>(
-        response,
-        "Gagal memadam kategori kuarters.",
-      );
+      const response = await fetch(`/api/quarter-categories/${rowId}`, { method: "DELETE" });
+      const result = await parseApiResponse<QuarterCategoryMutationResponse>(response, "Gagal memadam kategori kuarters.");
 
       const nextQuarterCategories = quarterCategories.filter((item) => item.id !== rowId);
 
       setQuarterCategories(nextQuarterCategories);
       setEditor(null);
       setCurrentPage((previousPage) => {
-        const nextFilteredQuarterCategories = filterQuarterCategories(
-          nextQuarterCategories,
-          filters,
-        );
-        const nextPagination = buildQuarterCategoryPagination(
-          nextFilteredQuarterCategories,
-          previousPage,
-          {
-            hasActiveFilter: hasActiveFilters,
-            totalRecords: nextQuarterCategories.length,
-          },
-        );
-
+        const nextFilteredQuarterCategories = filterQuarterCategories(nextQuarterCategories, filters);
+        const nextPagination = buildQuarterCategoryPagination(nextFilteredQuarterCategories, previousPage, {
+          hasActiveFilter: hasActiveFilters,
+          totalRecords: nextQuarterCategories.length,
+        });
         return nextPagination.currentPage;
       });
-      showNotice({
-        tone: "success",
-        message: result.message,
-      });
+      showNotice({ tone: "success", message: result.message });
     } catch (error) {
-      showNotice({
-        tone: "error",
-        message: getErrorMessage(error, "Gagal memadam kategori kuarters."),
-      });
+      showNotice({ tone: "error", message: getErrorMessage(error, "Gagal memadam kategori kuarters.") });
     } finally {
       setPendingRowId(null);
       setPendingAction(null);
@@ -351,22 +317,17 @@ export default function KuartersPageClient({
   }
 
   function handleViewRow(quarterCategory: QuarterCategoryRecord) {
-    if (!ensureActionIsAvailable()) {
-      return;
-    }
-
+    if (!ensureActionIsAvailable()) return;
     router.push(`/pages/7_kuarters/${quarterCategory.id}`);
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-8">
+    <div className="flex flex-col gap-4">
       <KuartersPageHeader />
-      <KuartersFeedbackBanner
-        notice={notice}
-        onDismiss={() => setNotice(null)}
-      />
+      <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
       <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
       <KuartersCategoryRatesPanel
+        isLoading={isTableLoading}
         currentPage={pagination.currentPage}
         editor={editor}
         exportRates={filteredQuarterCategories}
@@ -375,9 +336,11 @@ export default function KuartersPageClient({
         onCancelEdit={handleCancelEdit}
         pendingAction={pendingAction}
         pendingRowId={pendingRowId}
-        pageItems={pagination.pageItems}
+        paginationItems={pagination.pageItems}
         rates={pagination.visibleRecords}
-        recordSummaryText={pagination.summaryText}
+        startIndex={pagination.startIndex}
+        endIndex={pagination.endIndex}
+        totalRecords={pagination.totalRecords}
         onAddRow={handleAddRow}
         onClearFilter={handleClearFilter}
         onDeleteRow={handleDeleteRow}
