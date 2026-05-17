@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import Icon from "./Icon";
-import { ROUTES } from "../constants/routes";
+import Icon from "../Icon/Icon";
+import { ROUTES } from "../../constants/routes";
 
 export default function ButtonLogout() {
 	const router = useRouter();

@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import Icon from "@/app/components/Icon";
-import ToolbarIconButton from "@/app/components/ToolbarIconButton";
+import Icon from "@/app/components/Icon/Icon";
+import ToolbarIconButton from "@/app/components/Icon/ToolbarIconButton";
 import type { AuditLogFilters } from "@/lib/audit-logs";
 
 type AuditLogFilterPanelProps = {

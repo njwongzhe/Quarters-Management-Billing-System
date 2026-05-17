@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         const quarters = newResident.occupancies[0]
             ? {
                 unitCode: newResident.occupancies[0].unit.unitCode,
-                                quarterName: newResident.occupancies[0].unit.quarterCategory.categoryName,
+                quarterName: newResident.occupancies[0].unit.quarterCategory.categoryName,
                 moveInDate: newResident.occupancies[0].moveInDate?.toISOString() || null,
                 moveOutDate: newResident.occupancies[0].moveOutDate?.toISOString() || null,
               }

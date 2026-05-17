@@ -60,6 +60,9 @@ export type PaginationItem = number | "ellipsis";
 export type QuarterUnitPaginationState = {
   currentPage: number;
   totalPages: number;
+  startIndex: number;
+  endIndex: number;
+  totalRecords: number;
   visibleRecords: QuarterUnitRecord[];
   pageItems: PaginationItem[];
   summaryText: string;
@@ -206,6 +209,9 @@ export function buildQuarterUnitPagination(
   return {
     currentPage,
     totalPages,
+    startIndex,
+    endIndex,
+    totalRecords,
     visibleRecords: units.slice(startIndex, endIndex),
     pageItems: buildPageItems(currentPage, totalPages),
     summaryText:

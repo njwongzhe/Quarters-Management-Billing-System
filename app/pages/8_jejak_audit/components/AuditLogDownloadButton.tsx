@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import ToolbarIconButton from "@/app/components/ToolbarIconButton";
+import ToolbarIconButton from "@/app/components/Icon/ToolbarIconButton";
 import {
   downloadXlsxFile,
   type XlsxCell,

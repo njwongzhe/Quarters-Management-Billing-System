@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
-import Icon, { commonIcons } from "@/app/components/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
-import {
-  downloadXlsxFile,
-  type XlsxCell,
-  type XlsxSheet,
-} from "@/lib/xlsx-export";
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { PaginationControls } from "@/app/components/Pagination/Pagination";
+import ToolbarButton from "@/app/components/Icon/ToolbarIconButton";
+import { downloadQuarterUnits } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
+import KuartersUnitDatePicker from "./KuartersUnitDatePicker";
+import type { QuarterUnitOccupancyDetails } from "@/lib/quarter-units";
 
 import type {
   KuartersUnitEditorState,
-  PaginationItem,
   QuarterUnitDraft,
   QuarterUnitRecord,
   QuarterUnitStatusFilter,
@@ -27,6 +24,7 @@ import KuartersUnitDetailsOverlay from "./KuartersUnitDetailsOverlay";
 type KuartersUnitsPanelProps = {
   units: QuarterUnitRecord[];
   exportUnits: QuarterUnitRecord[];
+  isLoading: boolean;
   categoryId: string;
   categoryName: string;
   address: string | null;
@@ -36,10 +34,12 @@ type KuartersUnitsPanelProps = {
   statusFilter: QuarterUnitStatusFilter;
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
-  pageItems: PaginationItem[];
+  paginationItems: (number | "ellipsis")[];
   pendingAction: "save" | "delete" | null;
   pendingUnitId: string | null;
-  recordSummaryText: string;
+  startIndex: number;
+  endIndex: number;
+  totalRecords: number;
   totalPages: number;
   onAddUnit: () => void;
   onCancelEdit: () => void;
@@ -82,44 +82,6 @@ function ActionButton({
   );
 }
 
-function PageButton({
-  item,
-  currentPage,
-  disabled = false,
-  onClick,
-}: {
-  item: PaginationItem;
-  currentPage: number;
-  disabled?: boolean;
-  onClick: (page: number) => void;
-}) {
-  if (item === "ellipsis") {
-    return (
-      <span className="px-1 text-sm font-semibold text-grey" aria-hidden="true">
-        ...
-      </span>
-    );
-  }
-
-  const isActive = item === currentPage;
-
-  return (
-    <button
-      type="button"
-      className={`min-h-8 min-w-8 rounded-md border px-2 text-sm transition-colors ${
-        isActive
-          ? "border-dark-blue bg-dark-blue font-bold text-white"
-          : "border-light-grey/30 bg-white text-grey hover:border-dark-blue hover:text-dark-blue"
-      } disabled:cursor-not-allowed disabled:opacity-40`}
-      aria-current={isActive ? "page" : undefined}
-      disabled={disabled}
-      onClick={() => onClick(item)}
-    >
-      {item}
-    </button>
-  );
-}
-
 function InputField({
   value,
   placeholder,
@@ -143,214 +105,7 @@ function InputField({
   );
 }
 
-function getFloatingDatePickerPosition(buttonRect: DOMRect, pickerWidth: number) {
-  const horizontalPadding = 12;
-  const verticalGap = 8;
-  const estimatedPickerHeight = 360;
-  const left = Math.min(
-    Math.max(horizontalPadding, buttonRect.right - pickerWidth),
-    window.innerWidth - pickerWidth - horizontalPadding,
-  );
-  const hasBottomRoom =
-    buttonRect.bottom + verticalGap + estimatedPickerHeight <= window.innerHeight;
-  const top = hasBottomRoom
-    ? buttonRect.bottom + verticalGap
-    : Math.max(verticalGap, buttonRect.top - estimatedPickerHeight - verticalGap);
 
-  return { left, top };
-}
-
-function DatePickerField({
-  value,
-  disabled = false,
-  required = false,
-  minDate,
-  maxDate,
-  onChange,
-}: {
-  value: string;
-  disabled?: boolean;
-  required?: boolean;
-  minDate?: string;
-  maxDate?: string;
-  onChange: (value: string) => void;
-}) {
-  const initialDate = parseDateInput(value);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [pickerPosition, setPickerPosition] = useState({
-    left: 0,
-    top: 0,
-  });
-  const [visibleMonth, setVisibleMonth] = useState(
-    initialDate ?? startOfDay(new Date()),
-  );
-  const days = buildCalendarDays(visibleMonth);
-  const pickerWidth = 288;
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    function updatePickerPosition() {
-      const buttonRect = buttonRef.current?.getBoundingClientRect();
-
-      if (!buttonRect) {
-        return;
-      }
-
-      setPickerPosition(getFloatingDatePickerPosition(buttonRect, pickerWidth));
-    }
-
-    updatePickerPosition();
-    window.addEventListener("resize", updatePickerPosition);
-    window.addEventListener("scroll", updatePickerPosition, true);
-
-    return () => {
-      window.removeEventListener("resize", updatePickerPosition);
-      window.removeEventListener("scroll", updatePickerPosition, true);
-    };
-  }, [isOpen]);
-
-  return (
-    <div>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        className={`flex min-h-10 w-full items-center gap-2 rounded-2xl border bg-white py-2 pl-3 pr-3 text-left text-sm font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_3px_10px_rgba(15,23,42,0.04)] outline-none transition-colors disabled:cursor-not-allowed disabled:bg-background disabled:text-light-grey ${
-          isOpen
-            ? "border-dark-blue text-dark-blue"
-            : "border-light-grey/25 text-dark-grey hover:border-dark-blue/30"
-        }`}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        onClick={() => {
-          if (!isOpen) {
-            const buttonRect = buttonRef.current?.getBoundingClientRect();
-
-            if (buttonRect) {
-              setPickerPosition(
-                getFloatingDatePickerPosition(buttonRect, pickerWidth),
-              );
-            }
-
-            setVisibleMonth(parseDateInput(value) ?? startOfDay(new Date()));
-          }
-
-          setIsOpen((currentState) => !currentState);
-        }}
-      >
-        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-xl bg-light-blue text-dark-blue">
-          <Icon icon="calendar_month" size={16} />
-        </span>
-        <span className={value ? "truncate" : "truncate text-grey"}>
-          {value ? formatDatePickerLabel(value) : "Pilih tarikh"}
-        </span>
-      </button>
-
-      {isOpen && typeof document !== "undefined"
-        ? createPortal(
-        <div
-          data-kuarters-date-picker="true"
-          className="fixed z-60 w-72 rounded-3xl border border-light-grey/20 bg-white p-3 text-left shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
-          style={{
-            left: `${pickerPosition.left}px`,
-            top: `${pickerPosition.top}px`,
-          }}
-          role="dialog"
-          aria-label="Pilih tarikh penghunian"
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
-              aria-label="Bulan sebelumnya"
-              onClick={() =>
-                setVisibleMonth((currentDate) => addMonths(currentDate, -1))
-              }
-            >
-              <Icon icon="chevron_left" size={20} />
-            </button>
-            <div className="text-sm font-extrabold text-dark-grey">
-              {formatMonthLabel(visibleMonth)}
-            </div>
-            <button
-              type="button"
-              className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
-              aria-label="Bulan seterusnya"
-              onClick={() =>
-                setVisibleMonth((currentDate) => addMonths(currentDate, 1))
-              }
-            >
-              <Icon icon="chevron_right" size={20} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold uppercase tracking-[0.12em] text-grey">
-            {["A", "I", "S", "R", "K", "J", "S"].map((dayLabel, index) => (
-              <div key={`${dayLabel}-${index}`} className="py-1.5">
-                {dayLabel}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-1 grid grid-cols-7 gap-1">
-            {days.map((day) => {
-              const dateValue = formatDateInput(day.date);
-              const isSelected = dateValue === value;
-              const isVisibleMonth =
-                day.date.getMonth() === visibleMonth.getMonth();
-              const isDisabled = Boolean(
-                (minDate && dateValue < minDate) ||
-                  (maxDate && dateValue > maxDate),
-              );
-
-              return (
-                <button
-                  key={dateValue}
-                  type="button"
-                  disabled={isDisabled}
-                  className={`grid h-9 place-items-center rounded-xl text-sm font-bold transition-colors ${
-                    isDisabled
-                      ? "cursor-not-allowed text-light-grey/60"
-                      : isSelected
-                      ? "bg-dark-blue text-white"
-                      : isVisibleMonth
-                        ? "text-dark-grey hover:bg-light-blue hover:text-dark-blue"
-                        : "text-light-grey hover:bg-light-blue"
-                  }`}
-                  onClick={() => {
-                    onChange(dateValue);
-                    setIsOpen(false);
-                  }}
-                >
-                  {day.date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-
-          {value && !required ? (
-            <button
-              type="button"
-              className="mt-3 w-full rounded-xl border border-light-grey/25 px-3 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue"
-              onClick={() => {
-                onChange("");
-                setIsOpen(false);
-              }}
-            >
-              Kosongkan tarikh
-            </button>
-          ) : null}
-        </div>,
-          document.body,
-        )
-        : null}
-    </div>
-  );
-}
 
 function PickerField({
   value,
@@ -400,6 +155,7 @@ function getStatusFilterLabel(status: QuarterUnitStatusFilter) {
 export default function KuartersUnitsPanel({
   units,
   exportUnits,
+  isLoading,
   categoryId,
   categoryName,
   address,
@@ -421,14 +177,17 @@ export default function KuartersUnitsPanel({
   onPageChange,
   onSaveUnit,
   onUnavailableFeature,
-  pageItems,
+  paginationItems,
   pendingAction,
   pendingUnitId,
-  recordSummaryText,
+  startIndex,
+  endIndex,
+  totalRecords,
   totalPages,
 }: KuartersUnitsPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
+  const [unitOccupancyHistory, setUnitOccupancyHistory] = useState<QuarterUnitOccupancyDetails[]>([]);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
@@ -439,6 +198,29 @@ export default function KuartersUnitsPanel({
   const isSearchFilterActive = filterQuery.trim().length > 0;
   const isStatusFilterActive = statusFilter !== "ALL";
   const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
+
+  useEffect(() => {
+    if (editor?.mode !== "edit") {
+      setUnitOccupancyHistory([]);
+      return;
+    }
+
+    const unitId = editor.rowId;
+    const controller = new AbortController();
+
+    fetch(`/api/quarter-categories/${categoryId}/units/${unitId}`, { signal: controller.signal })
+      .then((res) => res.json())
+      .then((payload: { success: boolean; data?: { unit?: { occupancyHistory?: QuarterUnitOccupancyDetails[] } } }) => {
+        if (payload.success && payload.data?.unit?.occupancyHistory) {
+          setUnitOccupancyHistory(payload.data.unit.occupancyHistory);
+        } else {
+          setUnitOccupancyHistory([]);
+        }
+      })
+      .catch(() => { /* aborted or failed — silently keep previous state */ });
+
+    return () => { controller.abort(); };
+  }, [categoryId, editor?.mode, editor?.rowId]);
 
   const handlePointerDownOutsideEditor = useEffectEvent((event: PointerEvent) => {
     if (!editor || pendingAction || isResidentPickerOpen) {
@@ -451,14 +233,12 @@ export default function KuartersUnitsPanel({
       return;
     }
 
-    if (
-      target instanceof Element &&
-      target.closest("[data-kuarters-date-picker='true']")
-    ) {
+    if (editingRowRef.current?.contains(target)) {
       return;
     }
 
-    if (editingRowRef.current?.contains(target)) {
+    const datePickerPortal = document.querySelector("[data-kuarters-date-picker='true']");
+    if (datePickerPortal?.contains(target)) {
       return;
     }
 
@@ -603,6 +383,29 @@ export default function KuartersUnitsPanel({
     setIsSearchOpen(false);
   }
 
+  function handlePaginationChange(
+    action: "prev" | "next" | "goto",
+    pageNum?: number,
+  ) {
+    if (pendingAction) {
+      return;
+    }
+
+    if (action === "prev") {
+      onPageChange(Math.max(currentPage - 1, 1));
+      return;
+    }
+
+    if (action === "next") {
+      onPageChange(Math.min(currentPage + 1, totalPages));
+      return;
+    }
+
+    if (action === "goto" && pageNum !== undefined) {
+      onPageChange(pageNum);
+    }
+  }
+
   function handleSelectStatusFilter(value: QuarterUnitStatusFilter) {
     onStatusFilterChange(value);
     setIsFilterMenuOpen(false);
@@ -621,47 +424,11 @@ export default function KuartersUnitsPanel({
   }
 
   function handleDownloadUnits() {
-    const headers: XlsxCell[] = [
-      { value: "ID Unit", style: "header" },
-      { value: "No. Kad Pengenalan Penghuni", style: "header" },
-      { value: "Nama Penghuni", style: "header" },
-      { value: "Tarikh Masuk", style: "header", align: "center" },
-      { value: "Tarikh Keluar", style: "header", align: "center" },
-      { value: "Status", style: "header", align: "center" },
-    ];
-    const rows: XlsxSheet["rows"] = exportUnits.map((unit) => [
-      unit.unitCode,
-      unit.occupantIcNumber ? formatIcNumber(unit.occupantIcNumber) : "N/A",
-      unit.occupantName ?? "N/A",
-      { value: formatDisplayDate(unit.moveInDate), align: "center" },
-      { value: formatDisplayDate(unit.moveOutDate), align: "center" },
-      {
-        value: getStatusFilterLabel(unit.status),
-        align: "center",
-      },
-    ]);
-
-    downloadXlsxFile({
-      filename: buildUnitsExportFilename(categoryName, address),
-      sheets: [
-        {
-          name: "Senarai Unit",
-          columns: [
-            { width: 18 },
-            { width: 30 },
-            { width: 38 },
-            { width: 16 },
-            { width: 16 },
-            { width: 16 },
-          ],
-          rows: [headers, ...rows],
-        },
-      ],
-    });
+    downloadQuarterUnits(exportUnits, categoryName, address);
   }
 
   return (
-    <section className="rounded-2xl border border-light-grey/20 bg-light-blue p-4 sm:p-5">
+    <section className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
       {selectedUnitId ? (
         <KuartersUnitDetailsOverlay
           categoryId={categoryId}
@@ -671,17 +438,17 @@ export default function KuartersUnitsPanel({
         />
       ) : null}
 
-      <div className="flex flex-col gap-4 border-b border-light-grey/20 pb-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-1">
-          <h2 className="text-xl font-extrabold tracking-[-0.02em] text-dark-grey">
+      <div className="flex flex-row justify-between px-3 pt-3">
+        <div>
+          <div className="text-lg font-bold text-dark-grey">
             Senarai Unit Kuarters
-          </h2>
-          <p className="text-sm text-grey">
+          </div>
+          <div className="text-xs text-grey">
             Klik pada ikon kemaskini untuk mengubah maklumat unit dan penghuni.
-          </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 self-start">
+        <div className="flex items-center gap-4">
           <ToolbarButton
             icon={commonIcons.search}
             label="Cari unit kuarters"
@@ -752,17 +519,18 @@ export default function KuartersUnitsPanel({
       </div>
 
       {isSearchOpen ? (
-      <div className="mt-4 rounded-2xl border border-light-grey/20 bg-white p-4">
+      <div className="px-3">
+      <div className="rounded-lg bg-white p-4 shadow">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <label className="block flex-1">
             <span className="mb-2 block text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
               Carian Mengikut Unit atau Penghuni
             </span>
-            <div className="flex items-center gap-3 rounded-xl border border-lightGrey/30 bg-background px-3 py-2 transition-colors focus-within:border-darkblue">
+            <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue">
               <Icon
                 icon={commonIcons.search}
                 size={18}
-                className="text-lightGrey"
+                className="text-light-grey"
               />
               <input
                 ref={searchInputRef}
@@ -770,7 +538,7 @@ export default function KuartersUnitsPanel({
                 value={filterQuery}
                 onChange={(event) => onFilterQueryChange(event.target.value)}
                 placeholder="Contoh: A-01-02 atau Ahmad"
-                className="w-full border-none bg-transparent text-sm font-medium text-darkGrey outline-none placeholder:text-lightGrey"
+                className="w-full border-none bg-transparent text-sm font-medium text-dark-grey outline-none placeholder:text-light-grey"
               />
             </div>
           </label>
@@ -787,41 +555,41 @@ export default function KuartersUnitsPanel({
           </div>
         </div>
       </div>
+      </div>
       ) : null}
 
-      <div className="mt-5 flex flex-col overflow-hidden rounded-2xl border border-light-grey/20 bg-white">
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full min-w-260 table-fixed border-collapse">
+      <div className="rounded-lg overflow-x-auto overflow-y-auto">
+        <div className="rounded-lg overflow-x-auto overflow-y-auto">
+          <table className="w-full">
             <thead className="bg-background">
-              <tr>
-                <th className="w-[15%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  ID Unit
-                </th>
-                <th className="w-[23%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  No. Kad Pengenalan Penghuni
-                </th>
-                <th className="w-[28%] px-6 py-4 text-left text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Nama Penghuni
-                </th>
-                <th className="w-[12%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Tarikh Masuk
-                </th>
-                <th className="w-[12%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Tarikh Keluar
-                </th>
-                <th className="w-[10%] px-6 py-4 text-center text-xs font-extrabold uppercase tracking-[0.18em] text-grey">
-                  Tindakan
-                </th>
+              <tr className="font-bold text-xs text-grey bg-background">
+                <th className="p-3 text-left w-min whitespace-nowrap">ID Unit</th>
+                <th className="p-3 text-left w-min whitespace-nowrap">No. K/P Penghuni</th>
+                <th className="p-3 text-left w-min whitespace-nowrap">Nama Penghuni</th>
+                <th className="p-3 text-center w-min whitespace-nowrap">Tarikh Masuk</th>
+                <th className="p-3 text-center w-min whitespace-nowrap">Tarikh Keluar</th>
+                <th className="w-[0%] p-3 text-center whitespace-nowrap">Tindakan</th>
               </tr>
             </thead>
-            <tbody>
-              {isCreateRowVisible ? (
+            <tbody className="bg-white">
+              {isLoading ? (
+                <tr className="border-t border-light-grey/20">
+                  <td
+                    colSpan={6}
+                    className="px-3 py-4 text-center text-sm font-medium text-grey"
+                  >
+                    Sedang membaca data unit kuarters...
+                  </td>
+                </tr>
+              ) : null}
+
+              {!isLoading && isCreateRowVisible ? (
                 <tr
                   ref={editor?.mode === "create" ? editingRowRef : null}
                   className="border-t border-light-grey/20 bg-dark-blue/3"
                 >
                   <td
-                    className={`px-6 py-4 align-middle ${getRowAccentClass(
+                    className={`px-6 py-4 align-middle w-min whitespace-nowrap ${getRowAccentClass(
                       editor.draft.occupantIcNumber.trim().length > 0
                         ? "OCCUPIED"
                         : "VACANT",
@@ -834,7 +602,7 @@ export default function KuartersUnitsPanel({
                       onChange={(value) => onDraftChange("unitCode", value)}
                     />
                   </td>
-                  <td className="px-6 py-4 align-middle">
+                  <td className="px-6 py-4 align-middle w-min whitespace-nowrap">
                     <PickerField
                       value={formatIcNumber(editor.draft.occupantIcNumber)}
                       placeholder="Pilih penghuni"
@@ -842,42 +610,42 @@ export default function KuartersUnitsPanel({
                       onClick={onOpenResidentPicker}
                     />
                   </td>
-                  <td className="px-6 py-4 align-middle">
+                  <td className="px-6 py-4 align-middle w-min whitespace-nowrap">
                     <p className="text-sm font-medium italic text-grey">
                       {editor.draft.occupantIcNumber.trim().length > 0
                         ? editor.draft.occupantName.trim() || "Penghuni dipilih."
                         : "N/A"}
                     </p>
                   </td>
-                  <td className="px-6 py-4 text-center align-middle text-sm font-semibold text-grey">
+                  <td className="px-6 py-4 text-center align-middle text-sm font-semibold text-grey w-min whitespace-nowrap">
                     {editor.draft.occupantIcNumber.trim().length > 0 ? (
-                      <DatePickerField
+                      <KuartersUnitDatePicker
+                        fieldType="moveInDate"
                         value={editor.draft.moveInDate}
                         disabled={pendingUnitId === EMPTY_QUARTER_UNIT_ID}
                         required
-                        maxDate={
-                          editor.draft.moveOutDate || getTodayDateInputValue()
-                        }
+                        occupancyHistory={[]}
                         onChange={(value) => onDraftChange("moveInDate", value)}
                       />
                     ) : (
                       "N/A"
                     )}
                   </td>
-                  <td className="px-6 py-4 text-center align-middle text-sm font-semibold text-grey">
+                  <td className="px-6 py-4 text-center align-middle text-sm font-semibold text-grey w-min whitespace-nowrap">
                     {editor.draft.occupantIcNumber.trim().length > 0 ? (
-                      <DatePickerField
+                      <KuartersUnitDatePicker
+                        fieldType="moveOutDate"
                         value={editor.draft.moveOutDate}
+                        moveInDate={editor.draft.moveInDate}
                         disabled={pendingUnitId === EMPTY_QUARTER_UNIT_ID}
-                        minDate={editor.draft.moveInDate}
-                        maxDate={getTodayDateInputValue()}
+                        occupancyHistory={[]}
                         onChange={(value) => onDraftChange("moveOutDate", value)}
                       />
                     ) : (
                       "N/A"
                     )}
                   </td>
-                  <td className="px-6 py-4 align-middle">
+                  <td className="px-6 py-4 align-middle w-min whitespace-nowrap">
                     <div className="flex justify-center">
                       {renderCreateActionCell()}
                     </div>
@@ -885,11 +653,11 @@ export default function KuartersUnitsPanel({
                 </tr>
               ) : null}
 
-              {units.length === 0 && !isCreateRowVisible ? (
+              {!isLoading && units.length === 0 && !isCreateRowVisible ? (
                 <tr className="border-t border-light-grey/20">
                   <td
                     colSpan={6}
-                    className="px-6 py-10 text-center text-sm font-medium text-grey"
+                    className="px-3 py-4 text-center text-sm font-medium text-grey"
                   >
                     {hasActiveFilters
                       ? "Tiada unit kuarters yang sepadan dengan tapisan semasa."
@@ -898,7 +666,7 @@ export default function KuartersUnitsPanel({
                 </tr>
               ) : null}
 
-              {units.map((unit) => {
+              {!isLoading && units.map((unit) => {
                 const isEditing = editor?.mode === "edit" && editor.rowId === unit.id;
                 const isCurrentRowPending = pendingUnitId === unit.id;
                 const occupantIcNumber = unit.occupantIcNumber
@@ -924,13 +692,10 @@ export default function KuartersUnitsPanel({
                     className="border-t border-light-grey/20"
                   >
                     <td
-                      className={`px-6 py-4 align-middle ${getRowAccentClass(
-                        isEditing
-                          ? hasOccupantDraft
-                            ? "OCCUPIED"
-                            : "VACANT"
-                          : unit.status,
-                      )}`}
+                      className={`overflow-hidden text-sm font-semibold text-dark-grey align-middle w-min whitespace-nowrap
+                        ${getRowAccentClass(isEditing ? hasOccupantDraft ? "OCCUPIED" : "VACANT" : unit.status,)}
+                        ${isEditing ? "px-3 py-4" : "px-3 py-2"}`
+                      }
                     >
                       {isEditing ? (
                         <InputField
@@ -940,16 +705,14 @@ export default function KuartersUnitsPanel({
                           onChange={(value) => onDraftChange("unitCode", value)}
                         />
                       ) : (
-                        <span className="inline-flex w-fit rounded-xl border border-light-grey/30 bg-background px-4 py-2 text-sm font-extrabold text-dark-blue">
-                          {unit.unitCode}
-                        </span>
+                        <span className="text-sm font-semibold text-dark-grey">{unit.unitCode}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 align-middle text-sm font-semibold text-dark-grey">
+                    <td className={`overflow-hidden align-middle text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <PickerField
                           value={formatIcNumber(editor.draft.occupantIcNumber)}
-                          placeholder="Pilih penghuni"
+                          placeholder="Pilih Penghuni"
                           disabled={isCurrentRowPending}
                           onClick={onOpenResidentPicker}
                         />
@@ -959,7 +722,7 @@ export default function KuartersUnitsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 align-middle text-sm font-semibold">
+                    <td className={`overflow-hidden align-middle text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
                         <p
                           className={`${
@@ -982,15 +745,14 @@ export default function KuartersUnitsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center align-middle text-sm font-semibold">
+                    <td className={`overflow-hidden text-center align-middle text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing && hasOccupantDraft ? (
-                        <DatePickerField
+                        <KuartersUnitDatePicker
+                          fieldType="moveInDate"
                           value={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
                           required
-                          maxDate={
-                            editor.draft.moveOutDate || getTodayDateInputValue()
-                          }
+                          occupancyHistory={unitOccupancyHistory}
                           onChange={(value) => onDraftChange("moveInDate", value)}
                         />
                       ) : (
@@ -1003,13 +765,14 @@ export default function KuartersUnitsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center align-middle text-sm font-semibold">
+                    <td className={`overflow-hidden text-center align-middle text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing && hasOccupantDraft ? (
-                        <DatePickerField
+                        <KuartersUnitDatePicker
+                          fieldType="moveOutDate"
                           value={editor.draft.moveOutDate}
+                          moveInDate={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
-                          minDate={editor.draft.moveInDate}
-                          maxDate={getTodayDateInputValue()}
+                          occupancyHistory={unitOccupancyHistory}
                           onChange={(value) => onDraftChange("moveOutDate", value)}
                         />
                       ) : (
@@ -1022,7 +785,7 @@ export default function KuartersUnitsPanel({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 align-middle">
+                    <td className="px-3 py-2 align-middle">
                       <div className="flex justify-center">
                         {renderActionCell(unit, isEditing)}
                       </div>
@@ -1034,73 +797,30 @@ export default function KuartersUnitsPanel({
           </table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-light-grey/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Halaman sebelumnya"
-              disabled={currentPage <= 1 || Boolean(pendingAction)}
-              onClick={() => onPageChange(currentPage - 1)}
-            >
-              <Icon icon={commonIcons.chevronLeft} size={18} />
-            </button>
-
-            {pageItems.map((item, index) => (
-              <PageButton
-                key={`${item}-${index}`}
-                item={item}
-                currentPage={currentPage}
-                disabled={Boolean(pendingAction)}
-                onClick={onPageChange}
-              />
-            ))}
-
-            <button
-              type="button"
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-md border border-light-grey/30 bg-white text-grey transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Halaman seterusnya"
-              disabled={currentPage >= totalPages || Boolean(pendingAction)}
-              onClick={() => onPageChange(currentPage + 1)}
-            >
-              <Icon icon={commonIcons.chevronRight} size={18} />
-            </button>
-          </div>
-
-          <p className="text-sm text-grey">{recordSummaryText}</p>
+        <div className="flex flex-col gap-3 border-t bg-white border-light-grey/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            totalRecords={totalRecords}
+            paginationItems={paginationItems}
+            onPageChange={handlePaginationChange}
+          />
         </div>
       </div>
 
       <button
         type="button"
-        className="fixed bottom-6 right-6 z-40 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-dark-blue px-5 py-3 text-sm font-extrabold text-white shadow-[0_18px_45px_rgba(13,47,86,0.28)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:bottom-8 sm:right-8"
+        className="fixed bottom-8 right-8 z-40 flex gap-1 p-4 items-center justify-center rounded-lg bg-dark-blue text-white shadow-[0_4px_10px_rgba(0,0,0,0.3)] transition-transform hover:scale-105 active:scale-95"
         disabled={Boolean(pendingAction)}
         onClick={onAddUnit}
       >
-        <Icon icon="add" size={20} />
-        Tambah Unit
+        <Icon icon="add" size={15} />
+        <span className="font-bold text-xs">Tambah Unit</span>
       </button>
     </section>
   );
-}
-
-function buildUnitsExportFilename(categoryName: string, address: string | null) {
-  return [
-    "senarai-unit-kuarters",
-    sanitizeFilenamePart(categoryName),
-    sanitizeFilenamePart(address ?? "tiada-alamat"),
-  ]
-    .filter(Boolean)
-    .join("-");
-}
-
-function sanitizeFilenamePart(value: string) {
-  return value
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 function formatDisplayDate(value: string | null) {
@@ -1131,72 +851,4 @@ function formatIcNumber(value: string) {
   return `${digits.slice(0, 6)}-${digits.slice(6, 8)}-${digits.slice(8)}`;
 }
 
-function parseDateInput(value: string | undefined) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
 
-  const date = new Date(`${value}T00:00:00`);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function addMonths(date: Date, amount: number) {
-  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
-}
-
-function buildCalendarDays(monthDate: Date) {
-  const firstDayOfMonth = new Date(
-    monthDate.getFullYear(),
-    monthDate.getMonth(),
-    1,
-  );
-  const firstCalendarDate = new Date(firstDayOfMonth);
-  firstCalendarDate.setDate(
-    firstCalendarDate.getDate() - firstCalendarDate.getDay(),
-  );
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(firstCalendarDate);
-    date.setDate(firstCalendarDate.getDate() + index);
-
-    return { date };
-  });
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatDatePickerLabel(value: string) {
-  const date = parseDateInput(value);
-
-  if (!date) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ms-MY", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatMonthLabel(date: Date) {
-  return new Intl.DateTimeFormat("ms-MY", {
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
-function getTodayDateInputValue() {
-  return formatDateInput(new Date());
-}

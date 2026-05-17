@@ -20,10 +20,10 @@ function KuartersStatCard({
 }) {
   return (
     <article
-      className={`rounded-xl border border-light-grey/20 bg-white px-5 py-5 shadow-sm ${accentClass}`}
+      className={`flex flex-col flex-1 gap-1 rounded-lg border-l-4 bg-white p-4 shadow ${accentClass}`}
     >
-      <p className="text-sm font-medium text-grey md:text-base">{card.label}</p>
-      <p className="mt-3 text-4xl font-extrabold leading-none tracking-[-0.05em] text-dark-grey md:text-5xl">
+      <p className="text-xs font-semibold text-grey/70">{card.label}</p>
+      <p className="text-3xl font-bold text-dark-grey">
         {card.value}
       </p>
     </article>
@@ -34,7 +34,7 @@ export default function KuartersOverviewCards({
   cards,
 }: KuartersOverviewCardsProps) {
   return (
-    <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+    <section className="flex flex-col gap-3 md:flex-row">
       {cards.map((card, index) => (
         <KuartersStatCard
           key={card.label}

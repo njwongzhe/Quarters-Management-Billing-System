@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 
 // Pagination management function.
 export function usePaginationLogic(totalItems: number, itemsPerPage: number) {
     const [currentPage, setCurrentPage] = useState(1);
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
 
@@ -70,6 +70,8 @@ export function PaginationControls({
     paginationItems: (number | "ellipsis")[];
     onPageChange: (action: "prev" | "next" | "goto", pageNum?: number) => void;
 }) {
+    const displayStart = totalRecords === 0 ? 0 : startIndex + 1;
+
     const PageButtonComponent = ({ item, currentPage, onPageChange }: { item: number | "ellipsis"; currentPage: number; onPageChange: (action: "prev" | "next" | "goto", pageNum?: number) => void }) => {
         if (item === "ellipsis") {
             // Pagination component for ellipsis (non-clickable).
@@ -132,7 +134,7 @@ export function PaginationControls({
 
             {/* Displaying Record Range Info */}
             <div className="text-xs text-grey">
-                Memaparkan <span className="font-bold">{startIndex + 1}</span> - <span className="font-bold">{endIndex}</span> Daripada <span className="font-bold">{totalRecords}</span> Rekod
+                Memaparkan <span className="font-bold">{displayStart}</span> - <span className="font-bold">{endIndex}</span> Daripada <span className="font-bold">{totalRecords}</span> Rekod
             </div>
         </div>
     );

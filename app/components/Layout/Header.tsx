@@ -1,7 +1,7 @@
 "use client";
 
-import ButtonHelp from "@/app/components/button-help";
-import ButtonLogout from "@/app/components/button-logout";
+import ButtonHelp from "@/app/components/Layout/ButtonHelp";
+import ButtonLogout from "@/app/components/Layout/ButtonLogout";
 
 export default function Header() {
     return (

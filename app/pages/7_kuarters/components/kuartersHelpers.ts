@@ -84,6 +84,9 @@ export type PaginationItem = number | "ellipsis";
 export type QuarterCategoryPaginationState = {
   currentPage: number;
   totalPages: number;
+  startIndex: number;
+  endIndex: number;
+  totalRecords: number;
   visibleRecords: QuarterCategoryRecord[];
   pageItems: PaginationItem[];
   summaryText: string;
@@ -95,10 +98,10 @@ type BuildQuarterCategoryPaginationOptions = {
 };
 
 const emptySummaryCards: KuartersSummaryCard[] = [
-  { label: "Jumlah Unit", value: "--" },
-  { label: "Unit Didiami", value: "--" },
-  { label: "Unit Kosong", value: "--" },
-  { label: "Kadar Penghunian", value: "--" },
+  { label: "JUMLAH UNIT", value: "--" },
+  { label: "UNIT DIDIAMI", value: "--" },
+  { label: "UNIT KOSONG", value: "--" },
+  { label: "KADAR PENGHUNIAN", value: "--" },
 ];
 
 export function buildKuartersSummaryCards(
@@ -110,19 +113,19 @@ export function buildKuartersSummaryCards(
 
   return [
     {
-      label: "Jumlah Unit",
+      label: "JUMLAH UNIT",
       value: formatWholeNumber(summary.totalUnits),
     },
     {
-      label: "Unit Didiami",
+      label: "UNIT DIDIAMI",
       value: formatWholeNumber(summary.occupiedUnits),
     },
     {
-      label: "Unit Kosong",
+      label: "UNIT KOSONG",
       value: formatWholeNumber(summary.vacantUnits),
     },
     {
-      label: "Kadar Penghunian",
+      label: "KADAR PENGHUNIAN",
       value: `${summary.occupancyRate.toFixed(1)}%`,
     },
   ];
@@ -245,6 +248,9 @@ export function buildQuarterCategoryPagination(
   return {
     currentPage,
     totalPages,
+    startIndex,
+    endIndex,
+    totalRecords,
     visibleRecords: quarterCategories.slice(startIndex, endIndex),
     pageItems: buildPageItems(currentPage, totalPages),
     summaryText:

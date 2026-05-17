@@ -1,9 +1,9 @@
 "use client";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import { useState } from "react";
-import { InputField, InputFieldFormat, InputBox, DropdownField, Topic } from "./InputField";
-import { handleCreate, handleFieldChange } from "../controller/DatabaseControl";
+import { InputField, InputFieldFormat, InputBox, DropdownField, Topic } from "../../../components/InputField";
+import { handleCreate, handleFieldChange, stripResidentFormatting } from "../controller/DatabaseControl";
 
 type PenghuniCreateProps = {
     onClose?: () => void;
@@ -24,6 +24,13 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
         { label: "Aktif", color: "text-aktif" },
         { label: "Tidak Layak", color: "text-x-layak" },
     ];
+
+    // Form Status
+    const [name, setName] = useState("");
+    const [icNumber, setIcNumber] = useState("");
+    const isNameValid = name.trim() !== "";
+    const isIcValid = icNumber.length > 0 && stripResidentFormatting(icNumber).length === 12;
+    const isFormValid = isNameValid && isIcValid;
 
     // State for form data, loading status and notifications.
     const [isCreating, setIsCreating] = useState(false);
@@ -60,6 +67,13 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
         setIsCreating,
         showNotification,
     });
+
+    const validateForm = () => {
+        const nextNameValid = name.trim() !== "";
+        const nextIcValid = icNumber.length > 0 && stripResidentFormatting(icNumber).length === 12;
+
+        return nextNameValid && nextIcValid;
+    };
 
     return (
         <div>
@@ -100,8 +114,33 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
                             <section className="flex flex-col gap-4">
                                 <Topic content="MAKLUMAT PERIBADI" />
                                 <div className="grid grid-cols-2 gap-4">
-                                    <InputField label="NAMA" value={formData.fullName} state="active" onChange={handleFieldChange.bind(null, setFormData, "fullName")} placeholder="Cth: Ahmad Zaki" className="col-span-1"/>
-                                    <InputFieldFormat label="NO. K/P" format="######-##-####" value={formData.icNumber} state="active" onChange={handleFieldChange.bind(null, setFormData, "icNumber")} placeholder="Cth: XXXXXX-XX-XXXX" className="col-span-1"/>
+                                    <InputField
+                                        label="NAMA"
+                                        value={name}
+                                        state="active"
+                                        onChange={(value) => {
+                                            setName(value);
+                                            handleFieldChange(setFormData, "fullName", value);
+                                        }}
+                                        placeholder="Cth: Ahmad Zaki"
+                                        className="col-span-1"
+                                        error={!isNameValid}
+                                        errorMessage={!isNameValid ? "Nama diperlukan." : ""}
+                                    />
+                                    <InputFieldFormat
+                                        label="NO. K/P"
+                                        format="######-##-####"
+                                        value={icNumber}
+                                        state="active"
+                                        onChange={(value) => {
+                                            setIcNumber(value);
+                                            handleFieldChange(setFormData, "icNumber", value);
+                                        }}
+                                        placeholder="Cth: XXXXXX-XX-XXXX"
+                                        className="col-span-1"
+                                        error={!isIcValid}
+                                        errorMessage={!isIcValid ? "No. K/P mesti 12 digit." : ""}
+                                    />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <InputFieldFormat label="NO. TELEFON" format="###-#### ####" value={formData.phone} state="active" onChange={handleFieldChange.bind(null, setFormData, "phone")} placeholder="Cth: 012-345 6789" className="col-span-1"/>
@@ -148,8 +187,16 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
                                     <button 
                                         className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                         type="button"
-                                        onClick={handleCreateResident}
-                                        disabled={isCreating}
+                                        onClick={() => {
+                                            const isReadyToSubmit = validateForm();
+
+                                            if (!isReadyToSubmit) {
+                                                return;
+                                            }
+
+                                            handleCreateResident();
+                                        }}
+                                        disabled={isCreating || !isFormValid}
                                     >
                                         <Icon icon="add" size={16} />
                                         {isCreating ? "Sedang Tambah..." : "Tambah Rekod"}

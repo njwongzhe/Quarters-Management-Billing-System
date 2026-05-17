@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { PatternFormat } from "react-number-format";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
 import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
-import { PaginationControls, usePaginationLogic } from "@/app/pages/6_penghuni/controller/PaginationControl";
+import { PaginationControls, usePaginationLogic } from "@/app/components/Pagination/Pagination";
 import type { ExtractedPenghuniRecord } from "../../../../components/extract-review-shared";
 import { getPenghuniRecordKey } from "./helpers";
 import PenghuniReviewDetail from "./PenghuniReviewDetail";

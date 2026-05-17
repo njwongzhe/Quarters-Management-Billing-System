@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 import {
   InputBox,
   InputField,
   InputFieldFormat,
   Topic,
-} from "@/app/pages/6_penghuni/components/InputField";
+} from "@/app/components/InputField";
 import type { ExtractedPenghuniRecord } from "../../../../components/extract-review-shared";
 
 type PenghuniReviewDetailProps = {

@@ -2,8 +2,8 @@
 
 import "./globals.css";
 import { usePathname } from "next/navigation";
-import Header from "./components/Header";
-import Sidebar from "./components/Sidebar";
+import Header from "./components/Layout/Header";
+import Sidebar from "./components/Layout/Sidebar";
 import { ROUTES, SHELL_ROUTES, SHELL_ROUTE_PREFIXES } from "./constants/routes";
 
 export default function RootLayout({

@@ -1,4 +1,4 @@
-import Icon from "../../../components/Icon";
+import Icon from "../../../components/Icon/Icon";
 import type { ProcessingDraftSummary } from "./extract-review-shared";
 import { formatDraftDateTime } from "./extract-review-shared";
 import type { Category } from "./types";

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePaginationLogic, PaginationControls } from "../controller/PaginationControl";
-import { Topic } from "./InputField";
-import Icon from "@/app/components/Icon";
+import { usePaginationLogic, PaginationControls } from "@/app/components/Pagination/Pagination";
+import { Topic } from "../../../components/InputField";
+import Icon from "@/app/components/Icon/Icon";
 
 export type TransactionRecord = {
     id: string;
@@ -152,23 +152,21 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
                     </tbody>
                     
                     {/* Pagination Controls */}
-                    {!isLoading && historyWithBaki.length > 0 && (
-                        <tfoot>
-                            <tr>
-                                <td colSpan={7} className="bg-white border-t border-light-grey/20 px-4 py-4">
-                                    <PaginationControls
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        startIndex={startIndex}
-                                        endIndex={endIndex}
-                                        totalRecords={historyWithBaki.length}
-                                        paginationItems={paginationItems}
-                                        onPageChange={handlePageChange}
-                                    />
-                                </td>
-                            </tr>
-                        </tfoot>
-                    )}
+                    <tfoot>
+                        <tr>
+                            <td colSpan={7} className="bg-white border-t border-light-grey/20 px-4 py-4">
+                                <PaginationControls
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    startIndex={startIndex}
+                                    endIndex={endIndex}
+                                    totalRecords={historyWithBaki.length}
+                                    paginationItems={paginationItems}
+                                    onPageChange={handlePageChange}
+                                />
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>

@@ -1,4 +1,4 @@
-import Icon from "../../../../../../components/Icon";
+import Icon from "../../../../../../components/Icon/Icon";
 import type { VerifyingMode } from "./types";
 
 type ReviewActionsProps = {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import Icon from "@/app/components/Icon";
+import Icon from "@/app/components/Icon/Icon";
 
 import type { KuartersNotice, NoticeTone } from "./kuartersHelpers";
 
