@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Calender from "@/app/components/Calender/Calender";
 import Icon from "@/app/components/Icon/Icon";
-import type { QuarterUnitOccupancyDetails } from "@/lib/quarter-units";
+import type { QuarterUnitOccupancyDetails } from "@/lib/quarters/quarter-units";
 
 type KuartersUnitDatePickerProps = {
   fieldType: "moveInDate" | "moveOutDate";

@@ -5,8 +5,8 @@ import type {
   ExtractResult,
   ProcessingDraft,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { createAuditLog } from "@/lib/audit-logs";
-import { getCurrentAdmin } from "@/lib/current-admin";
+import { createAuditLog } from "@/lib/audit/audit-logs";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 import { createPendingBayaranRows } from "@/lib/uploaded-document/bayaran/import";
 import {

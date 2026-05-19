@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { buildDiceBearAvatarUrl } from "@/lib/avatar";
+import { buildDiceBearAvatarUrl } from "@/lib/profile/avatar";
 
 import { PROFILE_ROUTES, ROUTES, SIDEBAR_ROUTES } from "../../constants/routes"; 
 

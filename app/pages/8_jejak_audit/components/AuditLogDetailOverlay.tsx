@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import type { AuditLogDetailItem } from "@/lib/audit-logs";
-import { formatEnumLabel } from "@/lib/audit-logs";
+import type { AuditLogDetailItem } from "@/lib/audit/audit-logs";
+import { formatEnumLabel } from "@/lib/audit/audit-logs";
 import AuditActionBadge from "./AuditActionBadge";
 
 export default function AuditLogDetailOverlay({

@@ -4,7 +4,7 @@ import PenghuniComplete from "@/app/components/RecordNavigation/PenghuniComplete
 import { formatMoney } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 import { InputField, Topic } from "@/app/components/InputField";
 
-import type { QuarterUnitDetails } from "@/lib/quarter-units";
+import type { QuarterUnitDetails } from "@/lib/quarters/quarter-units";
 
 type KuartersUnitDetailsUnitTabProps = {
   unitDetails: QuarterUnitDetails;

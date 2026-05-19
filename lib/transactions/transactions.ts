@@ -1,5 +1,5 @@
 import { Prisma, TransactionStatus, TransactionCategory } from "@prisma/client";
-import { prisma } from "./prisma";
+import { prisma } from "../prisma";
 
 // ==========================================
 // 1. TYPES & INTERFACES

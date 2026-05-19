@@ -2,7 +2,11 @@
 
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import { commonIcons } from "@/app/components/Icon/Icon";
-import { downloadDataAsXlsx, type DownloadSheetConfig } from "@/app/hooks/download/downloadXlsx";
+import {
+  downloadXlsxFile,
+  type XlsxCell,
+  type XlsxSheet,
+} from "@/lib/download/xlsx-export";
 import type { ResidentRecord } from "../page";
 
 type PenghuniDownloadProps = {
@@ -11,33 +15,19 @@ type PenghuniDownloadProps = {
 
 export default function PenghuniDownload({ residents }: PenghuniDownloadProps) {
   function handleDownloadResidents() {
-    const sheet: DownloadSheetConfig = {
-      name: "Senarai Penghuni",
-      columns: [
-        { width: 34 },
-        { width: 24 },
-        { width: 20 },
-        { width: 34 },
-        { width: 24 },
-        { width: 24 },
-        { width: 20 },
-        { width: 24 },
-        { width: 18 },
-        { width: 34 },
-      ],
-      headers: [
-        { value: "Nama", style: "header" },
-        { value: "No. Kad Pengenalan", style: "header" },
-        { value: "No. Telefon", style: "header" },
-        { value: "Emel", style: "header" },
-        { value: "Jawatan", style: "header" },
-        { value: "Jabatan", style: "header" },
-        { value: "Status", style: "header", align: "center" },
-        { value: "Kuarters", style: "header" },
-        { value: "ID Unit", style: "header", align: "center" },
-        { value: "Alamat", style: "header" },
-      ],
-      rows: residents.map((resident) => [
+    const headers: XlsxCell[] = [
+      { value: "Nama", style: "header" },
+      { value: "No. Kad Pengenalan", style: "header" },
+      { value: "No. Telefon", style: "header" },
+      { value: "Emel", style: "header" },
+      { value: "Jawatan", style: "header" },
+      { value: "Jabatan", style: "header" },
+      { value: "Status", style: "header", align: "center" },
+      { value: "Kuarters", style: "header" },
+      { value: "ID Unit", style: "header", align: "center" },
+      { value: "Alamat", style: "header" },
+    ];
+    const rows: XlsxSheet["rows"] = residents.map((resident) => [
         resident.fullName,
         formatIcNumber(resident.icNumber),
         resident.phone ? formatPhoneNumber(resident.phone) : "N/A",
@@ -48,12 +38,28 @@ export default function PenghuniDownload({ residents }: PenghuniDownloadProps) {
         resident.quarters?.quarterName ?? "N/A",
         { value: resident.quarters?.unitCode ?? "N/A", align: "center" },
         resident.quarters?.address ?? "N/A",
-      ]),
-    };
+      ]);
 
-    downloadDataAsXlsx({
+    downloadXlsxFile({
       filename: "senarai-penghuni",
-      sheets: [sheet],
+      sheets: [
+        {
+          name: "Senarai Penghuni",
+          columns: [
+            { width: 34 },
+            { width: 24 },
+            { width: 20 },
+            { width: 34 },
+            { width: 24 },
+            { width: 24 },
+            { width: 20 },
+            { width: 24 },
+            { width: 18 },
+            { width: 34 },
+          ],
+          rows: [headers, ...rows],
+        },
+      ],
     });
   }
 

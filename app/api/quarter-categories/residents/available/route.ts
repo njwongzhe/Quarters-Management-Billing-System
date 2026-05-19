@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { mapAvailableResidentForApi } from "@/lib/residents";
+import { mapAvailableResidentForApi } from "@/lib/residents/residents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

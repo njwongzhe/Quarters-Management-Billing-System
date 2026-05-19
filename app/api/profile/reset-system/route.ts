@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { createAuditLog } from "@/lib/audit-logs";
-import { getCurrentAdmin } from "@/lib/current-admin";
+import { createAuditLog } from "@/lib/audit/audit-logs";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";

@@ -13,7 +13,7 @@ import { PaginationControls } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadQuarterUnits } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
 import KuartersUnitDatePicker from "./KuartersUnitDatePicker";
-import type { QuarterUnitOccupancyDetails } from "@/lib/quarter-units";
+import type { QuarterUnitOccupancyDetails } from "@/lib/quarters/quarter-units";
 
 import type {
   KuartersUnitEditorState,

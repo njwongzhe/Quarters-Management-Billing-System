@@ -9,7 +9,7 @@ import {
   getAuditLogPage,
   hasActiveAuditLogFilters,
   parseAuditLogFilters,
-} from "@/lib/audit-logs";
+} from "@/lib/audit/audit-logs";
 
 type JejakAuditPageProps = {
   searchParams?: Promise<{

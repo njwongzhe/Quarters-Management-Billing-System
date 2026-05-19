@@ -1,11 +1,11 @@
 import type { UnitStatus } from "@prisma/client";
-import type { QuarterCategorySummary } from "@/lib/quarter-categories";
-import type { AvailableResidentListItem } from "@/lib/residents";
+import type { QuarterCategorySummary } from "@/lib/quarters/quarter-categories";
+import type { AvailableResidentListItem } from "@/lib/residents/residents";
 
 import type {
   QuarterCategoryUnitsDetail,
   QuarterUnitListItem,
-} from "@/lib/quarter-units";
+} from "@/lib/quarters/quarter-units";
 
 export const EMPTY_QUARTER_UNIT_ID = "__new__";
 

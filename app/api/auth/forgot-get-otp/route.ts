@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import getSupabaseClient from "../../../../lib/supabaseServer";
+import getSupabaseClient from "../../../../lib/auth/supabaseServer";
 import { DOMAIN_RESTRICTION, RESTRICTED_EMAIL_DOMAIN } from "@/app/constants/auth";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

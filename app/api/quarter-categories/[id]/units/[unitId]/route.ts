@@ -14,9 +14,9 @@ import {
   mapQuarterUnitForApi,
   parseQuarterUnitUpdateBody,
   quarterUnitDetailsInclude,
-} from "@/lib/quarter-units";
-import { createAuditLog } from "@/lib/audit-logs";
-import { getCurrentAdmin } from "@/lib/current-admin";
+} from "@/lib/quarters/quarter-units";
+import { createAuditLog } from "@/lib/audit/audit-logs";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {

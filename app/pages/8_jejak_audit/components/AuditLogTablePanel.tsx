@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import Icon from "@/app/components/Icon/Icon";
-import type { AuditLogFilters, AuditLogListItem } from "@/lib/audit-logs";
+import type { AuditLogFilters, AuditLogListItem } from "@/lib/audit/audit-logs";
 import AuditActionBadge from "./AuditActionBadge";
 import AuditLogDownloadButton from "./AuditLogDownloadButton";
 import AuditLogFilterPanel from "./AuditLogFilterPanel";

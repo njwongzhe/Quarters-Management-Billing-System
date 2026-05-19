@@ -1,5 +1,5 @@
 import Icon from "@/app/components/Icon/Icon";
-import { buildDiceBearAvatarUrl } from "@/lib/avatar";
+import { buildDiceBearAvatarUrl } from "@/lib/profile/avatar";
 
 export default function ProfileHeaderCard({
   fullName,

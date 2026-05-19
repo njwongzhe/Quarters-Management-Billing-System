@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears";
-import { createAuditLog } from "@/lib/audit-logs";
-import { getCurrentAdmin } from "@/lib/current-admin";
-import { generateTransactionNo } from "@/lib/transactions"; 
+import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears/arrears";
+import { createAuditLog } from "@/lib/audit/audit-logs";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import { generateTransactionNo } from "@/lib/transactions/transactions"; 
 
 export async function GET() {
   try {

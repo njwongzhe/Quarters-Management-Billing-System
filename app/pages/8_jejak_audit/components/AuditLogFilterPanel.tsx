@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
-import type { AuditLogFilters } from "@/lib/audit-logs";
+import type { AuditLogFilters } from "@/lib/audit/audit-logs";
 
 type AuditLogFilterPanelProps = {
   filters: AuditLogFilters;

@@ -7,7 +7,7 @@ import {
   downloadXlsxFile,
   type XlsxCell,
   type XlsxSheet,
-} from "@/lib/xlsx-export";
+} from "@/lib/download/xlsx-export";
 
 type AuditLogExportRecord = {
   id: string;

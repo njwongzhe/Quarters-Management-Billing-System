@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTransactionsList, getTransactionsSummary, TransactionFilterParams } from "@/lib/transactions";
+import { getTransactionsList, getTransactionsSummary, TransactionFilterParams } from "@/lib/transactions/transactions";
 import { TransactionCategory, TransactionStatus } from "@prisma/client";
-import { getCurrentAdmin } from "@/lib/current-admin";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 
 export async function GET(request: NextRequest) {
   try {

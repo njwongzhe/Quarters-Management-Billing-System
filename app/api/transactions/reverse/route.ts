@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { reverseTransaction } from "@/lib/transactions";
-import { getCurrentAdmin } from "@/lib/current-admin";
+import { reverseTransaction } from "@/lib/transactions/transactions";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 
 export async function POST(request: NextRequest) {
   try {

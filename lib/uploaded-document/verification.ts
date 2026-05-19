@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import type { ExtractResult } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { getCurrentAdmin } from "@/lib/current-admin";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 import { verifyBayaranDrafts } from "@/lib/uploaded-document/bayaran/verification";
 import { mapUploadedDocumentForReview } from "@/lib/uploaded-document/documents";

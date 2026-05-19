@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE_NAME } from "@/app/constants/auth-server";
-import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { getSupabaseAdminClient } from "@/lib/auth/supabaseAdmin";
 
 export async function POST(request: Request) {
 	const sessionToken = request.headers

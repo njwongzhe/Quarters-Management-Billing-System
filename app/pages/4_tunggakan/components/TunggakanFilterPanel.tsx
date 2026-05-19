@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import Icon from "../../../components/Icon/Icon";
-import type { TunggakanListItem, TunggakanFilter } from "@/lib/arrears";
+import type { TunggakanListItem, TunggakanFilter } from "@/lib/arrears/arrears";
 
 export type { TunggakanFilter };
-export { defaultFilter } from "@/lib/arrears";
+export { defaultFilter } from "@/lib/arrears/arrears";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 

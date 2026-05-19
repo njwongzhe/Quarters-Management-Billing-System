@@ -7,9 +7,9 @@ import {
   buildQuarterCategorySummary,
   mapQuarterCategoryForApi,
   parseQuarterCategoryCreateBody,
-} from "@/lib/quarter-categories";
-import { createAuditLog } from "@/lib/audit-logs";
-import { getCurrentAdmin } from "@/lib/current-admin";
+} from "@/lib/quarters/quarter-categories";
+import { createAuditLog } from "@/lib/audit/audit-logs";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs"; // This API route uses Prisma which is not compatible with the Edge runtime, so we specify that it should run in a Node.js environment.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { mapTunggakanForApi } from "@/lib/arrears"; // Make sure this path is correct!
+import { mapTunggakanForApi } from "@/lib/arrears/arrears"; // Make sure this path is correct!
 
 export async function GET(
   request: Request,

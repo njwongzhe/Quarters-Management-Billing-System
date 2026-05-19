@@ -1,6 +1,9 @@
-import type { QuarterUnitOccupancyDetails } from "@/lib/quarter-units";
-import { type XlsxCell, type XlsxSheet } from "@/lib/xlsx-export";
-import { downloadDataAsXlsx } from "@/app/hooks/download/downloadXlsx";
+import type { QuarterUnitOccupancyDetails } from "@/lib/quarters/quarter-units";
+import {
+  downloadXlsxFile,
+  type XlsxCell,
+  type XlsxSheet,
+} from "@/lib/download/xlsx-export";
 
 type QuarterCategoryRateExportRecord = {
   categoryName: string;
@@ -38,7 +41,7 @@ export function downloadQuarterCategoryRates(
     { value: rate.penaltyPrice, type: "number", align: "right" },
   ]);
 
-  downloadDataAsXlsx({
+  downloadXlsxFile({
     filename: "senarai-kategori-kuarters",
     sheets: [
       {
@@ -50,8 +53,7 @@ export function downloadQuarterCategoryRates(
           { width: 18 },
           { width: 16 },
         ],
-        headers,
-        rows,
+        rows: [headers, ...rows],
       },
     ],
   });
@@ -83,7 +85,7 @@ export function downloadQuarterUnits(
     },
   ]);
 
-  downloadDataAsXlsx({
+  downloadXlsxFile({
     filename: buildUnitsExportFilename(categoryName, address),
     sheets: [
       {
@@ -96,8 +98,7 @@ export function downloadQuarterUnits(
           { width: 16 },
           { width: 16 },
         ],
-        headers,
-        rows,
+        rows: [headers, ...rows],
       },
     ],
   });
@@ -126,7 +127,7 @@ export function downloadQuarterUnitOccupancyHistory(
     },
   ]);
 
-  downloadDataAsXlsx({
+  downloadXlsxFile({
     filename: ["sejarah-penghunian", sanitizeFilenamePart(unitCode)]
       .filter(Boolean)
       .join("-"),
@@ -140,8 +141,7 @@ export function downloadQuarterUnitOccupancyHistory(
           { width: 24 },
           { width: 14 },
         ],
-        headers,
-        rows,
+        rows: [headers, ...rows],
       },
     ],
   });

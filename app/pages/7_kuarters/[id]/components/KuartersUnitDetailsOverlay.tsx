@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import Icon from "@/app/components/Icon/Icon";
-import type { QuarterUnitDetails } from "@/lib/quarter-units";
+import type { QuarterUnitDetails } from "@/lib/quarters/quarter-units";
 
 import KuartersUnitDetailsHistoryTab from "./KuartersUnitDetailsHistoryTab";
 import KuartersUnitDetailsUnitTab from "./KuartersUnitDetailsUnitTab";

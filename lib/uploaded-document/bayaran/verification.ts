@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 
 import { Prisma } from "@prisma/client";
 
-import { generateTransactionNos } from "@/lib/transactions";
+import { generateTransactionNos } from "@/lib/transactions/transactions";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 
 export async function verifyBayaranDrafts(

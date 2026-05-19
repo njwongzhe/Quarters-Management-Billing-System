@@ -14,7 +14,7 @@ import { downloadQuarterUnitOccupancyHistory } from "@/app/pages/7_kuarters/hook
 import type {
   QuarterUnitDetails,
   QuarterUnitOccupancyDetails,
-} from "@/lib/quarter-units";
+} from "@/lib/quarters/quarter-units";
 
 type KuartersUnitDetailsHistoryTabProps = {
   unitDetails: QuarterUnitDetails;

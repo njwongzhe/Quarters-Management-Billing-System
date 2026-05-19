@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateTransactionNo } from "@/lib/transactions"; // Ensure this path is correct
+import { generateTransactionNo } from "@/lib/transactions/transactions"; // Ensure this path is correct
 
 // Vercel Cron Jobs send a GET request
 export async function GET(request: Request) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getAuditLogDetail } from "@/lib/audit-logs";
+import { getAuditLogDetail } from "@/lib/audit/audit-logs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

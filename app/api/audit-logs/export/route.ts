@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getAuditLogExportRows, parseAuditLogFilters } from "@/lib/audit-logs";
+import { getAuditLogExportRows, parseAuditLogFilters } from "@/lib/audit/audit-logs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
