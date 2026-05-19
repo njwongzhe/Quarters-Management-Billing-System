@@ -1,4 +1,4 @@
-import { calculateAgeByIc } from "@/app/utils/resident";
+import { calculateAgeByIc } from "@/lib/calculateAge";
 import type { DropdownOption } from "../../../components/InputField";
 
 export type ResidentStatusRuleResult = {
