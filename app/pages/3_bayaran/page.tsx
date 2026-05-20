@@ -1,7 +1,9 @@
 import Icon from "@/app/components/Icon/Icon";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import Link from "next/link";
+import BayaranRowActions from "./components/BayaranRowActions";
 
 const statTemplates = [
   {
@@ -46,12 +48,30 @@ const statTemplates = [
   },
 ];
 
-const checks = [
-  ["Cukup Bayaran", "bg-cukup"],
-  ["Kurang Bayaran", "bg-kurang"],
-  ["Lebihan Bayaran", "bg-lebih"],
-  ["Data Tidak Lengkap", "bg-x-lengkap"],
+const statusFilters = [
+  {
+    label: "Cukup Bayaran",
+    value: "cukup",
+    checkedClass: "peer-checked:bg-cukup",
+  },
+  {
+    label: "Kurang Bayaran",
+    value: "kurang",
+    checkedClass: "peer-checked:bg-kurang",
+  },
+  {
+    label: "Lebihan Bayaran",
+    value: "lebih",
+    checkedClass: "peer-checked:bg-lebih",
+  },
+  {
+    label: "Data Tidak Lengkap",
+    value: "tidak-lengkap",
+    checkedClass: "peer-checked:bg-x-lengkap",
+  },
 ] as const;
+
+type BayaranStatusFilter = (typeof statusFilters)[number]["value"];
 
 type PaymentStatus = "green" | "red" | "blue" | "purple";
 
@@ -96,128 +116,35 @@ const ROWS_PER_PAGE = 10;
 type BayaranPageProps = {
   searchParams?: Promise<{
     page?: string;
+    nama?: string;
+    ic?: string;
+    kelas?: string;
+    unit?: string;
+    status?: string | string[];
+    statusMode?: string;
   }>;
+};
+
+type BayaranFilters = {
+  nama: string;
+  ic: string;
+  kelas: string;
+  unit: string;
+  statuses: BayaranStatusFilter[];
+  statusMode: boolean;
 };
 
 export default async function BayaranPage({ searchParams }: BayaranPageProps) {
   const resolvedSearchParams = await searchParams;
+  const filters = parseBayaranFilters(resolvedSearchParams);
   const currentPage = Math.max(1, Number(resolvedSearchParams?.page) || 1);
   const offset = (currentPage - 1) * ROWS_PER_PAGE;
-  const [{ count: totalRecords }] = await prisma.$queryRaw<{ count: bigint }[]>`
-    SELECT COUNT(*)::bigint AS "count"
-    FROM "Payment"
-  `;
-  const [paymentStats] = await prisma.$queryRaw<PaymentStatsQueryRow[]>`
-    WITH payment_arrears AS (
-      SELECT a."totalArrearsAmount"
-      FROM "Payment" p
-      LEFT JOIN "Resident" r
-        ON r."id" = p."residentId"
-      LEFT JOIN LATERAL (
-        SELECT arrears."totalArrearsAmount"
-        FROM "ArrearsSummary" arrears
-        INNER JOIN "Resident" arrears_resident
-          ON arrears_resident."id" = arrears."residentId"
-        WHERE arrears."residentId" = r."id"
-          OR regexp_replace(arrears_resident."icNumber", '\\D', '', 'g') =
-            regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
-        ORDER BY
-          CASE WHEN arrears."residentId" = r."id" THEN 0 ELSE 1 END,
-          arrears."updatedAt" DESC
-        LIMIT 1
-      ) a
-        ON TRUE
-    )
-    SELECT
-      COUNT(*)::bigint AS "total",
-      COUNT(*) FILTER (WHERE "totalArrearsAmount" = 0)::bigint AS "cukup",
-      COUNT(*) FILTER (WHERE "totalArrearsAmount" > 0)::bigint AS "kurang",
-      COUNT(*) FILTER (WHERE "totalArrearsAmount" < 0)::bigint AS "lebih",
-      COUNT(*) FILTER (WHERE "totalArrearsAmount" IS NULL)::bigint AS "tidakLengkap"
-    FROM payment_arrears
-  `;
-  const payments = await prisma.$queryRaw<PaymentQueryRow[]>`
-    SELECT
-      p."id",
-      p."residentId",
-      r."fullName",
-      r."icNumber",
-      qc."categoryName",
-      u."unitCode",
-      penghuni_record."nama" AS "extractedName",
-      penghuni_record."noKadPengenalan" AS "extractedIcNumber",
-      penghuni_record."kuarters" AS "extractedKuarters",
-      penghuni_record."unit" AS "extractedUnit",
-      qc."rentalPrice",
-      qc."maintenancePrice",
-      a."totalArrearsAmount",
-      p."amount"
-    FROM "Payment" p
-    LEFT JOIN "Resident" r
-      ON r."id" = p."residentId"
-    LEFT JOIN LATERAL (
-      SELECT o."unitId"
-      FROM "UnitOccupancy" o
-      INNER JOIN "Resident" occupancy_resident
-        ON occupancy_resident."id" = o."residentId"
-      WHERE (
-          o."residentId" = r."id"
-          OR regexp_replace(occupancy_resident."icNumber", '\\D', '', 'g') =
-            regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
-        )
-        AND o."status" = 'CURRENT'::"OccupancyStatus"
-      ORDER BY o."moveInDate" DESC
-      LIMIT 1
-    ) current_occupancy
-      ON TRUE
-    LEFT JOIN "Unit" u
-      ON u."id" = current_occupancy."unitId"
-    LEFT JOIN "QuarterCategory" qc
-      ON qc."id" = u."categoryId"
-    LEFT JOIN LATERAL (
-      SELECT arrears."totalArrearsAmount"
-      FROM "ArrearsSummary" arrears
-      INNER JOIN "Resident" arrears_resident
-        ON arrears_resident."id" = arrears."residentId"
-      WHERE arrears."residentId" = r."id"
-        OR regexp_replace(arrears_resident."icNumber", '\\D', '', 'g') =
-          regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
-      ORDER BY
-        CASE WHEN arrears."residentId" = r."id" THEN 0 ELSE 1 END,
-        arrears."updatedAt" DESC
-      LIMIT 1
-    ) a
-      ON TRUE
-    LEFT JOIN LATERAL (
-      SELECT
-        record ->> 'nama' AS "nama",
-        record ->> 'noKadPengenalan' AS "noKadPengenalan",
-        record ->> 'kuarters' AS "kuarters",
-        record ->> 'unit' AS "unit"
-      FROM "UploadedDocument" d
-      CROSS JOIN LATERAL jsonb_array_elements((d."remark"::jsonb) -> 'records') record
-      WHERE d."category" = 'PENGHUNI'::"DocumentCategory"
-        AND d."remark" IS NOT NULL
-        AND (d."remark"::jsonb) ->> 'documentType' = 'penghuni'
-        AND regexp_replace(record ->> 'noKadPengenalan', '\\D', '', 'g') =
-          regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
-      ORDER BY d."uploadedAt" DESC
-      LIMIT 1
-    ) penghuni_record
-      ON TRUE
-    ORDER BY
-      CASE
-        WHEN u."id" IS NOT NULL THEN 0
-        WHEN NULLIF(penghuni_record."kuarters", '') IS NOT NULL
-          AND NULLIF(penghuni_record."unit", '') IS NOT NULL THEN 1
-        ELSE 2
-      END,
-      p."paymentDate" DESC,
-      p."createdAt" DESC
-    LIMIT ${ROWS_PER_PAGE}
-    OFFSET ${offset}
-  `;
-
+  const filterWhere = buildPaymentFilterWhere(filters);
+  const [quarterOptions, { rows: payments, totalRecords, paymentStats }] =
+    await Promise.all([
+      getQuarterOptions(),
+      getFilteredPaymentPage(filterWhere, offset),
+    ]);
   const rows = payments.map((payment): BayaranRow => {
     const paymentAmount = Number(payment.amount);
     const arrearsAmount =
@@ -264,7 +191,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
             <article
               key={stat.label}
               className={[
-                "min-h-26 border-l-4 bg-white px-5 py-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)]",
+                "min-h-26 rounded-lg border-l-4 bg-white px-5 py-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)]",
                 stat.accent,
               ].join(" ")}
             >
@@ -306,54 +233,87 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
             </div>
           </div>
 
-          <div className="relative rounded-t-xl bg-white px-6 pb-7 pt-5 shadow-sm">
+          <form
+            action="/pages/3_bayaran"
+            className="relative rounded-t-xl bg-white px-6 pb-7 pt-5 shadow-sm"
+          >
             <span className="absolute right-9 top-[-11px] h-0 w-0 border-x-[12px] border-b-[12px] border-x-transparent border-b-white" />
+            <input type="hidden" name="statusMode" value="1" />
             <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-6">
-              <Field label="Nama" placeholder="Cth: Ahmad Zaki" />
-              <Field label="No. K/P" placeholder="Cth: 850212-01-XXXX" />
+              <Field
+                name="nama"
+                label="Nama"
+                placeholder="Cth: Ahmad Zaki"
+                defaultValue={filters.nama}
+              />
+              <Field
+                name="ic"
+                label="No. K/P"
+                placeholder="Cth: 850212-01-XXXX"
+                defaultValue={filters.ic}
+              />
               <label className="flex flex-col gap-2">
                 <span className="text-[9px] font-extrabold uppercase text-[#667085]">
                   Kelas Kuarters
                 </span>
                 <select
+                  name="kelas"
+                  defaultValue={filters.kelas}
                   className="h-9 rounded border border-[#E2E7F1] bg-[#F3F6FC] px-3 text-[11px] font-semibold text-[#4B5567] outline-none"
                   suppressHydrationWarning
                 >
-                  <option>Semua Kelas</option>
+                  <option value="">Semua Kelas</option>
+                  {quarterOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <Field label="Unit Kuarters" placeholder="Cth: Blok A-01-01" />
+              <Field
+                name="unit"
+                label="Unit Kuarters"
+                placeholder="Cth: Blok A-01-01"
+                defaultValue={filters.unit}
+              />
             </div>
 
             <div className="mt-7 flex items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-4">
-                {checks.map(([label, color]) => (
+                {statusFilters.map((status) => (
                   <label
-                    key={label}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-[#172033]"
+                    key={status.value}
+                    className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-extrabold text-[#172033]"
                   >
+                    <input
+                      type="checkbox"
+                      name="status"
+                      value={status.value}
+                      defaultChecked={isStatusChecked(filters, status.value)}
+                      className="peer sr-only"
+                    />
                     <span
                       className={[
-                        "flex h-3.5 w-3.5 items-center justify-center rounded-[2px] text-white",
-                        color,
+                        "flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border border-[#D0D5DD] bg-white text-transparent transition-colors peer-checked:border-transparent peer-checked:text-white",
+                        status.checkedClass,
                       ].join(" ")}
                     >
                       <Icon icon="check" size={11} weight={700} />
                     </span>
-                    {label}
+                    {status.label}
                   </label>
                 ))}
               </div>
               <div className="flex items-center gap-7">
-                <button
-                  type="button"
+                <Link
+                  href="/pages/3_bayaran"
                   className="text-[11px] font-semibold text-[#667085]"
                   suppressHydrationWarning
                 >
                   Set Semula
-                </button>
+                </Link>
                 <button
-                  type="button"
+                  type="submit"
                   className="inline-flex h-10 min-w-29 items-center justify-center gap-2 rounded bg-dark-blue px-5 text-xs font-extrabold text-white shadow-[0_8px_14px_rgba(21,30,102,0.22)]"
                   suppressHydrationWarning
                 >
@@ -362,7 +322,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
                 </button>
               </div>
             </div>
-          </div>
+          </form>
 
           <div className="overflow-hidden rounded-b-xl bg-white shadow-sm">
             <table className="w-full table-fixed border-collapse text-left">
@@ -419,14 +379,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
                       {row.amount}
                     </td>
                     <td className="px-7 py-4">
-                      <div className="flex items-center justify-center gap-6 text-dark-blue">
-                        <button type="button" aria-label="Lihat" suppressHydrationWarning>
-                          <Icon icon="visibility" size={16} weight={600} />
-                        </button>
-                        <button type="button" aria-label="Tambah" suppressHydrationWarning>
-                          <Icon icon="add" size={18} weight={700} />
-                        </button>
-                      </div>
+                      <BayaranRowActions paymentId={row.id} />
                     </td>
                   </tr>
                 )))}
@@ -437,6 +390,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
               <div className="flex items-center gap-2">
                 <PaginationLink
                   page={Math.max(1, currentPage - 1)}
+                  filters={filters}
                   disabled={!canGoPrevious}
                   className="flex h-7 w-7 items-center justify-center rounded text-[#667085] aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
                 >
@@ -451,6 +405,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
                     <PaginationLink
                       key={page}
                       page={page}
+                      filters={filters}
                       className={[
                         "flex h-7 min-w-7 items-center justify-center rounded px-2",
                         page === currentPage
@@ -464,6 +419,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
                 )}
                 <PaginationLink
                   page={Math.min(totalPages, currentPage + 1)}
+                  filters={filters}
                   disabled={!canGoNext}
                   className="flex h-7 w-7 items-center justify-center rounded text-[#667085] aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
                 >
@@ -482,20 +438,327 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
   );
 }
 
+async function getQuarterOptions() {
+  const rows = await prisma.$queryRaw<{ categoryName: string }[]>`
+    SELECT DISTINCT "categoryName"
+    FROM "QuarterCategory"
+    WHERE NULLIF(TRIM("categoryName"), '') IS NOT NULL
+    ORDER BY "categoryName" ASC
+  `;
+
+  return rows.map((row) => row.categoryName);
+}
+
+async function getFilteredPaymentPage(filterWhere: Prisma.Sql, offset: number) {
+  const [totalRows, statsRows, rows] = await Promise.all([
+    prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      WITH ${latestPaymentsCte()}
+      SELECT COUNT(*)::bigint AS "count"
+      FROM latest_payments p
+      ${paymentBaseJoins()}
+      ${filterWhere}
+    `),
+    prisma.$queryRaw<PaymentStatsQueryRow[]>(Prisma.sql`
+      WITH ${latestPaymentsCte()}
+      SELECT
+        COUNT(*)::bigint AS "total",
+        COUNT(*) FILTER (WHERE a."totalArrearsAmount" = 0)::bigint AS "cukup",
+        COUNT(*) FILTER (WHERE a."totalArrearsAmount" > 0)::bigint AS "kurang",
+        COUNT(*) FILTER (WHERE a."totalArrearsAmount" < 0)::bigint AS "lebih",
+        COUNT(*) FILTER (WHERE a."totalArrearsAmount" IS NULL)::bigint AS "tidakLengkap"
+      FROM latest_payments p
+      ${paymentBaseJoins()}
+      ${filterWhere}
+    `),
+    prisma.$queryRaw<PaymentQueryRow[]>(Prisma.sql`
+      WITH ${latestPaymentsCte()}
+      SELECT
+        p."id",
+        p."residentId",
+        r."fullName",
+        r."icNumber",
+        qc."categoryName",
+        u."unitCode",
+        penghuni_record."nama" AS "extractedName",
+        penghuni_record."noKadPengenalan" AS "extractedIcNumber",
+        penghuni_record."kuarters" AS "extractedKuarters",
+        penghuni_record."unit" AS "extractedUnit",
+        qc."rentalPrice",
+        qc."maintenancePrice",
+        a."totalArrearsAmount",
+        p."amount"
+      FROM latest_payments p
+      ${paymentBaseJoins()}
+      ${filterWhere}
+      ORDER BY
+        CASE
+          WHEN u."id" IS NOT NULL THEN 0
+          WHEN NULLIF(penghuni_record."kuarters", '') IS NOT NULL
+            AND NULLIF(penghuni_record."unit", '') IS NOT NULL THEN 1
+          ELSE 2
+        END,
+        p."paymentDate" DESC,
+        p."createdAt" DESC
+      LIMIT ${ROWS_PER_PAGE}
+      OFFSET ${offset}
+    `),
+  ]);
+
+  return {
+    rows,
+    totalRecords: totalRows[0]?.count ?? BigInt(0),
+    paymentStats:
+      statsRows[0] ?? {
+        total: BigInt(0),
+        cukup: BigInt(0),
+        kurang: BigInt(0),
+        lebih: BigInt(0),
+        tidakLengkap: BigInt(0),
+      },
+  };
+}
+
+function latestPaymentsCte() {
+  return Prisma.sql`
+    latest_payments AS (
+      SELECT DISTINCT ON (p."residentId")
+        p."id",
+        p."residentId",
+        p."paymentDate",
+        p."createdAt",
+        p."amount"
+      FROM "Payment" p
+      WHERE p."residentId" IS NOT NULL
+      ORDER BY
+        p."residentId",
+        p."paymentDate" DESC,
+        p."createdAt" DESC,
+        p."id" DESC
+    )
+  `;
+}
+
+function paymentBaseJoins() {
+  return Prisma.sql`
+    LEFT JOIN "Resident" r
+      ON r."id" = p."residentId"
+    LEFT JOIN LATERAL (
+      SELECT o."unitId"
+      FROM "UnitOccupancy" o
+      INNER JOIN "Resident" occupancy_resident
+        ON occupancy_resident."id" = o."residentId"
+      WHERE (
+          o."residentId" = r."id"
+          OR regexp_replace(occupancy_resident."icNumber", '\\D', '', 'g') =
+            regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
+        )
+        AND o."status" = 'CURRENT'::"OccupancyStatus"
+      ORDER BY o."moveInDate" DESC
+      LIMIT 1
+    ) current_occupancy
+      ON TRUE
+    LEFT JOIN "Unit" u
+      ON u."id" = current_occupancy."unitId"
+    LEFT JOIN "QuarterCategory" qc
+      ON qc."id" = u."categoryId"
+    LEFT JOIN LATERAL (
+      SELECT arrears."totalArrearsAmount"
+      FROM "ArrearsSummary" arrears
+      INNER JOIN "Resident" arrears_resident
+        ON arrears_resident."id" = arrears."residentId"
+      WHERE arrears."residentId" = r."id"
+        OR regexp_replace(arrears_resident."icNumber", '\\D', '', 'g') =
+          regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
+      ORDER BY
+        CASE WHEN arrears."residentId" = r."id" THEN 0 ELSE 1 END,
+        arrears."updatedAt" DESC
+      LIMIT 1
+    ) a
+      ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        record ->> 'nama' AS "nama",
+        record ->> 'noKadPengenalan' AS "noKadPengenalan",
+        record ->> 'kuarters' AS "kuarters",
+        record ->> 'unit' AS "unit"
+      FROM "UploadedDocument" d
+      CROSS JOIN LATERAL jsonb_array_elements((d."remark"::jsonb) -> 'records') record
+      WHERE d."category" = 'PENGHUNI'::"DocumentCategory"
+        AND d."remark" IS NOT NULL
+        AND (d."remark"::jsonb) ->> 'documentType' = 'penghuni'
+        AND regexp_replace(record ->> 'noKadPengenalan', '\\D', '', 'g') =
+          regexp_replace(COALESCE(r."icNumber", ''), '\\D', '', 'g')
+      ORDER BY d."uploadedAt" DESC
+      LIMIT 1
+    ) penghuni_record
+      ON TRUE
+  `;
+}
+
+function buildPaymentFilterWhere(filters: BayaranFilters) {
+  const conditions: Prisma.Sql[] = [];
+  const normalizedIc = filters.ic.replace(/\D/g, "");
+
+  if (filters.nama) {
+    conditions.push(Prisma.sql`
+      COALESCE(r."fullName", penghuni_record."nama", '') ILIKE ${toLikePattern(filters.nama)}
+      ESCAPE '\\'
+    `);
+  }
+
+  if (normalizedIc) {
+    conditions.push(Prisma.sql`
+      regexp_replace(
+        COALESCE(r."icNumber", penghuni_record."noKadPengenalan", ''),
+        '\\D',
+        '',
+        'g'
+      ) LIKE ${`%${normalizedIc}%`}
+    `);
+  }
+
+  if (filters.kelas) {
+    conditions.push(Prisma.sql`
+      LOWER(COALESCE(qc."categoryName", penghuni_record."kuarters", '')) =
+      LOWER(${filters.kelas})
+    `);
+  }
+
+  if (filters.unit) {
+    conditions.push(Prisma.sql`
+      COALESCE(u."unitCode", penghuni_record."unit", '') ILIKE ${toLikePattern(filters.unit)}
+      ESCAPE '\\'
+    `);
+  }
+
+  const statusCondition = buildStatusFilterCondition(filters);
+
+  if (statusCondition) {
+    conditions.push(statusCondition);
+  }
+
+  return conditions.length
+    ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
+    : Prisma.empty;
+}
+
+function buildStatusFilterCondition(filters: BayaranFilters) {
+  if (!filters.statusMode) {
+    return null;
+  }
+
+  if (filters.statuses.length === 0) {
+    return Prisma.sql`false`;
+  }
+
+  if (filters.statuses.length === statusFilters.length) {
+    return null;
+  }
+
+  const conditions = filters.statuses.map((status) => {
+    if (status === "cukup") {
+      return Prisma.sql`a."totalArrearsAmount" = 0`;
+    }
+
+    if (status === "kurang") {
+      return Prisma.sql`a."totalArrearsAmount" > 0`;
+    }
+
+    if (status === "lebih") {
+      return Prisma.sql`a."totalArrearsAmount" < 0`;
+    }
+
+    return Prisma.sql`a."totalArrearsAmount" IS NULL`;
+  });
+
+  return Prisma.sql`(${Prisma.join(conditions, " OR ")})`;
+}
+
+function parseBayaranFilters(
+  searchParams: Awaited<BayaranPageProps["searchParams"]> | undefined,
+): BayaranFilters {
+  return {
+    nama: getStringParam(searchParams?.nama),
+    ic: getStringParam(searchParams?.ic),
+    kelas: getStringParam(searchParams?.kelas),
+    unit: getStringParam(searchParams?.unit),
+    statuses: getArrayParam(searchParams?.status).filter(isBayaranStatusFilter),
+    statusMode: getStringParam(searchParams?.statusMode) === "1",
+  };
+}
+
+function getStringParam(value: string | string[] | undefined) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+
+  return String(rawValue ?? "").replace(/\s+/g, " ").trim();
+}
+
+function getArrayParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value.map(getStringParam).filter(Boolean);
+  }
+
+  const normalizedValue = getStringParam(value);
+
+  return normalizedValue ? [normalizedValue] : [];
+}
+
+function isBayaranStatusFilter(value: string): value is BayaranStatusFilter {
+  return statusFilters.some((status) => status.value === value);
+}
+
+function isStatusChecked(filters: BayaranFilters, value: BayaranStatusFilter) {
+  if (!filters.statusMode && filters.statuses.length === 0) {
+    return true;
+  }
+
+  return filters.statuses.includes(value);
+}
+
+function toLikePattern(value: string) {
+  return `%${value.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+function buildBayaranQueryString(filters: BayaranFilters, page: number) {
+  const params = new URLSearchParams();
+
+  if (filters.nama) params.set("nama", filters.nama);
+  if (filters.ic) params.set("ic", filters.ic);
+  if (filters.kelas) params.set("kelas", filters.kelas);
+  if (filters.unit) params.set("unit", filters.unit);
+
+  if (filters.statusMode) {
+    params.set("statusMode", "1");
+    for (const status of filters.statuses) {
+      params.append("status", status);
+    }
+  }
+
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+
+  const queryString = params.toString();
+
+  return queryString ? `?${queryString}` : "";
+}
+
 function PaginationLink({
   page,
+  filters,
   disabled = false,
   className,
   children,
 }: {
   page: number;
+  filters: BayaranFilters;
   disabled?: boolean;
   className: string;
   children: React.ReactNode;
 }) {
   return (
     <Link
-      href={`/pages/3_bayaran?page=${page}`}
+      href={`/pages/3_bayaran${buildBayaranQueryString(filters, page)}`}
       aria-disabled={disabled}
       tabIndex={disabled ? -1 : undefined}
       className={className}
@@ -560,13 +823,25 @@ function formatMoney(value: number) {
   });
 }
 
-function Field({ label, placeholder }: { label: string; placeholder: string }) {
+function Field({
+  name,
+  label,
+  placeholder,
+  defaultValue,
+}: {
+  name: string;
+  label: string;
+  placeholder: string;
+  defaultValue: string;
+}) {
   return (
     <label className="flex flex-col gap-2">
       <span className="text-[9px] font-extrabold uppercase text-[#667085]">
         {label}
       </span>
       <input
+        name={name}
+        defaultValue={defaultValue}
         className="h-9 rounded border border-[#E2E7F1] bg-[#F3F6FC] px-3 text-[11px] font-semibold text-[#4B5567] outline-none placeholder:text-[#8A94A6]"
         placeholder={placeholder}
         suppressHydrationWarning

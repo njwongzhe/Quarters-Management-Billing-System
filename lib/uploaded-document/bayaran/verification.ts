@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 
 import { Prisma } from "@prisma/client";
 
-import { generateTransactionNos } from "@/lib/transactions/transactions";
+import { createPaymentRecords } from "@/lib/payments/payment-records";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 
 export async function verifyBayaranDrafts(
@@ -68,31 +68,18 @@ export async function verifyBayaranDrafts(
     return { verifiedRows: 0, failedMessages };
   }
 
-  const transactionNos = await generateTransactionNos(tx, rowsToVerify.length);
-  const paymentRows = rowsToVerify.map((row) => ({
-    id: randomUUID(),
-    residentId: row.residentId,
-    paymentDate: row.draft.paymentDate,
-    receiptNo: row.receiptNo,
-    amount: row.draft.amount,
-    description: row.draft.description,
-  }));
-
-  await tx.payment.createMany({ data: paymentRows });
-
-  await tx.transaction.createMany({
-    data: rowsToVerify.map((row, index) => ({
-      transactionNo: transactionNos[index],
+  await createPaymentRecords(
+    tx,
+    rowsToVerify.map((row) => ({
       residentId: row.residentId,
-      paymentId: paymentRows[index].id,
-      transactionDate: row.draft.paymentDate,
-      category: "BAYARAN",
-      creditAmount: row.draft.amount,
-      debitAmount: 0,
+      paymentDate: row.draft.paymentDate,
       receiptNo: row.receiptNo,
-      description: row.draft.description ?? "Bayaran daripada muat naik.",
+      amount: row.draft.amount,
+      description: row.draft.description,
+      uploadedDocumentId,
+      source: "uploaded",
     })),
-  });
+  );
 
   await tx.paymentDraft.deleteMany({
     where: { id: { in: rowsToVerify.map((row) => row.draft.id) } },

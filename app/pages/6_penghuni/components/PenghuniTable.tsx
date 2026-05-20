@@ -94,7 +94,15 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
         if (!targetId) return;
         didAutoOpenRef.current = true;
         const found = residents.find((r) => r.id === targetId);
-        if (found) setSelectedResident(found);
+        if (!found) return;
+
+        const timer = window.setTimeout(() => {
+            setSelectedResident(found);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
     }, [isLoading, residents, searchParams]);
 
     // Handlers for Updating & Deleting Residents
