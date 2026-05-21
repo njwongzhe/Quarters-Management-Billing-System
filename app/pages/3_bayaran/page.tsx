@@ -1,8 +1,11 @@
 import Icon from "@/app/components/Icon/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
+import BayaranDownload, {
+  type BayaranExportRow,
+} from "./components/BayaranDownload";
+import BayaranFilterShell from "./components/BayaranFilterShell";
 import BayaranRowActions from "./components/BayaranRowActions";
 
 const statTemplates = [
@@ -140,29 +143,17 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
   const currentPage = Math.max(1, Number(resolvedSearchParams?.page) || 1);
   const offset = (currentPage - 1) * ROWS_PER_PAGE;
   const filterWhere = buildPaymentFilterWhere(filters);
-  const [quarterOptions, { rows: payments, totalRecords, paymentStats }] =
-    await Promise.all([
-      getQuarterOptions(),
-      getFilteredPaymentPage(filterWhere, offset),
-    ]);
-  const rows = payments.map((payment): BayaranRow => {
-    const paymentAmount = Number(payment.amount);
-    const arrearsAmount =
-      payment.totalArrearsAmount === null
-        ? null
-        : Number(payment.totalArrearsAmount);
-
-    return {
-      id: payment.id,
-      name: payment.fullName ?? payment.extractedName ?? "N/A",
-      ic: payment.icNumber ?? payment.extractedIcNumber ?? "N/A",
-      quarters: payment.categoryName ?? payment.extractedKuarters ?? "N/A",
-      unit: payment.unitCode ?? payment.extractedUnit ?? "N/A",
-      arrears: arrearsAmount === null ? "N/A" : formatMoney(arrearsAmount),
-      amount: formatMoney(paymentAmount),
-      tone: getPaymentTone(arrearsAmount),
-    };
-  });
+  const [
+    quarterOptions,
+    { rows: payments, totalRecords, paymentStats },
+    exportPayments,
+  ] = await Promise.all([
+    getQuarterOptions(),
+    getFilteredPaymentPage(filterWhere, offset),
+    getPaymentExportRows(filterWhere),
+  ]);
+  const rows = payments.map(mapPaymentRow);
+  const exportRows = exportPayments.map(mapPaymentExportRow);
 
   const stats = buildStats(paymentStats);
   const visibleRows = rows;
@@ -217,114 +208,101 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
           ))}
         </div>
 
-        <div className="rounded-xl bg-light-blue p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-          <div className="mb-5 flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-extrabold leading-tight text-[#07162F]">
-                Senarai Rekod Bayaran
-              </h2>
-              <p className="text-xs font-medium text-[#344054]">
-                Rekod bayaran terkini.
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <ToolbarButton icon="download" label="Muat turun rekod bayaran" />
-              <ToolbarButton icon="filter" label="Tapis rekod bayaran" />
-            </div>
-          </div>
-
-          <form
-            action="/pages/3_bayaran"
-            className="relative rounded-t-xl bg-white px-6 pb-7 pt-5 shadow-sm"
-          >
-            <span className="absolute right-9 top-[-11px] h-0 w-0 border-x-[12px] border-b-[12px] border-x-transparent border-b-white" />
-            <input type="hidden" name="statusMode" value="1" />
-            <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-6">
-              <Field
-                name="nama"
-                label="Nama"
-                placeholder="Cth: Ahmad Zaki"
-                defaultValue={filters.nama}
-              />
-              <Field
-                name="ic"
-                label="No. K/P"
-                placeholder="Cth: 850212-01-XXXX"
-                defaultValue={filters.ic}
-              />
-              <label className="flex flex-col gap-2">
-                <span className="text-[9px] font-extrabold uppercase text-[#667085]">
-                  Kelas Kuarters
-                </span>
-                <select
-                  name="kelas"
-                  defaultValue={filters.kelas}
-                  className="h-9 rounded border border-[#E2E7F1] bg-[#F3F6FC] px-3 text-[11px] font-semibold text-[#4B5567] outline-none"
-                  suppressHydrationWarning
-                >
-                  <option value="">Semua Kelas</option>
-                  {quarterOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Field
-                name="unit"
-                label="Unit Kuarters"
-                placeholder="Cth: Blok A-01-01"
-                defaultValue={filters.unit}
-              />
-            </div>
-
-            <div className="mt-7 flex items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-4">
-                {statusFilters.map((status) => (
-                  <label
-                    key={status.value}
-                    className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-extrabold text-[#172033]"
+        <BayaranFilterShell
+          downloadButton={<BayaranDownload exportRows={exportRows} />}
+          filterForm={(
+            <form
+              action="/pages/3_bayaran"
+              className="relative rounded-t-xl bg-white px-6 pb-7 pt-5 shadow-sm"
+            >
+              <span className="absolute right-2 top-[-11px] h-0 w-0 border-x-[12px] border-b-[12px] border-x-transparent border-b-white" />
+              <input type="hidden" name="statusMode" value="1" />
+              <div className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-6">
+                <Field
+                  name="nama"
+                  label="Nama"
+                  placeholder="Cth: Ahmad Zaki"
+                  defaultValue={filters.nama}
+                />
+                <Field
+                  name="ic"
+                  label="No. K/P"
+                  placeholder="Cth: 850212-01-XXXX"
+                  defaultValue={filters.ic}
+                />
+                <label className="flex flex-col gap-2">
+                  <span className="text-[9px] font-extrabold uppercase text-[#667085]">
+                    Kelas Kuarters
+                  </span>
+                  <select
+                    name="kelas"
+                    defaultValue={filters.kelas}
+                    className="h-9 rounded border border-[#E2E7F1] bg-[#F3F6FC] px-3 text-[11px] font-semibold text-[#4B5567] outline-none"
+                    suppressHydrationWarning
                   >
-                    <input
-                      type="checkbox"
-                      name="status"
-                      value={status.value}
-                      defaultChecked={isStatusChecked(filters, status.value)}
-                      className="peer sr-only"
-                    />
-                    <span
-                      className={[
-                        "flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border border-[#D0D5DD] bg-white text-transparent transition-colors peer-checked:border-transparent peer-checked:text-white",
-                        status.checkedClass,
-                      ].join(" ")}
-                    >
-                      <Icon icon="check" size={11} weight={700} />
-                    </span>
-                    {status.label}
-                  </label>
-                ))}
+                    <option value="">Semua Kelas</option>
+                    {quarterOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Field
+                  name="unit"
+                  label="Unit Kuarters"
+                  placeholder="Cth: Blok A-01-01"
+                  defaultValue={filters.unit}
+                />
               </div>
-              <div className="flex items-center gap-7">
-                <Link
-                  href="/pages/3_bayaran"
-                  className="text-[11px] font-semibold text-[#667085]"
-                  suppressHydrationWarning
-                >
-                  Set Semula
-                </Link>
-                <button
-                  type="submit"
-                  className="inline-flex h-10 min-w-29 items-center justify-center gap-2 rounded bg-dark-blue px-5 text-xs font-extrabold text-white shadow-[0_8px_14px_rgba(21,30,102,0.22)]"
-                  suppressHydrationWarning
-                >
-                  <Icon icon="search" size={15} weight={600} />
-                  Cari
-                </button>
-              </div>
-            </div>
-          </form>
 
-          <div className="overflow-hidden rounded-b-xl bg-white shadow-sm">
+              <div className="mt-7 flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  {statusFilters.map((status) => (
+                    <label
+                      key={status.value}
+                      className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-extrabold text-[#172033]"
+                    >
+                      <input
+                        type="checkbox"
+                        name="status"
+                        value={status.value}
+                        defaultChecked={isStatusChecked(filters, status.value)}
+                        className="peer sr-only"
+                      />
+                      <span
+                        className={[
+                          "flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border border-[#D0D5DD] bg-white text-transparent transition-colors peer-checked:border-transparent peer-checked:text-white",
+                          status.checkedClass,
+                        ].join(" ")}
+                      >
+                        <Icon icon="check" size={11} weight={700} />
+                      </span>
+                      {status.label}
+                    </label>
+                  ))}
+                </div>
+                <div className="flex items-center gap-7">
+                  <Link
+                    href="/pages/3_bayaran"
+                    className="text-[11px] font-semibold text-[#667085]"
+                    suppressHydrationWarning
+                  >
+                    Set Semula
+                  </Link>
+                  <button
+                    type="submit"
+                    className="inline-flex h-10 min-w-29 items-center justify-center gap-2 rounded bg-dark-blue px-5 text-xs font-extrabold text-white shadow-[0_8px_14px_rgba(21,30,102,0.22)]"
+                    suppressHydrationWarning
+                  >
+                    <Icon icon="search" size={15} weight={600} />
+                    Cari
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        >
             <table className="w-full table-fixed border-collapse text-left">
               <thead className="bg-[#F6F8FD] text-[9px] font-extrabold uppercase tracking-[0.06em] text-[#667085]">
                 <tr>
@@ -431,8 +409,7 @@ export default async function BayaranPage({ searchParams }: BayaranPageProps) {
                 {totalRecordCount.toLocaleString("ms-MY")} Rekod
               </p>
             </div>
-          </div>
-        </div>
+        </BayaranFilterShell>
       </div>
     </section>
   );
@@ -516,6 +493,39 @@ async function getFilteredPaymentPage(filterWhere: Prisma.Sql, offset: number) {
         tidakLengkap: BigInt(0),
       },
   };
+}
+
+async function getPaymentExportRows(filterWhere: Prisma.Sql) {
+  return prisma.$queryRaw<PaymentQueryRow[]>(Prisma.sql`
+    WITH ${latestPaymentsCte()}
+    SELECT
+      p."id",
+      p."residentId",
+      r."fullName",
+      r."icNumber",
+      qc."categoryName",
+      u."unitCode",
+      penghuni_record."nama" AS "extractedName",
+      penghuni_record."noKadPengenalan" AS "extractedIcNumber",
+      penghuni_record."kuarters" AS "extractedKuarters",
+      penghuni_record."unit" AS "extractedUnit",
+      qc."rentalPrice",
+      qc."maintenancePrice",
+      a."totalArrearsAmount",
+      p."amount"
+    FROM latest_payments p
+    ${paymentBaseJoins()}
+    ${filterWhere}
+    ORDER BY
+      CASE
+        WHEN u."id" IS NOT NULL THEN 0
+        WHEN NULLIF(penghuni_record."kuarters", '') IS NOT NULL
+          AND NULLIF(penghuni_record."unit", '') IS NOT NULL THEN 1
+        ELSE 2
+      END,
+      p."paymentDate" DESC,
+      p."createdAt" DESC
+  `);
 }
 
 function latestPaymentsCte() {
@@ -800,6 +810,37 @@ function buildStats(stats: PaymentStatsQueryRow) {
   }));
 }
 
+function mapPaymentRow(payment: PaymentQueryRow): BayaranRow {
+  const paymentAmount = normalizeAmount(payment.amount);
+  const arrearsAmount = normalizeNullableAmount(payment.totalArrearsAmount);
+
+  return {
+    id: payment.id,
+    name: payment.fullName ?? payment.extractedName ?? "N/A",
+    ic: payment.icNumber ?? payment.extractedIcNumber ?? "N/A",
+    quarters: payment.categoryName ?? payment.extractedKuarters ?? "N/A",
+    unit: payment.unitCode ?? payment.extractedUnit ?? "N/A",
+    arrears: arrearsAmount === null ? "N/A" : formatMoney(arrearsAmount),
+    amount: formatMoney(paymentAmount),
+    tone: getPaymentTone(arrearsAmount),
+  };
+}
+
+function mapPaymentExportRow(payment: PaymentQueryRow): BayaranExportRow {
+  const arrearsAmount = normalizeNullableAmount(payment.totalArrearsAmount);
+  const amount = normalizeAmount(payment.amount);
+
+  return {
+    name: payment.fullName ?? payment.extractedName ?? "N/A",
+    ic: payment.icNumber ?? payment.extractedIcNumber ?? "N/A",
+    quarters: payment.categoryName ?? payment.extractedKuarters ?? "N/A",
+    unit: payment.unitCode ?? payment.extractedUnit ?? "N/A",
+    arrearsAmount,
+    amount,
+    status: getPaymentStatusLabel(arrearsAmount),
+  };
+}
+
 function getPaymentTone(arrearsAmount: number | null): PaymentStatus {
   if (arrearsAmount === null || !Number.isFinite(arrearsAmount)) {
     return "purple";
@@ -814,6 +855,38 @@ function getPaymentTone(arrearsAmount: number | null): PaymentStatus {
   }
 
   return "green";
+}
+
+function getPaymentStatusLabel(arrearsAmount: number | null) {
+  if (arrearsAmount === null || !Number.isFinite(arrearsAmount)) {
+    return "Data Tidak Lengkap";
+  }
+
+  if (arrearsAmount < 0) {
+    return "Lebihan Bayaran";
+  }
+
+  if (arrearsAmount > 0) {
+    return "Kurang Bayaran";
+  }
+
+  return "Cukup Bayaran";
+}
+
+function normalizeNullableAmount(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const amount = Number(value);
+
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function normalizeAmount(value: unknown) {
+  const amount = Number(value);
+
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 function formatMoney(value: number) {
