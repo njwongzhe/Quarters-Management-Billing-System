@@ -1,11 +1,50 @@
 import Icon from "@/app/components/Icon/Icon";
+import { InputField, InputFieldFormat } from "@/app/components/InputField";
 
 import {
-  ProfileField,
   ProfileSegmentedField,
-  ReadOnlyProfileField,
 } from "./ProfileFields";
 import type { AdminProfile, ProfileForm } from "./profileTypes";
+
+function formatPhoneForDisplay(phoneNumber: string) {
+  const digits = phoneNumber.replace(/\D/g, "");
+
+  if (!digits) {
+    return "-";
+  }
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 7) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)} ${digits.slice(7)}`;
+}
+
+function ProfileValueRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 text-[8px] font-bold uppercase tracking-[0.9px] text-[#95A3B8]">
+        {label}
+      </div>
+      <div className="flex min-h-5 items-center gap-2 text-xs text-[#0B1C30]">
+        <Icon icon={icon} size={14} className="text-[#8AA0BD]" />
+        {value || "-"}
+      </div>
+    </div>
+  );
+}
 
 export default function ProfileInfoCard({
   profile,
@@ -29,32 +68,66 @@ export default function ProfileInfoCard({
     >
       <h2 className="mb-7 flex items-center gap-2 text-xs font-extrabold">
         <Icon icon="badge" size={15} />
-        Maklumat Perhubungan
+        MAKLUMAT PERHUBUNGAN
       </h2>
 
-      <div className="flex flex-col gap-4.5">
-        <ProfileField
-          icon="person"
-          label="Nama Penuh"
-          value={profileForm.fullName}
-          isEditing={isEditingProfile}
-          onChange={(value) =>
-            onProfileFormChange({ ...profileForm, fullName: value })
-          }
-          required
-        />
-        <ProfileField
-          icon="apartment"
-          label="Jabatan / Unit"
-          value={profileForm.department}
-          isEditing={isEditingProfile}
-          onChange={(value) =>
-            onProfileFormChange({ ...profileForm, department: value })
-          }
-        />
+      <div
+        className={`overflow-hidden transition-[max-height] duration-300 ease-out ${
+          isEditingProfile ? "max-h-176" : "max-h-112"
+        }`}
+      >
+        <div className="flex flex-col gap-4.5">
+        {/* Name */}
+        {isEditingProfile ? (
+          <InputField
+            label="NAMA PENUH"
+            value={profileForm.fullName}
+            state="active"
+            onChange={(value) =>
+              onProfileFormChange({ ...profileForm, fullName: value })
+            }
+            leadingIcon={<Icon icon="person" size={14} className="text-[#8AA0BD]" />}
+            labelFontSize={8}
+            inputFontSize={12}
+            inputMinHeight={40}
+            className="tracking-normal"
+            required
+          />
+        ) : (
+          <ProfileValueRow
+            icon="person"
+            label="NAMA PENUH"
+            value={profileForm.fullName || "-"}
+          />
+        )}
+
+        {/* Department & Unit */}
+        {isEditingProfile ? (
+          <InputField
+            label="JABATAN / UNIT"
+            value={profileForm.department}
+            state="active"
+            onChange={(value) =>
+              onProfileFormChange({ ...profileForm, department: value })
+            }
+            leadingIcon={<Icon icon="apartment" size={14} className="text-[#8AA0BD]" />}
+            labelFontSize={8}
+            inputFontSize={12}
+            inputMinHeight={40}
+            className="tracking-normal"
+          />
+        ) : (
+          <ProfileValueRow
+            icon="apartment"
+            label="JABATAN / UNIT"
+            value={profileForm.department || "-"}
+          />
+        )}
+
+        {/* Gender */}
         <ProfileSegmentedField
           icon="wc"
-          label="Jantina"
+          label="JANTINA"
           value={profileForm.gender}
           isEditing={isEditingProfile}
           options={[
@@ -66,34 +139,52 @@ export default function ProfileInfoCard({
             onProfileFormChange({ ...profileForm, gender: value })
           }
         />
-        <ReadOnlyProfileField
+        <ProfileValueRow
           icon="email"
-          label="Alamat Emel"
+          label="ALAMAT EMEL"
           value={profile?.email ?? "-"}
         />
-        <ProfileField
-          icon="phone"
-          label="Nombor Telefon"
-          value={profileForm.phoneNumber}
-          isEditing={isEditingProfile}
-          onChange={(value) =>
-            onProfileFormChange({ ...profileForm, phoneNumber: value })
-          }
-        />
+
+        {/* Phone Number */}
+        {isEditingProfile ? (
+          <InputFieldFormat
+            label="NOMBOR TELEFON"
+            format="###-#### ####"
+            value={profileForm.phoneNumber}
+            state="active"
+            onChange={(value) =>
+              onProfileFormChange({ ...profileForm, phoneNumber: value })
+            }
+            leadingIcon={<Icon icon="phone" size={14} className="text-[#8AA0BD]" />}
+            labelFontSize={8}
+            inputFontSize={12}
+            inputMinHeight={40}
+            className="tracking-normal"
+          />
+        ) : (
+          <ProfileValueRow
+            icon="phone"
+            label="NOMBOR TELEFON"
+            value={formatPhoneForDisplay(profileForm.phoneNumber)}
+          />
+        )}
+
+        {/* Save Button */}
+        {isEditingProfile ? (
+          <div className="flex justify-end pt-3">
+            <button
+              type="submit"
+              disabled={isSavingProfile}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-[3px] bg-dark-blue px-5 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Icon icon="save" size={14} />
+              {isSavingProfile ? "Menyimpan..." : "Simpan Profil"}
+            </button>
+          </div>
+        ) : null}
+        </div>
       </div>
 
-      {isEditingProfile ? (
-        <div className="mt-7 flex justify-end">
-          <button
-            type="submit"
-            disabled={isSavingProfile}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-[3px] bg-dark-blue px-5 text-[11px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Icon icon="save" size={14} />
-            {isSavingProfile ? "Menyimpan..." : "Simpan Profil"}
-          </button>
-        </div>
-      ) : null}
     </form>
   );
 }

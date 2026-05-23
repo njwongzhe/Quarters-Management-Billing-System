@@ -39,7 +39,7 @@ export default function ProfileHeaderCard({
 
         <button
           type="button"
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[3px] bg-dark-blue px-4 text-[11px] font-extrabold text-white transition hover:-translate-y-0.5 hover:opacity-90"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[3px] bg-dark-blue px-4 text-[11px] font-bold text-white transition hover:-translate-y-0.5 hover:opacity-90"
           onClick={onToggleEdit}
         >
           <Icon icon={isEditingProfile ? "close" : "edit"} size={14} />
