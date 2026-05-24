@@ -28,6 +28,11 @@ import {
 } from "./kuartersUnitHelpers";
 import KuartersUnitDetailsOverlay from "./KuartersUnitDetailsOverlay";
 
+type UnitOccupancyHistoryState = {
+  unitId: string;
+  records: QuarterUnitOccupancyDetails[];
+} | null;
+
 type KuartersUnitsPanelProps = {
   units: QuarterUnitRecord[];
   exportUnits: QuarterUnitRecord[];
@@ -38,6 +43,7 @@ type KuartersUnitsPanelProps = {
   currentPage: number;
   editor: KuartersUnitEditorState | null;
   filterQuery: string;
+  targetUnitId?: string;
   statusFilter: QuarterUnitStatusFilter[];
   selectedResidentOccupancyRanges: AvailableResidentOccupancyRecord[];
   hasActiveFilters: boolean;
@@ -125,6 +131,7 @@ export default function KuartersUnitsPanel({
   currentPage,
   editor,
   filterQuery,
+  targetUnitId = "",
   statusFilter,
   selectedResidentOccupancyRanges,
   hasActiveFilters,
@@ -151,7 +158,10 @@ export default function KuartersUnitsPanel({
 }: KuartersUnitsPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
-  const [unitOccupancyHistory, setUnitOccupancyHistory] = useState<QuarterUnitOccupancyDetails[]>([]);
+  const targetUnitRowRef = useRef<HTMLTableRowElement | null>(null);
+  const lastScrolledTargetUnitIdRef = useRef<string | null>(null);
+  const [unitOccupancyHistory, setUnitOccupancyHistory] =
+    useState<UnitOccupancyHistoryState>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLDivElement | null>(null);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
@@ -168,7 +178,6 @@ export default function KuartersUnitsPanel({
 
   useEffect(() => {
     if (editor?.mode !== "edit") {
-      setUnitOccupancyHistory([]);
       return;
     }
 
@@ -179,9 +188,15 @@ export default function KuartersUnitsPanel({
       .then((res) => res.json())
       .then((payload: { success: boolean; data?: { unit?: { occupancyHistory?: QuarterUnitOccupancyDetails[] } } }) => {
         if (payload.success && payload.data?.unit?.occupancyHistory) {
-          setUnitOccupancyHistory(payload.data.unit.occupancyHistory);
+          setUnitOccupancyHistory({
+            unitId,
+            records: payload.data.unit.occupancyHistory,
+          });
         } else {
-          setUnitOccupancyHistory([]);
+          setUnitOccupancyHistory({
+            unitId,
+            records: [],
+          });
         }
       })
       .catch(() => { /* aborted or failed — silently keep previous state */ });
@@ -267,6 +282,26 @@ export default function KuartersUnitsPanel({
       searchInputRef.current?.querySelector("input")?.focus();
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (!targetUnitId || isLoading) {
+      return;
+    }
+
+    const targetRow = targetUnitRowRef.current;
+
+    if (!targetRow || lastScrolledTargetUnitIdRef.current === targetUnitId) {
+      return;
+    }
+
+    lastScrolledTargetUnitIdRef.current = targetUnitId;
+    window.setTimeout(() => {
+      targetRow.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  }, [isLoading, targetUnitId, units]);
 
   function renderActionCell(unit: QuarterUnitRecord, isEditing: boolean) {
     if (isEditing) {
@@ -624,12 +659,30 @@ export default function KuartersUnitsPanel({
                 const draftOccupantName = isEditing
                   ? editor.draft.occupantName.trim()
                   : "";
+                const activeUnitOccupancyHistory =
+                  unitOccupancyHistory?.unitId === unit.id
+                    ? unitOccupancyHistory.records
+                    : [];
 
                 return (
                   <tr
                     key={unit.id}
-                    ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 ${isEditing ? "bg-dark-blue/3" : ""}`}
+                    ref={(node) => {
+                      if (isEditing) {
+                        editingRowRef.current = node;
+                      }
+
+                      if (unit.id === targetUnitId) {
+                        targetUnitRowRef.current = node;
+                      }
+                    }}
+                    className={`border-t border-light-grey/20 ${
+                      unit.id === targetUnitId
+                        ? "bg-dark-blue/8 ring-2 ring-inset ring-dark-blue/20"
+                        : isEditing
+                          ? "bg-dark-blue/3"
+                          : ""
+                    }`}
                   >
                     <td
                       className={`overflow-hidden text-sm font-semibold text-dark-grey align-middle w-min whitespace-nowrap
@@ -694,7 +747,7 @@ export default function KuartersUnitsPanel({
                           value={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
                           required
-                          occupancyHistory={unitOccupancyHistory}
+                          occupancyHistory={activeUnitOccupancyHistory}
                           residentOccupancyHistory={filteredResidentOccupancyRanges}
                           onChange={(value) => onDraftChange("moveInDate", value)}
                         />
@@ -715,7 +768,7 @@ export default function KuartersUnitsPanel({
                           value={editor.draft.moveOutDate}
                           moveInDate={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
-                          occupancyHistory={unitOccupancyHistory}
+                          occupancyHistory={activeUnitOccupancyHistory}
                           residentOccupancyHistory={filteredResidentOccupancyRanges}
                           onChange={(value) => onDraftChange("moveOutDate", value)}
                         />

@@ -6,16 +6,7 @@ import {
   type XlsxCell,
   type XlsxSheet,
 } from "@/lib/download/xlsx-export";
-
-export type BayaranExportRow = {
-  name: string;
-  ic: string;
-  quarters: string;
-  unit: string;
-  arrearsAmount: number | null;
-  amount: number;
-  status: string;
-};
+import type { BayaranExportRow } from "@/lib/payments/bayaran-types";
 
 type BayaranDownloadProps = {
   exportRows: BayaranExportRow[];

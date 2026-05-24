@@ -1,6 +1,11 @@
 import { Prisma, TransactionStatus, TransactionCategory } from "@prisma/client";
 import { prisma } from "../prisma";
 
+type TransactionNoClient = Pick<
+  Prisma.TransactionClient,
+  "$executeRaw" | "transaction"
+>;
+
 // ==========================================
 // 1. TYPES & INTERFACES
 // ==========================================
@@ -178,9 +183,9 @@ export async function adjustTransaction(
     const isDebitOriginal = Number(original.debitAmount) > 0;
     const originalAmount = isDebitOriginal ? Number(original.debitAmount) : Number(original.creditAmount);
     
-    const pastPelarasans = original.childTransactions.filter((c: any) => c.status === "PELARASAN");
-    const totalPastDebit = pastPelarasans.reduce((sum: number, c: any) => sum + Number(c.debitAmount), 0);
-    const totalPastCredit = pastPelarasans.reduce((sum: number, c: any) => sum + Number(c.creditAmount), 0);
+    const pastPelarasans = original.childTransactions.filter((c) => c.status === "PELARASAN");
+    const totalPastDebit = pastPelarasans.reduce((sum, c) => sum + Number(c.debitAmount), 0);
+    const totalPastCredit = pastPelarasans.reduce((sum, c) => sum + Number(c.creditAmount), 0);
     
     let currentNet = originalAmount;
     if (isDebitOriginal) {
@@ -239,12 +244,14 @@ export async function adjustTransaction(
  * Generates a custom transaction ID: YYYYMMDD-0000000X
  * We pass the `txClient` so it works safely inside Prisma $transactions.
  */
-export async function generateTransactionNo(txClient: any = prisma): Promise<string> {
+export async function generateTransactionNo(
+  txClient: TransactionNoClient = prisma,
+): Promise<string> {
   return (await generateTransactionNos(txClient, 1))[0];
 }
 
 export async function generateTransactionNos(
-  txClient: any = prisma,
+  txClient: TransactionNoClient = prisma,
   count = 1,
 ): Promise<string[]> {
   const totalCount = Math.max(0, Math.floor(count));
@@ -252,6 +259,10 @@ export async function generateTransactionNos(
   if (totalCount === 0) {
     return [];
   }
+
+  await txClient.$executeRaw(
+    Prisma.sql`SELECT pg_advisory_xact_lock(724019337)`,
+  );
 
   const today = new Date();
   

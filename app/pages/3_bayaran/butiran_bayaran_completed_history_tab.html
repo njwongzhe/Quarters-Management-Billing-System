@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Butiran Bayaran</title>
+  <style>
+    :root {
+      --navy: #171f6f;
+      --navy-2: #11195f;
+      --page-bg: #eef4ff;
+      --field-bg: #edf3ff;
+      --field-border: #d9e0ef;
+      --text: #101827;
+      --muted: #72747f;
+      --muted-2: #9aa7ba;
+      --green: #00875a;
+      --danger: #ff5757;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(0,0,0,.88) 0 46%, rgba(0,0,0,.98) 70%),
+        #050505;
+    }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 42px;
+    }
+
+    .stage {
+      width: min(1188px, 100%);
+      position: relative;
+      filter: drop-shadow(0 52px 58px rgba(0,0,0,.68));
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: -44px -76px -90px;
+      border-radius: 38px;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at center, transparent 0 56%, rgba(255,255,255,.08) 57%, transparent 72%),
+        radial-gradient(ellipse at center, rgba(0,0,0,.75), rgba(0,0,0,.95));
+      opacity: .9;
+      z-index: -2;
+    }
+
+    .modal {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 16px;
+      background: var(--page-bg);
+    }
+
+    .modal-header {
+      height: 123px;
+      padding: 35px 32px 0;
+      background: var(--navy);
+      color: #fff;
+      position: relative;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1.04;
+      font-weight: 800;
+      letter-spacing: -.35px;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      font-size: 15px;
+      letter-spacing: 2px;
+      font-weight: 500;
+      color: rgba(255,255,255,.68);
+      text-transform: uppercase;
+    }
+
+    .close {
+      position: absolute;
+      right: 37px;
+      top: 47px;
+      width: 24px;
+      height: 24px;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .close::before,
+    .close::after {
+      content: "";
+      position: absolute;
+      left: 11px;
+      top: 0;
+      width: 3px;
+      height: 24px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      transform: rotate(45deg);
+    }
+
+    .close::after {
+      transform: rotate(-45deg);
+    }
+
+    .tabs {
+      height: 72px;
+      background: white;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 44px;
+      border-bottom: 1px solid rgba(198,197,210,.32);
+    }
+
+    .tab {
+      height: 72px;
+      padding: 0 0 24px;
+      display: flex;
+      align-items: flex-end;
+      border: 0;
+      background: transparent;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #7d7e88;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      color: var(--navy-2);
+    }
+
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      background: var(--navy-2);
+    }
+
+    .content {
+      padding: 43px 42px 42px;
+      min-height: 755px;
+      background: var(--page-bg);
+    }
+
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 33px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #25347f;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+
+    .section-title::before {
+      content: "";
+      display: block;
+      width: 5px;
+      height: 22px;
+      background: #314ba6;
+      border-radius: 1px;
+    }
+
+    .profile-link {
+      color: var(--navy-2);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding-right: 2px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .profile-link::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-top: 2px solid currentColor;
+      border-right: 2px solid currentColor;
+      transform: rotate(45deg);
+      margin-top: -1px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr .46fr;
+      gap: 33px 32px;
+      align-items: end;
+    }
+
+    .date-status-row {
+      display: grid;
+      grid-template-columns: .72fr .72fr 1.55fr;
+      gap: 32px;
+      grid-column: 1 / -1;
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field.wide {
+      grid-column: span 1;
+    }
+
+    .field.unit {
+      grid-column: span 2;
+    }
+
+    .field-label {
+      margin: 0 0 12px 4px;
+      color: #757782;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .field-box {
+      height: 61px;
+      border: 1px solid var(--field-border);
+      background: rgba(239,244,255,.86);
+      border-radius: 10px;
+      padding: 0 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 18px;
+      font-weight: 500;
+      color: #0d1828;
+    }
+
+    .field-box.small {
+      max-width: 100%;
+    }
+
+    .field-box.muted {
+      color: #8b9bb0;
+    }
+
+    .field-box.strong {
+      color: var(--navy-2);
+      font-weight: 800;
+    }
+
+    .field-box.success {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .external {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      margin-left: 16px;
+      position: relative;
+      opacity: .42;
+    }
+
+    .external::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      bottom: 2px;
+      width: 10px;
+      height: 10px;
+      border: 2px solid #718099;
+      border-radius: 1px;
+    }
+
+    .external::after {
+      content: "↗";
+      position: absolute;
+      right: 0;
+      top: -6px;
+      font-size: 17px;
+      color: #718099;
+      font-weight: 800;
+    }
+
+    .payment-section {
+      margin-top: 6px;
+    }
+
+    .payment-card {
+      height: 172px;
+      border-radius: 18px;
+      background: var(--navy);
+      color: white;
+      padding: 27px 22px 21px;
+      box-shadow: 0 26px 36px rgba(34,43,113,.18);
+      position: relative;
+    }
+
+    .payment-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 31px;
+      border-bottom: 1px solid rgba(255,255,255,.13);
+      padding-bottom: 17px;
+      margin-bottom: 23px;
+    }
+
+    .payment-label {
+      color: rgba(255,255,255,.68);
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: 2.4px;
+      text-transform: uppercase;
+    }
+
+    .payment-value {
+      font-size: 21px;
+      font-weight: 800;
+      line-height: 1;
+      padding-right: 1px;
+    }
+
+    .arrears-label {
+      color: rgba(255,255,255,.66);
+      font-size: 12px;
+      letter-spacing: 4px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .arrears-value {
+      color: var(--danger);
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: -.7px;
+    }
+
+    .alert {
+      position: absolute;
+      right: 21px;
+      bottom: 21px;
+      width: 74px;
+      height: 74px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.10);
+      display: grid;
+      place-items: center;
+      font-size: 51px;
+      font-weight: 900;
+      line-height: .8;
+      color: #fff;
+      padding-bottom: 5px;
+    }
+
+    .history-panel {
+      display: none;
+      color: #0f1728;
+    }
+
+    .content[data-tab="history"] {
+      padding: 39px 42px 34px;
+      min-height: 397px;
+    }
+
+    .content[data-tab="history"] .main-panel {
+      display: none;
+    }
+
+    .content[data-tab="history"] .history-panel {
+      display: block;
+    }
+
+    .history-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 31px;
+    }
+
+    .history-actions {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+      padding-right: 38px;
+      color: #747781;
+    }
+
+    .icon-button {
+      width: 22px;
+      height: 22px;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: inherit;
+      cursor: pointer;
+      position: relative;
+      opacity: .95;
+    }
+
+    .icon-button.download::before {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 2px;
+      width: 3px;
+      height: 12px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .icon-button.download::after {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 10px;
+      width: 11px;
+      height: 11px;
+      border-left: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+    }
+
+    .download-line {
+      position: absolute;
+      left: 3px;
+      bottom: 1px;
+      width: 16px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .icon-button.filter::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 18px;
+      height: 9px;
+      border-left: 2px solid currentColor;
+      border-right: 2px solid currentColor;
+      border-top: 2px solid currentColor;
+      transform: perspective(24px) rotateX(28deg);
+      clip-path: polygon(0 0, 100% 0, 60% 100%, 40% 100%);
+    }
+
+    .icon-button.filter::after {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 12px;
+      width: 3px;
+      height: 8px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+
+    .history-card {
+      background: rgba(255,255,255,.92);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .payment-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .payment-table thead {
+      background: #f8fafc;
+      border-bottom: 1px solid #e7ebf3;
+    }
+
+    .payment-table th {
+      height: 53px;
+      padding: 0 25px;
+      text-align: left;
+      color: #777984;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .65px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .payment-table th.amount-head,
+    .payment-table td.amount {
+      text-align: right;
+    }
+
+    .payment-table tbody tr {
+      height: 52px;
+      border-bottom: 1px solid #eef1f7;
+    }
+
+    .payment-table tbody tr:last-child {
+      border-bottom: 0;
+    }
+
+    .payment-table td {
+      padding: 0 25px;
+      font-size: 14px;
+      color: #414652;
+      vertical-align: middle;
+    }
+
+    .payment-table td.date {
+      color: #0d1a2c;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .payment-table td.id,
+    .payment-table td.receipt {
+      font-size: 11px;
+      letter-spacing: .25px;
+    }
+
+    .payment-table td.amount {
+      color: #00994d;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .history-footer {
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fbfcff;
+      padding: 0 25px;
+      border-top: 1px solid #f0f2f8;
+    }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .page-btn,
+    .page-more {
+      min-width: 34px;
+      height: 34px;
+      border-radius: 5px;
+      border: 1px solid #edf1f8;
+      background: white;
+      color: #6e7481;
+      font-size: 13px;
+      font-weight: 600;
+      display: grid;
+      place-items: center;
+    }
+
+    .page-btn {
+      cursor: pointer;
+    }
+
+    .page-btn.active {
+      border-color: var(--navy);
+      background: var(--navy);
+      color: white;
+      font-weight: 800;
+    }
+
+    .page-btn.chevron {
+      font-size: 22px;
+      line-height: 1;
+      color: #b9c0cb;
+    }
+
+    .page-more {
+      border-color: transparent;
+      background: transparent;
+      color: #b7bfcc;
+    }
+
+    .history-summary {
+      color: #3e424d;
+      font-size: 13px;
+      font-weight: 500;
+      padding-right: 1px;
+    }
+
+    @media (max-width: 900px) {
+      .content[data-tab="history"] {
+        padding: 28px 18px;
+      }
+
+      .history-head {
+        align-items: flex-start;
+        gap: 14px;
+      }
+
+      .history-actions {
+        padding-right: 0;
+      }
+
+      .history-card {
+        overflow-x: auto;
+      }
+
+      .payment-table {
+        min-width: 760px;
+      }
+
+      .history-footer {
+        min-width: 760px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      body {
+        padding: 18px;
+      }
+
+      .modal-header {
+        height: auto;
+        min-height: 116px;
+        padding: 30px 24px;
+      }
+
+      .tabs {
+        gap: 24px;
+      }
+
+      .tab {
+        font-size: 14px;
+      }
+
+      .content {
+        padding: 32px 24px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .field.unit {
+        grid-column: span 1;
+      }
+
+      .date-status-row {
+        grid-template-columns: 1fr;
+        grid-column: span 1;
+      }
+
+      .payment-card {
+        height: auto;
+        min-height: 172px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="modal" role="dialog" aria-labelledby="dialogTitle">
+      <header class="modal-header">
+        <h1 id="dialogTitle" class="title">BUTIRAN BAYARAN</h1>
+        <div class="subtitle">MAKLUMAT TERPERINCI PEMBAYARAN SEMASA</div>
+        <button class="close" type="button" aria-label="Tutup"></button>
+      </header>
+
+      <nav class="tabs" aria-label="Payment tabs">
+        <button class="tab active" type="button" data-tab="info">MAKLUMAT BAYARAN</button>
+        <button class="tab" type="button" data-tab="history">SEJARAH PEMBAYARAN</button>
+      </nav>
+
+      <div class="content" data-tab="info">
+        <div class="main-panel">
+          <section class="section resident-section">
+            <div class="section-head">
+              <div class="section-title">MAKLUMAT PENGHUNI</div>
+              <a class="profile-link" href="#">PROFIL PENUH</a>
+            </div>
+
+            <div class="grid">
+              <div class="field">
+                <div class="field-label">NAMA PENGHUNI</div>
+                <div class="field-box">Ahmad Zaki Bin Rahim</div>
+              </div>
+
+              <div class="field">
+                <div class="field-label">NO. KAD PENGENALAN</div>
+                <div class="field-box">850214-01-5543</div>
+              </div>
+
+              <div class="field">
+                <div class="field-label">UMUR</div>
+                <div class="field-box">39</div>
+              </div>
+
+              <div class="field">
+                <div class="field-label">KELAS</div>
+                <div class="field-box">
+                  <span>Kelas C</span>
+                  <span class="external" aria-hidden="true"></span>
+                </div>
+              </div>
+
+              <div class="field unit">
+                <div class="field-label">UNIT KUARTERS</div>
+                <div class="field-box strong">
+                  <span>Blok B-04-12</span>
+                  <span class="external" aria-hidden="true"></span>
+                </div>
+              </div>
+
+              <div class="date-status-row">
+                <div class="field">
+                  <div class="field-label">TARIKH MASUK</div>
+                  <div class="field-box">15/06/2021</div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label">TARIKH KELUAR</div>
+                  <div class="field-box muted">N/A</div>
+                </div>
+
+                <div class="field">
+                  <div class="field-label">STATUS PENGHUNI</div>
+                  <div class="field-box success">Aktif</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section payment-section">
+            <div class="section-head">
+              <div class="section-title">MAKLUMAT BAYARAN</div>
+            </div>
+
+            <div class="payment-card">
+              <div class="payment-top">
+                <div class="payment-label">AMAUN BAYAR BULAN KINI</div>
+                <div class="payment-value">RM 300.00</div>
+              </div>
+
+              <div class="arrears-label">BAKI TUNGGAKAN</div>
+              <div class="arrears-value">RM 150.00</div>
+
+              <div class="alert">!</div>
+            </div>
+          </section>
+        </div>
+
+        <section class="history-panel" aria-label="Sejarah pembayaran">
+          <div class="history-head">
+            <div class="section-title">SEJARAH PEMBAYARAN</div>
+
+            <div class="history-actions" aria-label="Tindakan sejarah pembayaran">
+              <button class="icon-button download" type="button" title="Muat turun">
+                <span class="download-line" aria-hidden="true"></span>
+              </button>
+              <button class="icon-button filter" type="button" title="Tapis"></button>
+            </div>
+          </div>
+
+          <div class="history-card">
+            <table class="payment-table">
+              <thead>
+                <tr>
+                  <th style="width: 18%;">Tarikh</th>
+                  <th style="width: 23%;">ID</th>
+                  <th style="width: 19%;">No. Resit</th>
+                  <th style="width: 25%;">Catatan</th>
+                  <th class="amount-head" style="width: 15%;">Amaun (RM)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="date">30/04/2026</td>
+                  <td class="id">30042026-44332211</td>
+                  <td class="receipt">RES-2026-0492</td>
+                  <td>Bayaran Diterima</td>
+                  <td class="amount">1,120.00</td>
+                </tr>
+                <tr>
+                  <td class="date">25/03/2026</td>
+                  <td class="id">25032026-11223344</td>
+                  <td class="receipt">RES-2026-0315</td>
+                  <td>Bayaran Diterima</td>
+                  <td class="amount">450.00</td>
+                </tr>
+                <tr>
+                  <td class="date">28/02/2026</td>
+                  <td class="id">28022026-99887766</td>
+                  <td class="receipt">RES-2026-0208</td>
+                  <td>Bayaran Diterima</td>
+                  <td class="amount">450.00</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="history-footer">
+              <div class="pagination">
+                <button class="page-btn chevron" type="button" aria-label="Sebelumnya">‹</button>
+                <button class="page-btn active" type="button">1</button>
+                <button class="page-btn" type="button">2</button>
+                <span class="page-more">...</span>
+                <button class="page-btn" type="button">129</button>
+                <button class="page-btn chevron" type="button" aria-label="Seterusnya">›</button>
+              </div>
+
+              <div class="history-summary">Menunjukkan 1-3 Daripada 3 Rekod</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const content = document.querySelector(".content");
+    const closeButton = document.querySelector(".close");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        content.dataset.tab = tab.dataset.tab;
+      });
+    });
+
+    closeButton.addEventListener("click", () => {
+      document.querySelector(".modal").style.transform = "scale(.98)";
+      document.querySelector(".modal").style.opacity = "0";
+      setTimeout(() => {
+        document.querySelector(".stage").style.display = "none";
+      }, 160);
+    });
+  </script>
+</body>
+</html>

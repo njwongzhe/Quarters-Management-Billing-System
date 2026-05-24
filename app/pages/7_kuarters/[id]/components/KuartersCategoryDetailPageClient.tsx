@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 
 import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
 import KuartersOverviewCards from "@/app/pages/7_kuarters/components/KuartersOverviewCards";
@@ -16,6 +16,7 @@ import {
   type AvailableResidentRecord,
   type AvailableResidentsResponse,
   EMPTY_QUARTER_UNIT_ID,
+  QUARTER_UNIT_PAGE_SIZE,
   buildQuarterUnitPagination,
   buildQuarterUnitSummary,
   createDraftFromQuarterUnit,
@@ -44,6 +45,7 @@ type ResidentPickerState = {
 
 type KuartersCategoryDetailPageClientProps = {
   categoryId: string;
+  initialTargetUnitId?: string;
   initialNotice?: KuartersNotice | null;
 };
 
@@ -81,8 +83,11 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
 
 export default function KuartersCategoryDetailPageClient({
   categoryId,
+  initialTargetUnitId = "",
   initialNotice = null,
 }: KuartersCategoryDetailPageClientProps) {
+  const targetUnitId = initialTargetUnitId.trim();
+  const hasNavigatedToTargetUnitRef = useRef(false);
   const [detailData, setDetailData] = useState<KuartersCategoryDetailInitialData>({
     id: categoryId,
     categoryName: "Maklumat kategori kuarters",
@@ -123,6 +128,10 @@ export default function KuartersCategoryDetailPageClient({
     hasActiveFilter: hasActiveFilters,
     totalRecords: units.length,
   });
+
+  useEffect(() => {
+    hasNavigatedToTargetUnitRef.current = false;
+  }, [categoryId, targetUnitId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -234,6 +243,27 @@ export default function KuartersCategoryDetailPageClient({
       controller.abort();
     };
   }, [residentPicker.isOpen, deferredResidentPickerSearchQuery]);
+
+  useEffect(() => {
+    if (
+      !targetUnitId ||
+      isTableLoading ||
+      hasNavigatedToTargetUnitRef.current
+    ) {
+      return;
+    }
+
+    const targetIndex = sortedUnits.findIndex((unit) => unit.id === targetUnitId);
+
+    if (targetIndex < 0) {
+      return;
+    }
+
+    hasNavigatedToTargetUnitRef.current = true;
+    setEditor(null);
+    setFilters(createEmptyQuarterUnitFilters());
+    setCurrentPage(Math.floor(targetIndex / QUARTER_UNIT_PAGE_SIZE) + 1);
+  }, [isTableLoading, sortedUnits, targetUnitId]);
 
   function showNotice(nextNotice: KuartersNotice) {
     setNotice(nextNotice);
@@ -627,6 +657,7 @@ export default function KuartersCategoryDetailPageClient({
         editor={editor}
         exportUnits={filteredUnits}
         filterQuery={filters.query}
+        targetUnitId={targetUnitId}
         statusFilter={filters.status}
         selectedResidentOccupancyRanges={selectedResidentOccupancyRanges}
         hasActiveFilters={hasActiveFilters}

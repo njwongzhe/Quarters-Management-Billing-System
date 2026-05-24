@@ -1,57 +1,59 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-import Icon from "@/app/components/Icon/Icon";
-
-import ButiranBayaranModal from "./ButiranBayaranModal";
-import TambahBayaranModal from "./TambahBayaranModal";
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 
 type BayaranRowActionsProps = {
+  onAddPayment: (paymentId: string) => void;
+  onViewPayment: (paymentId: string) => void;
   paymentId: string;
 };
 
-export default function BayaranRowActions({ paymentId }: BayaranRowActionsProps) {
-  const router = useRouter();
-  const [activeModal, setActiveModal] = useState<"detail" | "manual" | null>(null);
-
-  const closeModal = () => setActiveModal(null);
-
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  textClass,
+}: {
+  icon: string;
+  label: string;
+  onClick?: () => void;
+  textClass: string;
+}) {
   return (
-    <>
-      <div className="flex items-center justify-center gap-6 text-dark-blue">
-        <button
-          type="button"
-          aria-label="Lihat butiran bayaran"
-          title="Lihat butiran bayaran"
-          onClick={() => setActiveModal("detail")}
-        >
-          <Icon icon="visibility" size={16} weight={600} />
-        </button>
-        <button
-          type="button"
-          aria-label="Tambah bayaran manual"
-          title="Tambah bayaran manual"
-          onClick={() => setActiveModal("manual")}
-        >
-          <Icon icon="add" size={18} weight={700} />
-        </button>
-      </div>
+    <button
+      type="button"
+      className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background ${textClass}`}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
+      <Icon icon={icon} size={18} />
+    </button>
+  );
+}
 
-      <ButiranBayaranModal
-        key={activeModal === "detail" ? `detail-${paymentId}` : "detail-closed"}
-        isOpen={activeModal === "detail"}
-        paymentId={paymentId}
-        onClose={closeModal}
+export default function BayaranRowActions({
+  onAddPayment,
+  onViewPayment,
+  paymentId,
+}: BayaranRowActionsProps) {
+  return (
+    <div
+      className="flex items-center justify-center gap-1"
+      data-payment-id={paymentId}
+    >
+      <ActionButton
+        icon={commonIcons.eye}
+        label="Lihat butiran bayaran"
+        onClick={() => onViewPayment(paymentId)}
+        textClass="text-dark-blue"
       />
-      <TambahBayaranModal
-        key={activeModal === "manual" ? `manual-${paymentId}` : "manual-closed"}
-        isOpen={activeModal === "manual"}
-        paymentId={paymentId}
-        onClose={closeModal}
-        onSaved={() => router.refresh()}
+      <ActionButton
+        icon="add"
+        label="Tambah bayaran manual"
+        onClick={() => onAddPayment(paymentId)}
+        textClass="text-grey"
       />
-    </>
+    </div>
   );
 }
