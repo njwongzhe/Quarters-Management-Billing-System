@@ -411,6 +411,10 @@ async function applyFinancialDeltaToBilling(
       await tx.monthlyCharge.update({ where: { id: monthlyCharge.id }, data: { paymentReceived: { increment: deltaAmount } } });
       arrearsDelta = -deltaAmount; // Payments lower arrears. So +Payment = -Arrears
       break;
+    default:
+      // Fallback for BAKI_AWAL or LAIN_LAIN to ensure the master total is always updated
+      arrearsDelta = deltaAmount;
+      break;
   }
 
   // 3. Keep the global Arrears Summary updated

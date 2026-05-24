@@ -33,7 +33,9 @@ export default function TunggakanPageClient() {
 
   const fetchBillingStatus = async () => {
     try {
-      const response = await fetch("/api/billing/status");
+      const response = await fetch(`/api/billing/status?t=${Date.now()}`, {
+        cache: "no-store"
+      });
       const result = await response.json();
       if (result.ok) {
         setIsBilledThisMonth(result.isBilledThisMonth);
@@ -48,7 +50,9 @@ export default function TunggakanPageClient() {
     console.log(">>> fetch started");
     try {
       setIsLoading(true);
-      const response = await fetch("/api/arrear");
+      const response = await fetch(`/api/arrear?t=${Date.now()}`, {
+        cache: "no-store"
+      });
       console.log(">>> response status:", response.status);
       const result = await response.json();
       console.log(">>> result:", result);

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mapTunggakanForApi } from "@/lib/arrears/arrears"; // Make sure this path is correct!
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> } // <-- Update the type to a Promise
@@ -13,6 +15,7 @@ export async function GET(
     const resident = await prisma.resident.findUnique({
       where: { id: residentId },
       include: {
+        arrearsSummary: true,
         occupancies: {
           where: { status: "CURRENT" },
           include: {

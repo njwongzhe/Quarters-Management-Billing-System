@@ -5,6 +5,8 @@ import { createAuditLog } from "@/lib/audit/audit-logs";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { generateTransactionNo } from "@/lib/transactions/transactions"; 
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     // 1. Fetch all residents with their active units and complete charge history

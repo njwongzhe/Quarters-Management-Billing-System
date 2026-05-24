@@ -6,7 +6,8 @@ import type {
   MonthlyCharge,
   AdditionalCharge,
   Rebate,
-  UnitOccupancy
+  UnitOccupancy,
+  ArrearsSummary
 } from "@prisma/client";
 
 // --- TYPES ---
@@ -96,6 +97,7 @@ export function mapTunggakanForApi(
   resident: Resident & {
       occupancies: (UnitOccupancy & { unit: Unit & { quarterCategory: QuarterCategory } })[];
       monthlyCharges: (MonthlyCharge & { additionalCharges: AdditionalCharge[], rebates: Rebate[] })[];
+      arrearsSummary?: ArrearsSummary | null;
   }
 ): TunggakanListItem {
   
@@ -120,8 +122,8 @@ export function mapTunggakanForApi(
       charge.rebates.forEach(r => { rebat += Number(r.amount) });
   });
 
-  // 3. SUBTRACT PAYMENTS FROM THE FINAL CALCULATION
-  const jumlahTunggakan = (sewa + senggara + penalti + tambahan) - rebat - bayaran;
+  // DIRECTLY USE THE MASTER ARREARS SUMMARY TABLE FOR NET TOTAL (Single Source of Truth!)
+  const jumlahTunggakan = resident.arrearsSummary ? Number(resident.arrearsSummary.totalArrearsAmount) : 0;
 
   return {
       id: resident.id,
