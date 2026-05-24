@@ -217,6 +217,8 @@ export async function POST(request: Request) {
                 maintenanceAmount: { increment: senggaraChargeToAdd },
                 additionalChargesTotal: { increment: totalNewTambahan },
                 rebateTotal: { increment: totalNewRebat },
+                totalMonthlyCharge: { increment: senggaraChargeToAdd + totalNewTambahan },
+                balanceForMonth: { increment: senggaraChargeToAdd + totalNewTambahan - totalNewRebat },
             }
         });
 

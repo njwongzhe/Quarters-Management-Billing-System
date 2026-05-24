@@ -28,7 +28,6 @@ export async function GET(
         // Pull their full transaction ledger, newest first
         transactions: {
           orderBy: { transactionDate: 'desc' },
-          where: { status: "NORMAL" } 
         }
       },
     });
@@ -73,7 +72,7 @@ export async function GET(
     const history = resident.transactions.map(t => ({
       tarikh: new Date(t.transactionDate).toLocaleDateString('en-GB'),
       id: t.id.substring(0, 8).toUpperCase(), // Create a short transaction ID for the UI
-      kategori: t.category.replace(/_/g, ' '), // Formats "CAJ_TAMBAHAN" to "CAJ TAMBAHAN"
+      kategori: t.status === "NORMAL" ? t.category.replace(/_/g, ' ') : `${t.category.replace(/_/g, ' ')} (${t.status})`,
       catatan: t.description || "-",
       debit: Number(t.debitAmount || 0),
       kredit: Number(t.creditAmount || 0),
