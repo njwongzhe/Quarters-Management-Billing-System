@@ -20,6 +20,7 @@ export default function TunggakanPageClient() {
   // NEW: Billing Automation States
   const [isBilledThisMonth, setIsBilledThisMonth] = useState(false);
   const [lastBilledDate, setLastBilledDate] = useState<string | null>(null);
+  const [targetBillingMonthLabel, setTargetBillingMonthLabel] = useState<string | null>(null);
   const [isBillingRunning, setIsBillingRunning] = useState(false);
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -40,6 +41,7 @@ export default function TunggakanPageClient() {
       if (result.ok) {
         setIsBilledThisMonth(result.isBilledThisMonth);
         setLastBilledDate(result.lastBilledDate);
+        setTargetBillingMonthLabel(result.targetBillingMonthLabel ?? null);
       }
     } catch (error) {
       console.error("Failed to fetch billing status:", error);
@@ -228,7 +230,8 @@ export default function TunggakanPageClient() {
   };
 
   const handleManualRun = async () => {
-    if (!confirm("Adakah anda pasti mahu menjana caj bulanan dan penalti sekarang?")) return;
+    const billingLabel = targetBillingMonthLabel ? ` untuk bulan ${targetBillingMonthLabel}` : "";
+    if (!confirm(`Adakah anda pasti mahu menjana caj bulanan dan penalti${billingLabel} sekarang?`)) return;
     
     setIsBillingRunning(true);
     try {
@@ -311,7 +314,7 @@ export default function TunggakanPageClient() {
                   }`}
               >
                 <Icon icon={isBillingRunning ? "progress_activity" : "autorenew"} size={18} className={isBillingRunning ? "animate-spin" : ""} />
-                {isBilledThisMonth ? "Caj Bulan Ini Selesai" : isBillingRunning ? "Sedang Menjana..." : "Jana Bil Manual"}
+                {isBilledThisMonth ? `Caj ${targetBillingMonthLabel ?? "Bulan Sasaran"} Selesai` : isBillingRunning ? "Sedang Menjana..." : "Jana Bil Manual"}
               </button>
 
               <ToolbarButton
@@ -335,7 +338,7 @@ export default function TunggakanPageClient() {
 
             {/* NEW: Automated Billing Status Text */}
             <div className="text-xs text-right">
-              <span className="text-grey">Status Caj Automatik: </span>
+              <span className="text-grey">Status Caj Automatik{targetBillingMonthLabel ? ` (${targetBillingMonthLabel})` : ""}: </span>
               <span className={`font-bold ${isBilledThisMonth ? "text-(--color-green)" : "text-yellow-600"}`}>
                 {isBilledThisMonth ? "Selesai" : "Belum Dijana"}
               </span>
@@ -547,8 +550,11 @@ export default function TunggakanPageClient() {
         isOpen={isKemasKiniModalOpen} 
         onClose={() => {
           setIsKemasKiniModalOpen(false);
-          // Optional: You can call fetchTunggakanData() here so the table refreshes after they save!
         }} 
+        onSaved={async () => {
+          await fetchTunggakanData();
+          setSelectedIds([]);
+        }}
         selectedCount={selectedIds.length} 
         selectedIds={selectedIds}
       />

@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPreviousBillingPeriod } from "@/lib/billing/billing-period";
 
 export async function GET() {
   try {
-    const today = new Date();
-    // Force to the 1st of the current month
-    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const {
+      billingMonth,
+      label: billingMonthLabel,
+    } = getPreviousBillingPeriod();
     
-    // 1. Check if THIS month has been successfully billed
+    // 1. Check if the target billing month has been successfully billed
     const currentCycle = await prisma.billingCycle.findUnique({
-      where: { billingMonth: currentMonth }
+      where: { billingMonth }
     });
 
     // 2. Find the absolute last time the system ran successfully (for UI display)
@@ -21,7 +23,9 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       isBilledThisMonth: !!(currentCycle && currentCycle.success),
-      lastBilledDate: lastCycle ? lastCycle.runDate : null
+      lastBilledDate: lastCycle ? lastCycle.runDate : null,
+      targetBillingMonth: billingMonth,
+      targetBillingMonthLabel: billingMonthLabel,
     });
   } catch (error) {
     console.error("[BILLING_STATUS_ERROR]", error);

@@ -13,11 +13,12 @@ type RowItem = {
 type KemasKiniModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  onSaved?: () => void | Promise<void>;
   selectedCount: number;
   selectedIds: string[];
 };
 
-export default function KemasKiniModal({ isOpen, onClose, selectedCount, selectedIds }: KemasKiniModalProps) {
+export default function KemasKiniModal({ isOpen, onClose, onSaved, selectedCount, selectedIds }: KemasKiniModalProps) {
   const [cajSenggaraEnabled, setCajSenggaraEnabled] = useState(false);
   const [cajTambahan, setCajTambahan] = useState<RowItem[]>([]);
   const [rebat, setRebat] = useState<RowItem[]>([]);
@@ -76,11 +77,12 @@ export default function KemasKiniModal({ isOpen, onClose, selectedCount, selecte
       }
 
       setFeedback({ type: "success", message: data.message });
+      await onSaved?.();
       setTimeout(() => {
         onClose();
       }, 1800);
 
-    } catch (error) {
+    } catch {
       setFeedback({ type: "error", message: "Ralat tidak dijangka berlaku. Sila cuba lagi." });
     } finally {
       setIsSaving(false);
