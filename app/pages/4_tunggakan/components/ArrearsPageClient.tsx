@@ -185,6 +185,8 @@ export default function TunggakanPageClient() {
     const filename = activeFilterCount > 0
       ? `Tunggakan_Ditapis_${new Date().toISOString().slice(0, 10)}`
       : `Tunggakan_Semua_${new Date().toISOString().slice(0, 10)}`;
+    const formatQuarterLocation = (row: TunggakanListItem) =>
+      row.quarterAddress ? `${row.unitCode}, ${row.quarterAddress}` : row.unitCode;
 
     downloadXlsxFile({
       filename,
@@ -195,7 +197,7 @@ export default function TunggakanPageClient() {
             { width: 28 }, // Nama
             { width: 18 }, // IC
             { width: 16 }, // Kelas
-            { width: 18 }, // Unit
+            { width: 36 }, // Unit
             { width: 16 }, // Sewa
             { width: 16 }, // Senggara
             { width: 16 }, // Penalti
@@ -209,7 +211,7 @@ export default function TunggakanPageClient() {
               { value: "NAMA PENGHUNI",   style: "header" },
               { value: "NO. KAD PENGENALAN", style: "header" },
               { value: "KELAS KUARTERS",  style: "header" },
-              { value: "KOD UNIT",        style: "header" },
+              { value: "KOD UNIT / ALAMAT", style: "header" },
               { value: `SEWA ${selectedChargeMonthLabel} (RM)`,       style: "header", align: "right" },
               { value: `SENGGARA ${selectedChargeMonthLabel} (RM)`,   style: "header", align: "right" },
               { value: `PENALTI ${selectedChargeMonthLabel} (RM)`,    style: "header", align: "right" },
@@ -222,7 +224,7 @@ export default function TunggakanPageClient() {
               { value: row.fullName },
               { value: row.icNumber },
               { value: row.quarterClass },
-              { value: row.unitCode },
+              { value: formatQuarterLocation(row) },
               { value: row.sewa,             type: "number" as const, align: "right" as const },
               { value: row.senggara,         type: "number" as const, align: "right" as const },
               { value: row.penalti,          type: "number" as const, align: "right" as const },
@@ -474,7 +476,9 @@ export default function TunggakanPageClient() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-bold text-dark-grey">{row.quarterClass}</div>
-                      <div className="text-xs text-light-grey mt-1">{row.unitCode}</div>
+                      <div className="text-xs text-light-grey mt-1 max-w-[240px] leading-snug whitespace-normal">
+                        {row.quarterAddress ? `${row.unitCode}, ${row.quarterAddress}` : row.unitCode}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right font-medium text-dark-grey">
                       {row.sewa.toFixed(2)}

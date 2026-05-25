@@ -18,6 +18,7 @@ export type TunggakanListItem = {
   icNumber: string;
   quarterClass: string; // e.g., "PPR Kempas"
   unitCode: string;     // e.g., "Blok B-04-12"
+  quarterAddress: string;
   sewa: number;
   senggara: number;
   penalti: number;
@@ -47,6 +48,7 @@ export type ResidentTunggakanDetails = {
   age: number;
   quarterClass: string;
   unitCode: string;
+  quarterAddress: string;
   moveInDate: string | null;
   moveOutDate: string | null;
   status: string;
@@ -104,6 +106,7 @@ export function mapTunggakanForApi(
   const activeOccupancy = resident.occupancies.find(o => o.status === "CURRENT");
   const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "Tiada";
   const unitCode = activeOccupancy?.unit.unitCode || "Tiada";
+  const quarterAddress = activeOccupancy?.unit.quarterCategory?.address || "";
 
   let sewa = 0;
   let senggara = 0;
@@ -131,6 +134,7 @@ export function mapTunggakanForApi(
       icNumber: resident.icNumber,
       quarterClass,
       unitCode,
+      quarterAddress,
       sewa: Number(sewa.toFixed(2)),
       senggara: Number(senggara.toFixed(2)),
       penalti: Number(penalti.toFixed(2)),
