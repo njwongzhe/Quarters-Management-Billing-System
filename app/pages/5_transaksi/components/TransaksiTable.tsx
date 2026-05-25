@@ -2,12 +2,32 @@
 
 import Icon from "../../../components/Icon";
 
+type TransactionRow = {
+  id: string;
+  transactionNo?: string | null;
+  relatedTransactionId?: string | null;
+  transactionDate: string | Date;
+  createdAt?: string | Date;
+  category: string;
+  status: string;
+  debitAmount: number | string;
+  creditAmount: number | string;
+  receiptNo?: string | null;
+  description?: string | null;
+  resident?: {
+    fullName?: string | null;
+    icNumber?: string | null;
+  } | null;
+  relatedTransaction?: TransactionRow | null;
+  childTransactions?: TransactionRow[];
+};
+
 interface TransaksiTableProps {
-  transactions: any[];
+  transactions: TransactionRow[];
   isLoading: boolean;
-  onView: (tx: any) => void;
-  onReverse: (tx: any) => void;
-  onAdjust: (tx: any) => void;
+  onView: (tx: TransactionRow) => void;
+  onReverse: (tx: TransactionRow) => void;
+  onAdjust: (tx: TransactionRow) => void;
 }
 
 export default function TransaksiTable({ transactions, isLoading, onView, onReverse, onAdjust }: TransaksiTableProps) {
@@ -36,22 +56,47 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
     );
   }
 
-  const seenPelarasan = new Set();
-  const displayTransactions = transactions.filter((tx) => {
-    if (tx.status === "PELARASAN" && tx.relatedTransactionId) {
-      if (seenPelarasan.has(tx.relatedTransactionId)) {
-        return false; // Sembunyikan pelarasan lama
-      }
-      seenPelarasan.add(tx.relatedTransactionId);
-    }
-    return true; // Kekalkan yang lain
-  }).sort((a, b) => {
+  const sortedTransactions = [...transactions].sort((a, b) => {
     // Susun mengikut waktu dicipta (Terkini sentiasa di atas)
     const timeA = new Date(a.createdAt || a.transactionDate).getTime();
     const timeB = new Date(b.createdAt || b.transactionDate).getTime();
     if (timeB !== timeA) return timeB - timeA;
     // Jika masa sama, susun mengikut ID (descending)
     return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
+  });
+
+  const getRelatedChildren = (tx: TransactionRow) => {
+    return (tx.relatedTransaction?.childTransactions || tx.childTransactions || [])
+      .filter((child) => child.status === "PELARASAN" || child.status === "PEMBALIKAN")
+      .sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.transactionDate).getTime();
+        const timeB = new Date(b.createdAt || b.transactionDate).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
+      });
+  };
+
+  const newestRelatedChildByParentId = new Map<string, string>();
+
+  sortedTransactions.forEach((tx) => {
+    const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
+    if (!isRelatedChild || !tx.relatedTransactionId) return;
+
+    if (!newestRelatedChildByParentId.has(tx.relatedTransactionId)) {
+      newestRelatedChildByParentId.set(tx.relatedTransactionId, tx.id);
+    }
+  });
+
+  const displayTransactions = sortedTransactions.filter((tx) => {
+    const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
+    if (!isRelatedChild) return true;
+
+    const relatedChildren = getRelatedChildren(tx);
+    if (relatedChildren.length > 0) {
+      return relatedChildren[0].id === tx.id;
+    }
+
+    return !!tx.relatedTransactionId && newestRelatedChildByParentId.get(tx.relatedTransactionId) === tx.id;
   });
 
   if (displayTransactions.length === 0) {
@@ -88,10 +133,10 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
             let finalDebit = Number(tx.debitAmount);
             let finalCredit = Number(tx.creditAmount);
             
-            if (isDilaraskan && tx.childTransactions?.length > 0) {
-                const pelarasanTxs = tx.childTransactions.filter((c: any) => c.status === "PELARASAN");
-                const totalDeltaDebit = pelarasanTxs.reduce((sum: number, c: any) => sum + Number(c.debitAmount), 0);
-                const totalDeltaCredit = pelarasanTxs.reduce((sum: number, c: any) => sum + Number(c.creditAmount), 0);
+            if (isDilaraskan && (tx.childTransactions?.length ?? 0) > 0) {
+                const pelarasanTxs = (tx.childTransactions ?? []).filter((c) => c.status === "PELARASAN");
+                const totalDeltaDebit = pelarasanTxs.reduce((sum, c) => sum + Number(c.debitAmount), 0);
+                const totalDeltaCredit = pelarasanTxs.reduce((sum, c) => sum + Number(c.creditAmount), 0);
                 
                 if (finalDebit > 0) finalDebit = finalDebit + totalDeltaDebit - totalDeltaCredit;
                 if (finalCredit > 0) finalCredit = finalCredit + totalDeltaCredit - totalDeltaDebit;
@@ -103,15 +148,14 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
 
             if (isDilaraskan || tx.status === "DIBALIKAN") {
                 // Find the newest child fixing this transaction
-                const fixes = tx.childTransactions?.filter((c: any) => c.status === "PELARASAN" || c.status === "PEMBALIKAN")
-                    .sort((a: any, b: any) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()) || [];
+                const fixes = getRelatedChildren(tx);
                 
                 if (fixes.length > 0) {
                     displayRelatedId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
-                    if (isDilaraskan) extraRelatedCount = fixes.length - 1;
+                    extraRelatedCount = fixes.length - 1;
                 }
             } else if (tx.relatedTransaction) {
-                // Find the parent this transaction is fixing
+                // Child rows point to their parent transaction, but do not show the hidden-related count.
                 displayRelatedId = tx.relatedTransaction.transactionNo || tx.relatedTransaction.id.split('-')[0] + '...';
             }
 
@@ -157,7 +201,7 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
                 <td className={`px-6 py-4 text-gray-500 ${isMuted ? 'opacity-50' : ''}`}>{tx.receiptNo || 'N/A'}</td>
 
                 {/* Catatan (Strike-through if muted) */}
-                <td className={`px-6 py-4 text-gray-500 truncate max-w-[150px] ${isMuted ? 'opacity-50 line-through' : ''}`} title={tx.description}>
+                <td className={`px-6 py-4 text-gray-500 truncate max-w-[150px] ${isMuted ? 'opacity-50 line-through' : ''}`} title={tx.description ?? undefined}>
                   {tx.description}
                   {/* Small helper text like Figma */}
                   {["PEMBALIKAN", "PELARASAN"].includes(tx.status) && (

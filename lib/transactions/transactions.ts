@@ -91,7 +91,11 @@ export async function getTransactionsList(params: TransactionFilterParams) {
             }
           }
         },
-        relatedTransaction: true, // Parent related transaction
+        relatedTransaction: {
+          include: {
+            childTransactions: true,
+          },
+        }, // Parent related transaction
         childTransactions: true,  // Child related transactions (Reversals/Adjustments)
       },
       orderBy: [
