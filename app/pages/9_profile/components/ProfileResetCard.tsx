@@ -1,4 +1,5 @@
 import Icon from "@/app/components/Icon/Icon";
+import { InputFieldPassword } from "@/app/components/InputField";
 
 export default function ProfileResetCard({
   criticalKey,
@@ -21,7 +22,7 @@ export default function ProfileResetCard({
         <div>
           <div className="mb-1.5 flex items-center gap-2 text-xs font-extrabold">
             <Icon icon="restart_alt" size={15} />
-            Sistem Set Semula
+            SISTEM SET SEMULA
           </div>
           <p className="text-[10px] leading-5 text-[#C7C7C7]">
             Tindakan ini akan memadam data operasi sistem dan mengekalkan akaun admin.
@@ -29,7 +30,7 @@ export default function ProfileResetCard({
         </div>
         <button
           type="button"
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[3px] bg-white px-4 text-[11px] font-extrabold text-[#111827] transition hover:-translate-y-0.5 hover:opacity-90"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[3px] bg-white px-4 text-[11px] font-bold text-[#111827] transition hover:-translate-y-0.5 hover:opacity-90"
           onClick={onToggle}
         >
           <Icon icon={isResetting ? "close" : "restart_alt"} size={14} />
@@ -37,33 +38,41 @@ export default function ProfileResetCard({
         </button>
       </div>
 
-      {isResetting ? (
-        <form className="mt-5 grid gap-3" onSubmit={onSubmit}>
-          <label className="grid gap-2">
-            <span className="text-[8px] font-extrabold uppercase tracking-[0.9px] text-[#C7C7C7]">
-              Kunci Kritikal
-            </span>
-            <input
-              type="password"
-              value={criticalKey}
-              onChange={(event) => onCriticalKeyChange(event.target.value)}
-              className="h-10 rounded-[3px] border border-white/15 bg-white/10 px-3 text-xs font-bold text-white outline-none placeholder:text-white/35 focus:border-white"
-              placeholder="Masukkan kunci kritikal untuk sahkan"
-              required
-            />
-          </label>
+      <div
+        className={`grid overflow-hidden transition-all duration-300 ease-out ${
+          isResetting
+            ? "mt-5 grid-rows-[1fr] opacity-100"
+            : "mt-0 grid-rows-[0fr] opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!isResetting}
+      >
+        <form className="grid min-h-0 gap-3" onSubmit={onSubmit}>
+          <InputFieldPassword
+            label="KUNCI KRITIKAL"
+            value={criticalKey}
+            state="active"
+            onChange={onCriticalKeyChange}
+            placeholder="Masukkan kunci kritikal untuk sahkan."
+            required
+            labelFontSize={8}
+            inputFontSize={12}
+            inputMinHeight={40}
+            className="tracking-normal"
+            activeBackgroundClass="bg-white/10 text-white border-white/15 placeholder:text-white/35 focus:border-white"
+            toggleButtonClassName="text-white/70 hover:text-white"
+          />
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={isSavingReset}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-[3px] bg-white px-5 text-[11px] font-extrabold text-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-[3px] bg-white px-5 text-[11px] font-bold text-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Icon icon="restart_alt" size={14} />
               {isSavingReset ? "Memproses..." : "Sahkan Set Semula"}
             </button>
           </div>
         </form>
-      ) : null}
+      </div>
     </section>
   );
 }

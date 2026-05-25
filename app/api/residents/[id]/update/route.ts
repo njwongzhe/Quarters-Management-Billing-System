@@ -105,14 +105,18 @@ export async function PATCH(
       );
     }
 
-    // Server-side: enforce allowed status transitions
+    // Server-side: enforce the same status transition rules used by the
+    // resident detail editor. Age/status automation may set a resident to
+    // PENCEN_MENDATANG, and saving profile fields should not force them to
+    // change into another status.
     const originalStatus = resident.status as ResidentStatus | undefined;
     const requestedStatus = normalizeResidentStatus(status);
 
     const allowedTransition = (() => {
       if (!originalStatus) return true;
       if (originalStatus === "DATA_TIDAK_LENGKAP") return requestedStatus === originalStatus;
-      if (originalStatus === "AKTIF" || originalStatus === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"].includes(requestedStatus);
+      if (originalStatus === "AKTIF") return ["AKTIF", "TIDAK_LAYAK"].includes(requestedStatus);
+      if (originalStatus === "PENCEN_MENDATANG") return ["PENCEN_MENDATANG", "TIDAK_LAYAK"].includes(requestedStatus);
       if (originalStatus === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"].includes(requestedStatus);
       return true;
     })();

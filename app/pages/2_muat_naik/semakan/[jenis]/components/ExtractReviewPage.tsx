@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
-import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
+import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
+import type { GlobalFixedNotice } from "@/app/components/Message/GlobalFixedMessage";
 import { ROUTES } from "../../../../../constants/routes";
 import type {
   BayaranExtractResult,
@@ -54,7 +54,7 @@ export default function ExtractReviewPage({
     string | null
   >(null);
   const [verificationNotice, setVerificationNotice] =
-    useState<KuartersNotice | null>(null);
+    useState<GlobalFixedNotice | null>(null);
   const [verifyingMode, setVerifyingMode] = useState<VerifyingMode | null>(null);
   const [selectedRecordKeys, setSelectedRecordKeys] = useState<string[]>([]);
   const [extractResult, setExtractResult] = useState<ExtractResult | null>(null);
@@ -63,7 +63,7 @@ export default function ExtractReviewPage({
   const uploadPageForKind = `${ROUTES.muatNaik}?kategori=${encodeURIComponent(kind)}`;
 
   const showVerificationNotice = (
-    tone: KuartersNotice["tone"],
+    tone: GlobalFixedNotice["tone"],
     message: string,
   ) => {
     setVerificationNotice(message ? { tone, message } : null);
@@ -815,7 +815,7 @@ export default function ExtractReviewPage({
           onVerify={handleVerifyData}
         />
 
-        <KuartersFeedbackBanner
+        <GlobalFixedMessage
           notice={verificationNotice}
           onDismiss={clearVerificationNotice}
         />

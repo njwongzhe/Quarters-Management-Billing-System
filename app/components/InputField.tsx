@@ -142,6 +142,8 @@ export function InputField({
     showLabel = true,
     value,
     placeholder = "",
+    type = "text",
+    required = false,
     leadingIcon,
     trailingIcon,
     error = false, 
@@ -158,6 +160,8 @@ export function InputField({
     label: string;
     value: string;
     state: FieldState;
+    type?: React.HTMLInputTypeAttribute;
+    required?: boolean;
     onChange?: (value: string) => void;
 } & BaseFieldStyleProps) {
     const isDisabled = state === "inactive";
@@ -174,9 +178,10 @@ export function InputField({
                     </div>
                 )}
                 <input
-                    type="text"
+                    type={type}
                     value={value}
                     disabled={isDisabled}
+                    required={required}
                     onChange={(e) => onChange && onChange(e.target.value)}
                     placeholder={placeholder}
                     className={`w-full rounded-md text-sm min-h-12 border outline-none
@@ -193,6 +198,80 @@ export function InputField({
                         {trailingIcon}
                     </div>
                 )}
+            </div>
+            {error && errorMessage && (
+                <p className="text-red text-xs pl-1">{errorMessage}</p>
+            )}
+        </div>
+    );
+}
+
+// Reusable password input with visibility toggle (eye icon) matching authentication pages.
+export function InputFieldPassword({
+    label,
+    showLabel = true,
+    value,
+    placeholder = "",
+    required = false,
+    leadingIcon,
+    error = false,
+    errorMessage = "",
+    state,
+    onChange,
+    className,
+    labelFontSize = 10,
+    inputFontSize,
+    inputMinHeight,
+    activeBackgroundClass = "bg-white",
+    inactiveBackgroundClass = "bg-transparent",
+    toggleButtonClassName = "text-grey",
+}: {
+    label: string;
+    value: string;
+    state: FieldState;
+    required?: boolean;
+    onChange?: (value: string) => void;
+    toggleButtonClassName?: string;
+} & Omit<BaseFieldStyleProps, "trailingIcon">) {
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+    const isDisabled = state === "inactive";
+
+    return (
+        <div className={`flex flex-col gap-2 tracking-widest ${className || ""}`}>
+            {showLabel && (
+                <label className="font-bold text-gray-500 pl-1" style={{ fontSize: labelFontSize }}>{label}</label>
+            )}
+            <div className="relative flex items-center">
+                {leadingIcon && (
+                    <div className="absolute left-3 flex items-center text-gray-400 pointer-events-none">
+                        {leadingIcon}
+                    </div>
+                )}
+                <input
+                    type={isPasswordVisible ? "text" : "password"}
+                    value={value}
+                    disabled={isDisabled}
+                    required={required}
+                    onChange={(e) => onChange && onChange(e.target.value)}
+                    placeholder={placeholder}
+                    className={`w-full rounded-md text-sm min-h-12 border outline-none
+                        ${leadingIcon ? 'pl-9' : 'pl-3'} pr-10 py-3
+                        ${error ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
+                        ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass}`}
+                    style={{
+                        fontSize: inputFontSize,
+                        minHeight: inputMinHeight,
+                    }}
+                />
+                <button
+                    type="button"
+                    disabled={isDisabled}
+                    aria-label={isPasswordVisible ? "Sembunyikan kata laluan" : "Papar kata laluan"}
+                    className={`absolute right-3 flex items-center ${toggleButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
+                    onClick={() => setIsPasswordVisible((value) => !value)}
+                >
+                    <Icon icon={isPasswordVisible ? "visibility" : "visibility_off"} />
+                </button>
             </div>
             {error && errorMessage && (
                 <p className="text-red text-xs pl-1">{errorMessage}</p>

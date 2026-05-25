@@ -1,5 +1,10 @@
 import type { Resident, ResidentStatus } from "@prisma/client";
 
+import {
+  getTodayStartInMalaysia,
+  isDateWithinOccupancy,
+} from "@/lib/quarters/quarter-units";
+
 export type AvailableResidentOccupancyRange = {
   id: string;
   unitId: string;
@@ -28,6 +33,7 @@ export function mapAvailableResidentForApi(
     }>;
   },
 ): AvailableResidentListItem {
+  const referenceDate = getTodayStartInMalaysia();
   const occupancyRanges = (resident.occupancies ?? []).map((occupancy) => ({
     id: occupancy.id,
     unitId: occupancy.unitId,
@@ -41,7 +47,13 @@ export function mapAvailableResidentForApi(
     icNumber: resident.icNumber,
     fullName: resident.fullName,
     status: resident.status,
-    hasCurrentUnit: occupancyRanges.some((occupancy) => occupancy.status === "CURRENT"),
+    hasCurrentUnit: occupancyRanges.some((occupancy) =>
+      isDateWithinOccupancy({
+        moveInDate: new Date(occupancy.moveInDate),
+        moveOutDate: occupancy.moveOutDate ? new Date(occupancy.moveOutDate) : null,
+        referenceDate,
+      }),
+    ),
     occupancyRanges,
   };
 }

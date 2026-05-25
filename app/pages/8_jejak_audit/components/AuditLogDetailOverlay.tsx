@@ -1,15 +1,17 @@
 import Link from "next/link";
 
 import type { AuditLogDetailItem } from "@/lib/audit/audit-logs";
-import { formatEnumLabel } from "@/lib/audit/audit-logs";
-import AuditActionBadge from "./AuditActionBadge";
 
 export default function AuditLogDetailOverlay({
   auditLog,
   closeHref,
+  errorMessage,
+  isLoading = false,
 }: {
   auditLog: AuditLogDetailItem | null;
   closeHref: string;
+  errorMessage?: string;
+  isLoading?: boolean;
 }) {
   return (
     <div className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-center justify-center bg-black/70 p-6">
@@ -40,7 +42,18 @@ export default function AuditLogDetailOverlay({
           </Link>
         </header>
 
-        {auditLog ? (
+        {isLoading ? (
+          <div className="flex min-h-108 items-center justify-center px-5 py-7 sm:px-8 sm:py-8">
+            <div className="w-full max-w-md rounded-xl border border-light-grey/20 bg-white p-6 text-center">
+              <h4 className="text-lg font-extrabold text-dark-grey">
+                Memuatkan butiran...
+              </h4>
+              <p className="mt-2 text-sm leading-6 text-grey">
+                Sila tunggu sebentar sementara rekod audit dibuka.
+              </p>
+            </div>
+          </div>
+        ) : auditLog ? (
           <div className="max-h-[calc(100vh-11rem)] overflow-auto px-5 py-6 sm:px-6">
             <section className="mb-7">
               <div className="mb-5 flex items-center justify-between gap-4">
@@ -99,7 +112,6 @@ export default function AuditLogDetailOverlay({
                 {auditLog.description || "N/A"}
               </div>
             </section>
-
           </div>
         ) : (
           <div className="flex min-h-108 items-center justify-center px-5 py-7 sm:px-8 sm:py-8">
@@ -108,8 +120,8 @@ export default function AuditLogDetailOverlay({
                 Rekod tidak ditemui
               </h4>
               <p className="mt-2 text-sm leading-6 text-grey">
-                Rekod audit ini mungkin telah dipadam atau tidak termasuk dalam
-                rekod operasi.
+                {errorMessage ??
+                  "Rekod audit ini mungkin telah dipadam atau tidak termasuk dalam rekod operasi."}
               </p>
             </div>
           </div>
@@ -117,6 +129,10 @@ export default function AuditLogDetailOverlay({
       </section>
     </div>
   );
+}
+
+function formatEnumLabel(value: string) {
+  return value.replace(/_/g, " ");
 }
 
 function SectionTitle({ children }: { children: string }) {

@@ -1,4 +1,5 @@
 import Icon from "@/app/components/Icon/Icon";
+import { InputField } from "@/app/components/InputField";
 
 export function ProfileField({
   icon,
@@ -17,15 +18,21 @@ export function ProfileField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[8px] font-extrabold uppercase tracking-[0.9px] text-[#95A3B8]">
+      <span className="mb-1.5 block text-[8px] font-bold uppercase tracking-[0.9px] text-[#95A3B8]">
         {label}
       </span>
       {isEditing ? (
-        <input
+        <InputField
+          label={label}
+          showLabel={false}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-10 w-full rounded-[3px] border border-[#E6EAF2] px-3 text-xs font-bold text-[#0B1C30] outline-none focus:border-dark-blue"
+          state="active"
+          onChange={onChange}
           required={required}
+          inputMinHeight={40}
+          inputFontSize={12}
+          className="tracking-normal"
+          activeBackgroundClass="bg-white"
         />
       ) : (
         <span className="flex min-h-5 items-center gap-2 text-xs text-[#0B1C30]">
@@ -48,7 +55,7 @@ export function ReadOnlyProfileField({
 }) {
   return (
     <div>
-      <div className="mb-1.5 text-[8px] font-extrabold uppercase tracking-[0.9px] text-[#95A3B8]">
+      <div className="mb-1.5 text-[8px] font-bold uppercase tracking-[0.9px] text-[#95A3B8]">
         {label}
       </div>
       <div className="flex min-h-5 items-center gap-2 text-xs text-[#0B1C30]">
@@ -79,7 +86,7 @@ export function ProfileSegmentedField({
 
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[8px] font-extrabold uppercase tracking-[0.9px] text-[#95A3B8]">
+      <span className="mb-1.5 block text-[8px] font-bold uppercase tracking-[0.9px] text-[#95A3B8]">
         {label}
       </span>
       {isEditing ? (
@@ -92,7 +99,7 @@ export function ProfileSegmentedField({
                 key={option.value}
                 type="button"
                 className={[
-                  "inline-flex items-center justify-center gap-1.5 rounded-xs px-2 text-[11px] font-extrabold transition",
+                  "inline-flex items-center justify-center gap-1.5 rounded-xs px-2 text-[11px] font-bold transition",
                   active
                     ? "border border-dark-blue bg-dark-blue text-white shadow-[0_3px_8px_rgba(21,30,102,0.18)]"
                     : "border border-[#E1E6F2] bg-white/45 text-[#667085] hover:bg-white hover:text-dark-blue",
@@ -134,12 +141,18 @@ export function PasswordInput({
       <span className="text-[8px] font-extrabold uppercase tracking-[0.9px] text-[#95A3B8]">
         {label}
       </span>
-      <input
-        type="password"
+      <InputField
+        label={label}
+        showLabel={false}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-[3px] border border-[#E6EAF2] px-3 text-xs font-bold text-[#0B1C30] outline-none focus:border-dark-blue"
+        type="password"
+        state="active"
+        onChange={onChange}
         required
+        inputMinHeight={40}
+        inputFontSize={12}
+        className="tracking-normal"
+        activeBackgroundClass="bg-white"
       />
     </label>
   );

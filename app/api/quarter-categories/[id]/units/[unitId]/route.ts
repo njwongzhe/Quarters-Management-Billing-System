@@ -10,10 +10,12 @@ import {
   buildQuarterUnitOccupancyConflictMessage,
   buildQuarterUnitResidentNotFoundMessage,
   buildQuarterUnitUpdatedMessage,
+  getTodayStartInMalaysia,
   mapQuarterUnitDetailsForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitUpdateBody,
   quarterUnitDetailsInclude,
+  resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
 import { createAuditLog } from "@/lib/audit/audit-logs";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
@@ -202,12 +204,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (parsedBody.data.providedFields.occupantIcNumber) {
       const requestedOccupantIcNumber =
         parsedBody.data.updates.occupantIcNumber ?? null;
-      const nextStatus = requestedOccupantIcNumber ? "OCCUPIED" : "VACANT";
 
       if (requestedOccupantIcNumber === null) {
         if (currentOccupantIcNumber !== null || existingUnit.status !== "VACANT") {
           changedFields.push("occupant");
           shouldReplaceOccupancy = currentOccupantIcNumber !== null;
+          unitUpdateData.status = "VACANT";
         }
       } else {
         if (requestedOccupantIcNumber !== currentOccupantIcNumber) {
@@ -241,10 +243,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         } else if (existingUnit.status !== "OCCUPIED") {
           changedFields.push("occupant");
         }
-      }
-
-      if (existingUnit.status !== nextStatus) {
-        unitUpdateData.status = nextStatus;
       }
     }
 
@@ -301,14 +299,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     const nextOccupancyMoveInDate =
       parsedBody.data.updates.moveInDate ??
       currentOccupancy?.moveInDate ??
-      (nextResident ? new Date() : null);
+      (nextResident ? getTodayStartInMalaysia() : null);
     const nextOccupancyMoveOutDate = parsedBody.data.providedFields.moveOutDate
       ? (parsedBody.data.updates.moveOutDate ?? null)
       : (currentOccupancy?.moveOutDate ?? null);
     const nextOccupancyResidentId =
       nextResident?.id ?? currentOccupancy?.resident.id ?? null;
-    const shouldEndOccupancy = Boolean(nextOccupancyMoveOutDate);
-    const todayStart = getTodayStartInMalaysia();
+    const nextOccupancyState =
+      nextOccupancyMoveInDate && nextOccupancyResidentId
+        ? resolveQuarterUnitOccupancyState({
+            moveInDate: nextOccupancyMoveInDate,
+            moveOutDate: nextOccupancyMoveOutDate,
+          })
+        : null;
 
     if (nextOccupancyMoveInDate && nextOccupancyMoveOutDate) {
       if (nextOccupancyMoveOutDate.getTime() < nextOccupancyMoveInDate.getTime()) {
@@ -389,23 +392,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    if (shouldEndOccupancy) {
-      unitUpdateData.status = "VACANT";
+    if (nextOccupancyState) {
+      unitUpdateData.status = nextOccupancyState.unitStatus;
 
       if (currentOccupancy && !shouldReplaceOccupancy) {
-        occupancyUpdateData.status = "PAST";
+        occupancyUpdateData.status = nextOccupancyState.occupancyStatus;
 
-        if (!changedFields.includes("occupant")) {
+        if (
+          nextOccupancyState.occupancyStatus === "PAST" &&
+          !changedFields.includes("occupant")
+        ) {
           changedFields.push("occupant");
         }
       }
-    } else if (
-      currentOccupancy &&
-      !shouldReplaceOccupancy &&
-      parsedBody.data.providedFields.moveOutDate
-    ) {
-      occupancyUpdateData.status = "CURRENT";
-      unitUpdateData.status = "OCCUPIED";
     }
 
     if (changedFields.length === 0) {
@@ -420,15 +419,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const updatedUnit = await prisma.$transaction(async (tx) => {
-      if (parsedBody.data.providedFields.occupantIcNumber && shouldReplaceOccupancy) {
-        await tx.unitOccupancy.updateMany({
+      if (
+        parsedBody.data.providedFields.occupantIcNumber &&
+        shouldReplaceOccupancy &&
+        currentOccupancy
+      ) {
+        await tx.unitOccupancy.update({
           where: {
-            unitId,
-            status: "CURRENT",
+            id: currentOccupancy.id,
           },
           data: {
             status: "PAST",
-            moveOutDate: new Date(),
+            moveOutDate: getTodayStartInMalaysia(),
           },
         });
       }
@@ -438,9 +440,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           data: {
             residentId: nextResident.id,
             unitId,
-            moveInDate: parsedBody.data.updates.moveInDate ?? new Date(),
+            moveInDate: nextOccupancyMoveInDate ?? getTodayStartInMalaysia(),
             moveOutDate: parsedBody.data.updates.moveOutDate ?? null,
-            status: shouldEndOccupancy ? "PAST" : "CURRENT",
+            status: nextOccupancyState?.occupancyStatus ?? "CURRENT",
           },
         });
       }
@@ -622,22 +624,6 @@ async function findOverlappingResidentOccupancy({
       },
     },
   });
-}
-
-function getTodayStartInMalaysia() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0),
-  );
 }
 
 // Used to delete a quarter unit, with validations to prevent deletion if the unit has current occupancies or associated monthly charges, and handling of related business logic such as revalidating relevant pages after deletion.

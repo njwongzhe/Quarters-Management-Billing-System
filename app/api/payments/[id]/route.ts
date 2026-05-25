@@ -1,45 +1,56 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
-import { getBayaranPaymentDetail } from "@/lib/payments/payment-records";
+import { getBayaranPaymentDetail } from "@/lib/payments/bayaran-detail";
+
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type PaymentRouteContext = {
-  params: Promise<{ id: string }>;
-};
+export async function GET(_request: Request, context: RouteContext) {
+  const { id } = await context.params;
 
-export async function GET(_request: Request, context: PaymentRouteContext) {
   try {
     const currentAdmin = await getCurrentAdmin();
 
     if (!currentAdmin) {
       return NextResponse.json(
-        { ok: false, message: "Akses ditolak. Sila log masuk semula." },
+        { success: false, message: "Akses ditolak. Sila log masuk semula." },
         { status: 401 },
       );
     }
 
-    const { id } = await context.params;
     const detail = await getBayaranPaymentDetail(id);
 
     if (!detail) {
       return NextResponse.json(
-        { ok: false, message: "Rekod bayaran tidak dijumpai." },
+        { success: false, message: "Rekod bayaran tidak ditemui." },
         { status: 404 },
       );
     }
 
-    return NextResponse.json({ ok: true, data: detail });
+    return NextResponse.json({
+      success: true,
+      message: "Butiran bayaran berjaya diambil.",
+      data: {
+        payment: detail,
+      },
+    });
   } catch (error) {
+    console.error("Gagal mendapatkan butiran bayaran:", error);
+
     return NextResponse.json(
       {
-        ok: false,
+        success: false,
         message:
           error instanceof Error
             ? error.message
-            : "Ralat semasa mengambil butiran bayaran.",
+            : "Ralat pelayan berlaku semasa mendapatkan butiran bayaran.",
       },
       { status: 500 },
     );

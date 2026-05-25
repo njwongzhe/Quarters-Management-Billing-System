@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
 import ProfileDivider from "./components/ProfileDivider";
-import ProfileFeedback from "./components/ProfileFeedback";
 import ProfileHeaderCard from "./components/ProfileHeaderCard";
 import ProfileInfoCard from "./components/ProfileInfoCard";
 import ProfilePasswordCard from "./components/ProfilePasswordCard";
@@ -86,20 +86,6 @@ export default function ProfilePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!feedback) {
-      return;
-    }
-
-    const feedbackTimer = window.setTimeout(() => {
-      setFeedback(null);
-    }, 5000);
-
-    return () => {
-      window.clearTimeout(feedbackTimer);
-    };
-  }, [feedback]);
-
   function showFeedback(type: Feedback["type"], message: string) {
     setFeedback({ type, message });
   }
@@ -108,6 +94,49 @@ export default function ProfilePage() {
     if (profile) {
       setProfileForm(buildProfileForm(profile));
     }
+  }
+
+  // When editing profile, hide password change and reset sections. 
+  function handleToggleProfileEdit() {
+    setIsEditingProfile((current) => {
+      const next = !current;
+
+      if (next) {
+        resetProfileForm();
+        setIsChangingPassword(false);
+        setIsResetting(false);
+      }
+
+      return next;
+    });
+  }
+
+  // When changing password, hide profile edit and reset sections.
+  function handleTogglePasswordSection() {
+    setIsChangingPassword((current) => {
+      const next = !current;
+
+      if (next) {
+        setIsEditingProfile(false);
+        setIsResetting(false);
+      }
+
+      return next;
+    });
+  }
+
+  // When resetting system, hide profile edit and password change sections.
+  function handleToggleResetSection() {
+    setIsResetting((current) => {
+      const next = !current;
+
+      if (next) {
+        setIsEditingProfile(false);
+        setIsChangingPassword(false);
+      }
+
+      return next;
+    });
   }
 
   async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -226,19 +255,17 @@ export default function ProfilePage() {
 
   return (
     <main className="w-full text-[#0B1C30]">
-      {feedback ? (
-        <ProfileFeedback feedback={feedback} onClose={() => setFeedback(null)} />
-      ) : null}
+      <GlobalFixedMessage
+        notice={feedback ? { tone: feedback.type, message: feedback.message } : null}
+        onDismiss={() => setFeedback(null)}
+      />
 
       <ProfileHeaderCard
         fullName={profile?.fullName ?? "-"}
         gender={profile?.gender ?? ""}
         adminDisplayId={adminDisplayId}
         isEditingProfile={isEditingProfile}
-        onToggleEdit={() => {
-          resetProfileForm();
-          setIsEditingProfile((current) => !current);
-        }}
+        onToggleEdit={handleToggleProfileEdit}
       />
 
       <ProfileInfoCard
@@ -254,7 +281,7 @@ export default function ProfilePage() {
         passwordForm={passwordForm}
         isChangingPassword={isChangingPassword}
         isSavingPassword={isSavingPassword}
-        onToggle={() => setIsChangingPassword((current) => !current)}
+        onToggle={handleTogglePasswordSection}
         onSubmit={handlePasswordSubmit}
         onPasswordFormChange={setPasswordForm}
       />
@@ -265,7 +292,7 @@ export default function ProfilePage() {
         criticalKey={criticalKey}
         isResetting={isResetting}
         isSavingReset={isSavingReset}
-        onToggle={() => setIsResetting((current) => !current)}
+        onToggle={handleToggleResetSection}
         onSubmit={handleResetSubmit}
         onCriticalKeyChange={setCriticalKey}
       />

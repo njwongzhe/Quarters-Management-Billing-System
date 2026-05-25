@@ -4,8 +4,8 @@ import { useState } from "react";
 import { PatternFormat } from "react-number-format";
 
 import Icon from "@/app/components/Icon/Icon";
-import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
-import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
+import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
+import type { GlobalFixedNotice } from "@/app/components/Message/GlobalFixedMessage";
 import { PaginationControls, usePaginationLogic } from "@/app/components/Pagination/Pagination";
 import type { ExtractedPenghuniRecord } from "../../../../components/extract-review-shared";
 import { getPenghuniRecordKey } from "./helpers";
@@ -22,7 +22,7 @@ type PenghuniReviewTableProps = {
   onRecordDelete?: (record: ExtractedPenghuniRecord) => void | Promise<void>;
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
-  onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
+  onNotice?: (tone: GlobalFixedNotice["tone"], message: string) => void;
 };
 
 export default function PenghuniReviewTable({
@@ -35,7 +35,7 @@ export default function PenghuniReviewTable({
 }: PenghuniReviewTableProps) {
   const [selectedResident, setSelectedResident] =
     useState<ExtractedPenghuniRecord | null>(null);
-  const [notice, setNotice] = useState<KuartersNotice | null>(null);
+  const [notice, setNotice] = useState<GlobalFixedNotice | null>(null);
   const itemsPerPage = 10;
   const {
     currentPage,
@@ -60,7 +60,7 @@ export default function PenghuniReviewTable({
   const isPartiallySelected =
     selectedSelectableKeys.length > 0 && !isAllSelected;
 
-  const showNotice = (tone: KuartersNotice["tone"], message: string) => {
+  const showNotice = (tone: GlobalFixedNotice["tone"], message: string) => {
     if (!onNotice) {
       setNotice({ tone, message });
     }
@@ -306,7 +306,7 @@ export default function PenghuniReviewTable({
         />
       ) : null}
       {!onNotice ? (
-        <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
+        <GlobalFixedMessage notice={notice} onDismiss={() => setNotice(null)} />
       ) : null}
     </div>
   );

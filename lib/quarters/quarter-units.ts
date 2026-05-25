@@ -1,4 +1,9 @@
-import type { Prisma, ResidentStatus, UnitStatus } from "@prisma/client";
+import type {
+  OccupancyStatus,
+  Prisma,
+  ResidentStatus,
+  UnitStatus,
+} from "@prisma/client";
 
 import { buildQuarterCategorySummary, type QuarterCategorySummary } from "./quarter-categories";
 
@@ -95,6 +100,11 @@ export type QuarterUnitUpdateBody = {
   };
 };
 
+export type QuarterUnitOccupancyState = {
+  unitStatus: UnitStatus;
+  occupancyStatus: OccupancyStatus;
+};
+
 // Used for validating and parsing request bodies for both create and update operations, where all fields are optional in the input but unitCode is required if provided.
 export const quarterUnitDetailsInclude = {
   quarterCategory: true,
@@ -119,29 +129,22 @@ export const quarterUnitDetailsInclude = {
 } satisfies Prisma.UnitInclude;
 
 export function buildQuarterUnitCurrentOccupancyInclude(
-  referenceDate = new Date(),
+  referenceDate = getTodayStartInMalaysia(),
 ) {
   return {
     occupancies: {
       where: {
+        moveInDate: {
+          lte: referenceDate,
+        },
         OR: [
           {
-            status: "CURRENT",
+            moveOutDate: null,
           },
           {
-            moveInDate: {
-              lte: referenceDate,
+            moveOutDate: {
+              gte: referenceDate,
             },
-            OR: [
-              {
-                moveOutDate: null,
-              },
-              {
-                moveOutDate: {
-                  gte: referenceDate,
-                },
-              },
-            ],
           },
         ],
       },
@@ -212,6 +215,7 @@ export function mapQuarterUnitForApi(
 export function mapQuarterUnitDetailsForApi(
   unit: UnitWithDetails,
 ): QuarterUnitDetails {
+  const referenceDate = getTodayStartInMalaysia();
   const occupancyHistory = unit.occupancies.map((occupancy) => ({
     id: occupancy.id,
     occupantId: occupancy.resident.id,
@@ -224,7 +228,13 @@ export function mapQuarterUnitDetailsForApi(
     status: occupancy.status,
   }));
   const currentOccupancy =
-    occupancyHistory.find((occupancy) => occupancy.status === "CURRENT") ??
+    occupancyHistory.find((occupancy) =>
+      isDateWithinOccupancy({
+        moveInDate: new Date(occupancy.moveInDate),
+        moveOutDate: occupancy.moveOutDate ? new Date(occupancy.moveOutDate) : null,
+        referenceDate,
+      }),
+    ) ??
     null;
 
   return {
@@ -249,10 +259,9 @@ export function mapQuarterUnitDetailsForApi(
 export function mapQuarterCategoryUnitsDetailForApi(
   quarterCategory: QuarterCategoryWithUnits,
 ): QuarterCategoryUnitsDetail {
-  const occupiedUnits = quarterCategory.units.filter(
-    (unit) => unit.status === "OCCUPIED",
-  ).length;
-  const totalUnits = quarterCategory.units.length;
+  const units = quarterCategory.units.map(mapQuarterUnitForApi);
+  const occupiedUnits = units.filter((unit) => unit.status === "OCCUPIED").length;
+  const totalUnits = units.length;
   const vacantUnits = totalUnits - occupiedUnits;
 
   return {
@@ -269,8 +278,63 @@ export function mapQuarterCategoryUnitsDetailForApi(
       occupiedUnits,
       vacantUnits,
     }),
-    units: quarterCategory.units.map(mapQuarterUnitForApi),
+    units,
   };
+}
+
+export function resolveQuarterUnitOccupancyState({
+  moveInDate,
+  moveOutDate,
+  referenceDate = getTodayStartInMalaysia(),
+}: {
+  moveInDate: Date;
+  moveOutDate: Date | null;
+  referenceDate?: Date;
+}): QuarterUnitOccupancyState {
+  const isCurrentlyOccupied = isDateWithinOccupancy({
+    moveInDate,
+    moveOutDate,
+    referenceDate,
+  });
+
+  return {
+    unitStatus: isCurrentlyOccupied ? "OCCUPIED" : "VACANT",
+    occupancyStatus:
+      moveOutDate !== null && moveOutDate.getTime() < referenceDate.getTime()
+        ? "PAST"
+        : "CURRENT",
+  };
+}
+
+export function isDateWithinOccupancy({
+  moveInDate,
+  moveOutDate,
+  referenceDate = getTodayStartInMalaysia(),
+}: {
+  moveInDate: Date;
+  moveOutDate: Date | null;
+  referenceDate?: Date;
+}) {
+  return (
+    moveInDate.getTime() <= referenceDate.getTime() &&
+    (moveOutDate === null || moveOutDate.getTime() >= referenceDate.getTime())
+  );
+}
+
+export function getTodayStartInMalaysia() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0),
+  );
 }
 
 export function parseQuarterUnitCreateBody(

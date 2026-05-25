@@ -9,7 +9,7 @@ import KuartersReviewTable from "../kuarters_components";
 import PenghuniReviewTable from "../penghuni_components";
 import TunggakanReviewTable from "../tunggakan_components";
 import type { ReviewKind } from "./types";
-import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
+import type { GlobalFixedNotice } from "@/app/components/Message/GlobalFixedMessage";
 
 type ReviewTableProps = {
   kind: ReviewKind;
@@ -51,7 +51,7 @@ type ReviewTableProps = {
   ) => ExtractedTunggakanRecord | void | Promise<ExtractedTunggakanRecord | void>;
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
-  onNotice?: (tone: KuartersNotice["tone"], message: string) => void;
+  onNotice?: (tone: GlobalFixedNotice["tone"], message: string) => void;
 };
 
 export default function ReviewTable({
