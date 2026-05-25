@@ -57,7 +57,6 @@ export default function PenghuniCreate(props?: PenghuniCreateProps) {
     // Function to display notification messages for success or error events.
     const showNotification = (type: "success" | "error", message: string) => {
         setNotification({ type, message });
-        setTimeout(() => setNotification({ type: null, message: "" }), 3000);
     };
 
     // Handler function for creating a new resident record. It uses the handleCreate function from DatabaseControl and passes necessary parameters and callbacks.

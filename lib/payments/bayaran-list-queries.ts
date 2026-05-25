@@ -11,7 +11,7 @@ export async function getBayaranPaymentListData(paymentMonth = new Date()) {
   const selectedNextMonthStart = getNextMonthStart(selectedMonthStart);
   const [statsRows, rows] = await Promise.all([
     prisma.$queryRaw<PaymentStatsQueryRow[]>`
-      WITH ${latestBayaranPaymentsCte(selectedMonthStart, selectedNextMonthStart)}
+      WITH ${bayaranResidentsCte(selectedMonthStart, selectedNextMonthStart)}
       SELECT
         COUNT(*)::bigint AS "total",
         COUNT(*) FILTER (
@@ -29,11 +29,11 @@ export async function getBayaranPaymentListData(paymentMonth = new Date()) {
         COUNT(*) FILTER (
           WHERE r."status" = 'DATA_TIDAK_LENGKAP'::"ResidentStatus"
         )::bigint AS "tidakLengkap"
-      FROM latest_payments p
+      FROM bayaran_residents p
       ${bayaranPaymentBaseJoins()}
     `,
     prisma.$queryRaw<PaymentQueryRow[]>`
-      WITH ${latestBayaranPaymentsCte(selectedMonthStart, selectedNextMonthStart)}
+      WITH ${bayaranResidentsCte(selectedMonthStart, selectedNextMonthStart)}
       SELECT
         p."id",
         p."residentId",
@@ -49,17 +49,12 @@ export async function getBayaranPaymentListData(paymentMonth = new Date()) {
         penghuni_record."unit" AS "extractedUnit",
         a."totalArrearsAmount",
         p."amount"
-      FROM latest_payments p
+      FROM bayaran_residents p
       ${bayaranPaymentBaseJoins()}
       ORDER BY
-        CASE
-          WHEN u."id" IS NOT NULL THEN 0
-          WHEN NULLIF(penghuni_record."kuarters", '') IS NOT NULL
-            AND NULLIF(penghuni_record."unit", '') IS NOT NULL THEN 1
-          ELSE 2
-        END,
-        p."paymentDate" DESC,
-        p."createdAt" DESC
+        p."paymentDate" DESC NULLS LAST,
+        r."fullName" ASC,
+        p."createdAt" DESC NULLS LAST
     `,
   ]);
 
@@ -76,28 +71,37 @@ export async function getBayaranPaymentListData(paymentMonth = new Date()) {
   };
 }
 
-function latestBayaranPaymentsCte(monthStart: Date, nextMonthStart: Date) {
+function bayaranResidentsCte(monthStart: Date, nextMonthStart: Date) {
   return Prisma.sql`
-    latest_payments AS (
-      SELECT DISTINCT ON (p."residentId")
-        p."id",
-        p."residentId",
-        p."paymentDate",
-        p."createdAt",
-        COALESCE((
-          SELECT SUM(monthly_payment."amount")
-          FROM "Payment" monthly_payment
-          WHERE monthly_payment."residentId" = p."residentId"
-            AND monthly_payment."paymentDate" >= ${monthStart}
-            AND monthly_payment."paymentDate" < ${nextMonthStart}
-        ), 0) AS "amount"
-      FROM "Payment" p
-      WHERE p."residentId" IS NOT NULL
-      ORDER BY
-        p."residentId",
-        p."paymentDate" DESC,
-        p."createdAt" DESC,
-        p."id" DESC
+    bayaran_residents AS (
+      SELECT
+        r."id",
+        r."id" AS "residentId",
+        latest_payment."paymentDate",
+        latest_payment."createdAt",
+        COALESCE(monthly_payment."amount", 0) AS "amount"
+      FROM "Resident" r
+      LEFT JOIN LATERAL (
+        SELECT
+          p."paymentDate",
+          p."createdAt"
+        FROM "Payment" p
+        WHERE p."residentId" = r."id"
+        ORDER BY
+          p."paymentDate" DESC,
+          p."createdAt" DESC,
+          p."id" DESC
+        LIMIT 1
+      ) latest_payment
+        ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT SUM(monthly_payment."amount") AS "amount"
+        FROM "Payment" monthly_payment
+        WHERE monthly_payment."residentId" = r."id"
+          AND monthly_payment."paymentDate" >= ${monthStart}
+          AND monthly_payment."paymentDate" < ${nextMonthStart}
+      ) monthly_payment
+        ON TRUE
     )
   `;
 }

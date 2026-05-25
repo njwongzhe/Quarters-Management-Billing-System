@@ -58,7 +58,7 @@ export function buildStats(stats: PaymentStatsQueryRow) {
 
 export function mapPaymentRow(payment: PaymentQueryRow): BayaranRow {
   const paymentAmount = normalizeAmount(payment.amount);
-  const arrearsAmount = normalizeNullableAmount(payment.totalArrearsAmount);
+  const arrearsAmount = normalizeNullableAmount(payment.totalArrearsAmount) ?? 0;
   const isDataTidakLengkap = isDataTidakLengkapResident(payment.residentStatus);
   const unitCode = payment.unitCode ?? payment.extractedUnit;
   const address = payment.categoryAddress;
@@ -81,7 +81,7 @@ export function mapPaymentRow(payment: PaymentQueryRow): BayaranRow {
     ic,
     quarters,
     unit,
-    arrears: arrearsAmount === null ? "N/A" : formatMoney(arrearsAmount),
+    arrears: formatMoney(arrearsAmount),
     amount: formatMoney(paymentAmount),
     tone: getPaymentTone(arrearsAmount, isDataTidakLengkap),
     paymentStatus,
@@ -92,7 +92,7 @@ export function mapPaymentRow(payment: PaymentQueryRow): BayaranRow {
 export function mapPaymentExportRow(
   payment: PaymentQueryRow,
 ): BayaranExportRow {
-  const arrearsAmount = normalizeNullableAmount(payment.totalArrearsAmount);
+  const arrearsAmount = normalizeNullableAmount(payment.totalArrearsAmount) ?? 0;
   const isDataTidakLengkap = isDataTidakLengkapResident(payment.residentStatus);
   const amount = normalizeAmount(payment.amount);
   const name = payment.fullName ?? payment.extractedName ?? "N/A";

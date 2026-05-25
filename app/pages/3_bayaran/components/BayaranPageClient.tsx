@@ -226,6 +226,20 @@ export default function BayaranPageClient() {
     setPaymentMonthKey(shiftMonthKey(paymentMonthKey, direction));
   }
 
+  function handlePaymentMonthSelect(monthKey: string) {
+    if (!/^\d{4}-\d{2}$/.test(monthKey) || monthKey > CURRENT_PAYMENT_MONTH_KEY) {
+      return;
+    }
+
+    setCurrentPage(1);
+    setPageState((currentState) => ({
+      ...currentState,
+      errorMessage: "",
+      isLoaded: false,
+    }));
+    setPaymentMonthKey(monthKey);
+  }
+
   function handleReloadBayaranData() {
     setPageState((currentState) => ({
       ...currentState,
@@ -259,8 +273,10 @@ export default function BayaranPageClient() {
             isLoading={isLoading}
             onAddPayment={setSelectedAddPaymentId}
             onNextPaymentMonth={() => handlePaymentMonthChange(1)}
+            onPaymentMonthSelect={handlePaymentMonthSelect}
             onPreviousPaymentMonth={() => handlePaymentMonthChange(-1)}
             onViewPayment={setSelectedPaymentId}
+            paymentMonthKey={paymentMonthKey}
             paymentMonthLabel={paymentMonthLabel}
           />
           <BayaranPagination

@@ -5,12 +5,12 @@ import type {
   BayaranStatusFilter,
 } from "@/lib/payments/bayaran-types";
 
-export async function getBayaranPaymentDetail(paymentId: string) {
-  const details = await getBayaranPaymentDetailsByIds([paymentId], {
+export async function getBayaranPaymentDetail(recordId: string) {
+  const details = await getBayaranPaymentDetailsByIds([recordId], {
     includeHistory: true,
   });
 
-  return details[paymentId] ?? null;
+  return details[recordId] ?? null;
 }
 
 type BayaranDetailOptions = {
@@ -18,58 +18,72 @@ type BayaranDetailOptions = {
 };
 
 export async function getBayaranPaymentDetailsByIds(
-  paymentIds: string[],
+  recordIds: string[],
   options: BayaranDetailOptions = {},
 ) {
-  const uniquePaymentIds = Array.from(new Set(paymentIds)).filter(Boolean);
+  const uniqueRecordIds = Array.from(new Set(recordIds)).filter(Boolean);
   const includeHistory = options.includeHistory ?? true;
 
-  if (uniquePaymentIds.length === 0) {
+  if (uniqueRecordIds.length === 0) {
     return {};
   }
 
-  const payments = await prisma.payment.findMany({
+  const paymentRecordRows = await prisma.payment.findMany({
     where: {
       id: {
-        in: uniquePaymentIds,
+        in: uniqueRecordIds,
       },
     },
     select: {
       id: true,
       residentId: true,
-      resident: {
+    },
+  });
+  const residentIdByRecordId = new Map(
+    uniqueRecordIds.map((recordId) => [recordId, recordId]),
+  );
+
+  paymentRecordRows.forEach((payment) => {
+    residentIdByRecordId.set(payment.id, payment.residentId);
+  });
+
+  const residentIds = Array.from(new Set(residentIdByRecordId.values()));
+  const residents = await prisma.resident.findMany({
+    where: {
+      id: {
+        in: residentIds,
+      },
+    },
+    select: {
+      id: true,
+      fullName: true,
+      icNumber: true,
+      status: true,
+      arrearsSummary: {
         select: {
-          id: true,
-          fullName: true,
-          icNumber: true,
-          status: true,
-          arrearsSummary: {
+          totalArrearsAmount: true,
+        },
+      },
+      occupancies: {
+        where: {
+          status: "CURRENT",
+        },
+        orderBy: {
+          moveInDate: "desc",
+        },
+        take: 1,
+        select: {
+          moveInDate: true,
+          moveOutDate: true,
+          unit: {
             select: {
-              totalArrearsAmount: true,
-            },
-          },
-          occupancies: {
-            where: {
-              status: "CURRENT",
-            },
-            orderBy: {
-              moveInDate: "desc",
-            },
-            take: 1,
-            select: {
-              moveInDate: true,
-              moveOutDate: true,
-              unit: {
+              id: true,
+              unitCode: true,
+              quarterCategory: {
                 select: {
                   id: true,
-                  unitCode: true,
-                  quarterCategory: {
-                    select: {
-                      id: true,
-                      categoryName: true,
-                      address: true,
-                    },
-                  },
+                  categoryName: true,
+                  address: true,
                 },
               },
             },
@@ -78,9 +92,7 @@ export async function getBayaranPaymentDetailsByIds(
       },
     },
   });
-  const residentIds = Array.from(
-    new Set(payments.map((payment) => payment.residentId)),
-  );
+  const residentById = new Map(residents.map((resident) => [resident.id, resident]));
   const currentMonthTotalsPromise = prisma.payment.groupBy({
     by: ["residentId"],
     where: {
@@ -154,22 +166,29 @@ export async function getBayaranPaymentDetailsByIds(
     historyByResidentId.set(history.residentId, residentHistory);
   });
 
-  return payments.reduce<Record<string, BayaranDetail>>((details, payment) => {
-    const currentOccupancy = payment.resident.occupancies[0] ?? null;
-    const arrearsAmount = payment.resident.arrearsSummary
-      ? Number(payment.resident.arrearsSummary.totalArrearsAmount)
-      : null;
-    const isDataTidakLengkap = payment.resident.status === "DATA_TIDAK_LENGKAP";
+  return uniqueRecordIds.reduce<Record<string, BayaranDetail>>((details, recordId) => {
+    const residentId = residentIdByRecordId.get(recordId);
+    const resident = residentId ? residentById.get(residentId) : null;
 
-    details[payment.id] = {
-      id: payment.id,
+    if (!resident) {
+      return details;
+    }
+
+    const currentOccupancy = resident.occupancies[0] ?? null;
+    const arrearsAmount = resident.arrearsSummary
+      ? Number(resident.arrearsSummary.totalArrearsAmount)
+      : null;
+    const isDataTidakLengkap = resident.status === "DATA_TIDAK_LENGKAP";
+
+    details[recordId] = {
+      id: recordId,
       resident: {
-        id: payment.resident.id,
-        name: payment.resident.fullName,
-        ic: payment.resident.icNumber,
-        age: calculateAgeFromIcNumber(payment.resident.icNumber),
-        status: payment.resident.status,
-        statusLabel: getResidentStatusLabel(payment.resident.status),
+        id: resident.id,
+        name: resident.fullName,
+        ic: resident.icNumber,
+        age: calculateAgeFromIcNumber(resident.icNumber),
+        status: resident.status,
+        statusLabel: getResidentStatusLabel(resident.status),
       },
       quarters: {
         categoryId: currentOccupancy?.unit.quarterCategory.id ?? null,
@@ -183,13 +202,13 @@ export async function getBayaranPaymentDetailsByIds(
       },
       payment: {
         amountThisMonth:
-          currentMonthTotalByResidentId.get(payment.residentId) ?? 0,
+          currentMonthTotalByResidentId.get(resident.id) ?? 0,
         arrearsAmount,
         status: getPaymentStatusFilter(arrearsAmount, isDataTidakLengkap),
         statusLabel: getPaymentStatusLabel(arrearsAmount, isDataTidakLengkap),
       },
       historyLoaded: includeHistory,
-      history: historyByResidentId.get(payment.residentId) ?? [],
+      history: historyByResidentId.get(resident.id) ?? [],
     };
 
     return details;

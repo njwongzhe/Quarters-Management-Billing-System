@@ -59,6 +59,7 @@ type CalenderProps = {
     onChange: (value: string) => void;           // Callback function when the selected date changes.
     onClose: () => void;                         // Callback function when the calendar popup is closed.
     disableAbsolutePositioning?: boolean;        // Whether to disable absolute positioning for the calendar popup.
+    monthOnly?: boolean;                         // Whether to show only month selection and return the first day of the selected month.
     scale?: number;                              // Scale factor for the calendar popup.
 };
 
@@ -77,7 +78,19 @@ const WEEKDAY_LABELS = [
 const MONTH_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
 
 // Main Calender component implementation.
-export default function Calender({
+export default function Calender(props: CalenderProps) {
+    if (!props.isOpen)
+        return null;
+
+    return (
+        <CalenderPanel
+            key={`${props.value}-${props.monthOnly ? "month" : "date"}`}
+            {...props}
+        />
+    );
+}
+
+function CalenderPanel({
     containerRef,
     isOpen,
     value,
@@ -90,11 +103,12 @@ export default function Calender({
     onChange,
     onClose,
     disableAbsolutePositioning = false,
+    monthOnly = false,
     scale,
 }: CalenderProps) {
     // State Management
     const [visibleMonth, setVisibleMonth] = useState(parseDateInput(value) ?? startOfDay(new Date()));
-    const [showMonthYearPicker, setShowMonthYearPicker] = useState(false);
+    const [showMonthYearPicker, setShowMonthYearPicker] = useState(monthOnly);
 
     // Derive current year and month from the visibleMonth state for header display and navigation logic.
     const currentYear = visibleMonth.getFullYear();
@@ -129,13 +143,6 @@ export default function Calender({
         setVisibleMonth((currentDate) => addMonths(currentDate, 1));
     };
 
-    // Effect to update the visible month when the value changes while the picker is open.
-    useEffect(() => {
-        if (!isOpen)
-            return;
-        setVisibleMonth(parseDateInput(value) ?? startOfDay(new Date()));
-    }, [isOpen, value]);
-
     // Effect to handle closing the calendar picker when clicking outside of it.
     useEffect(() => {
         if (!isOpen)
@@ -152,9 +159,6 @@ export default function Calender({
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, [isOpen, containerRef, onClose]);
-
-    if (!isOpen)
-        return null;
 
     return (
         <div
@@ -177,8 +181,12 @@ export default function Calender({
                 {/* Month and Year Label */}
                 <button
                     type="button"
-                    className="flex-1 text-center text-sm font-bold text-dark-grey transition-colors hover:text-dark-blue cursor-pointer"
-                    onClick={() => setShowMonthYearPicker(!showMonthYearPicker)}
+                    className="flex-1 cursor-pointer text-center text-sm font-bold text-dark-grey transition-colors hover:text-dark-blue"
+                    onClick={() => {
+                        if (!monthOnly) {
+                            setShowMonthYearPicker(!showMonthYearPicker);
+                        }
+                    }}
                 >
                     {showMonthYearPicker
                         ? `${currentYear}`
@@ -214,18 +222,35 @@ export default function Calender({
                 <div className="grid grid-cols-4 gap-1">
                     {MONTH_INDICES.map((monthIdx) => {
                         const monthName = new Date(visibleMonth.getFullYear(), monthIdx, 1).toLocaleDateString("ms-MY", {month: "short"});
+                        const monthDateValue = formatDateInput(new Date(visibleMonth.getFullYear(), monthIdx, 1));
+                        const isBelowMinDate = Boolean(minDate && monthDateValue.slice(0, 7) < minDate.slice(0, 7));
+                        const isAboveMaxDate = Boolean(maxDate && monthDateValue.slice(0, 7) > maxDate.slice(0, 7));
+                        const isDisabled = isBelowMinDate || isAboveMaxDate;
 
                         return (
                             <button
                                 key={monthIdx}
                                 type="button"
+                                aria-disabled={isDisabled}
+                                tabIndex={isDisabled ? -1 : 0}
                                 className={`rounded-lg px-2 py-2 text-xs font-bold transition-colors ${
-                                    monthIdx === currentMonth
+                                    isDisabled
+                                        ? "cursor-not-allowed text-light-grey/60"
+                                        : monthIdx === currentMonth
                                         ? "bg-dark-blue text-white"
                                         : "text-dark-grey hover:bg-light-blue hover:text-dark-blue"
                                 }`}
                                 onClick={() => {
-                                    setVisibleMonth(new Date(visibleMonth.getFullYear(), monthIdx, 1));
+                                    if (isDisabled) {
+                                        return;
+                                    }
+                                    const nextVisibleMonth = new Date(visibleMonth.getFullYear(), monthIdx, 1);
+                                    setVisibleMonth(nextVisibleMonth);
+                                    if (monthOnly) {
+                                        onChange(formatDateInput(nextVisibleMonth));
+                                        onClose();
+                                        return;
+                                    }
                                     setShowMonthYearPicker(false);
                                 }}
                             >

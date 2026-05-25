@@ -233,7 +233,7 @@ function PaymentInfoTab({
           paymentDetails.quarters.unitId,
         )}`
       : null;
-  const arrearsAmount = paymentDetails.payment.arrearsAmount;
+  const arrearsAmount = paymentDetails.payment.arrearsAmount ?? 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -330,7 +330,7 @@ function PaymentInfoTab({
               BAKI TUNGGAKAN
             </div>
             <div className="text-lg font-bold text-red">
-              {arrearsAmount === null ? "N/A" : `RM ${formatMoney(arrearsAmount)}`}
+              RM {formatMoney(arrearsAmount)}
             </div>
             <div className="mt-3 text-xs font-extralight text-light-grey">
               {paymentDetails.payment.statusLabel}

@@ -172,7 +172,7 @@ export default function BayaranFilterShell({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg bg-white shadow-sm">{children}</div>
+      <div className="overflow-visible rounded-lg bg-white shadow-sm">{children}</div>
     </div>
   );
 }

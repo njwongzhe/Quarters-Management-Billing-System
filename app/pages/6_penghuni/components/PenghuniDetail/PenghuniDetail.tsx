@@ -112,7 +112,6 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
     // Function to show notification messages. (Success or Error)
     const showNotification = (type: "success" | "error", message: string) => {
         setNotification({ type, message });
-        setTimeout(() => setNotification({ type: null, message: "" }), 3000);
     };
 
     // Helper function to format date for display.

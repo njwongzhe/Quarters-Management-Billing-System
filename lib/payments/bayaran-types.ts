@@ -10,7 +10,7 @@ export type BayaranFilters = {
 
 export type BayaranRow = {
   id: string;
-  residentId: string | null;
+  residentId: string;
   name: string;
   ic: string;
   quarters: string;
@@ -61,7 +61,7 @@ export type BayaranDetail = {
 
 export type PaymentQueryRow = {
   id: string;
-  residentId: string | null;
+  residentId: string;
   fullName: string | null;
   icNumber: string | null;
   residentStatus: string | null;
@@ -101,7 +101,7 @@ export type BayaranExportRow = {
   ic: string;
   quarters: string;
   unit: string;
-  arrearsAmount: number | null;
+  arrearsAmount: number;
   amount: number;
   status: string;
   paymentStatus: BayaranStatusFilter;

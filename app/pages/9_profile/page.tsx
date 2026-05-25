@@ -86,20 +86,6 @@ export default function ProfilePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!feedback) {
-      return;
-    }
-
-    const feedbackTimer = window.setTimeout(() => {
-      setFeedback(null);
-    }, 5000);
-
-    return () => {
-      window.clearTimeout(feedbackTimer);
-    };
-  }, [feedback]);
-
   function showFeedback(type: Feedback["type"], message: string) {
     setFeedback({ type, message });
   }

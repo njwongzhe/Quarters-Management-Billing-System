@@ -48,16 +48,11 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const sourcePayment = await prisma.payment.findUnique({
-      where: { id },
-      select: {
-        residentId: true,
-      },
-    });
+    const residentId = await resolvePaymentResidentId(id);
 
-    if (!sourcePayment) {
+    if (!residentId) {
       return NextResponse.json(
-        { success: false, message: "Rekod bayaran tidak ditemui." },
+        { success: false, message: "Rekod penghuni tidak ditemui." },
         { status: 404 },
       );
     }
@@ -73,7 +68,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const duplicateRecordIndex = findDuplicateManualPaymentIndex(
-      sourcePayment.residentId,
+      residentId,
       parsedRecords.records,
     );
 
@@ -88,11 +83,11 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     await prisma.$transaction(async (tx) => {
-      await lockManualPaymentResident(tx, sourcePayment.residentId);
+      await lockManualPaymentResident(tx, residentId);
 
       const existingDuplicateIndex = await findExistingManualPaymentIndex(
         tx,
-        sourcePayment.residentId,
+        residentId,
         parsedRecords.records,
       );
 
@@ -103,7 +98,7 @@ export async function POST(request: Request, context: RouteContext) {
       await createPaymentRecords(
         tx,
         parsedRecords.records.map((record) => ({
-          residentId: sourcePayment.residentId,
+          residentId,
           paymentDate: record.paymentDate,
           receiptNo: record.receiptNo,
           amount: record.amount,
@@ -148,6 +143,24 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
+}
+
+async function resolvePaymentResidentId(recordId: string) {
+  const resident = await prisma.resident.findUnique({
+    where: { id: recordId },
+    select: { id: true },
+  });
+
+  if (resident) {
+    return resident.id;
+  }
+
+  const payment = await prisma.payment.findUnique({
+    where: { id: recordId },
+    select: { residentId: true },
+  });
+
+  return payment?.residentId ?? null;
 }
 
 function parseManualPaymentRecords(body: unknown):

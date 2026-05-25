@@ -419,11 +419,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const updatedUnit = await prisma.$transaction(async (tx) => {
-      if (parsedBody.data.providedFields.occupantIcNumber && shouldReplaceOccupancy) {
-        await tx.unitOccupancy.updateMany({
+      if (
+        parsedBody.data.providedFields.occupantIcNumber &&
+        shouldReplaceOccupancy &&
+        currentOccupancy
+      ) {
+        await tx.unitOccupancy.update({
           where: {
-            unitId,
-            status: "CURRENT",
+            id: currentOccupancy.id,
           },
           data: {
             status: "PAST",

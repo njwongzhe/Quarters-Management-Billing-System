@@ -8,11 +8,12 @@ import {
   resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
-import { findUnitIdForPenghuniRecord } from "@/lib/uploaded-document/penghuni/queries";
 import {
   findQuarterCategoryByNameAddress,
   findUnitByCategoryIdAndCode,
 } from "@/lib/uploaded-document/kuarters/queries";
+
+const DEFAULT_QUARTER_ADDRESS = "N/A";
 
 export async function verifyPenghuniDrafts(
   tx: Prisma.TransactionClient,
@@ -51,7 +52,14 @@ export async function verifyPenghuniDrafts(
   const successMessages: string[] = [];
   const residentIdByIc = await findResidentIdsByNormalizedIc(tx, selectedDrafts);
   const existingResidentIds = new Set(residentIdByIc.values());
-  const unitResolutionCache = createPenghuniUnitResolutionCache();
+  const recordByDraftId = new Map(
+    selectedDrafts.map((draft) => [draft.id, buildRecordFromDraft(draft)]),
+  );
+  const unitResolutionCache = await createPenghuniUnitResolutionCache(
+    tx,
+    [...recordByDraftId.values()],
+  );
+  const selectedIcNumbersQueuedForVerification = new Set<string>();
   const candidates: PreparedPenghuniDraft[] = [];
 
   if (selectedDrafts.length === 0) {
@@ -64,7 +72,7 @@ export async function verifyPenghuniDrafts(
   }
 
   for (const draft of selectedDrafts) {
-    const record = buildRecordFromDraft(draft);
+    const record = recordByDraftId.get(draft.id) ?? buildRecordFromDraft(draft);
     const normalizedDraftIc = normalizeIc(draft.icNumber);
 
     if (normalizedDraftIc.length !== 12) {
@@ -73,6 +81,15 @@ export async function verifyPenghuniDrafts(
       );
       continue;
     }
+
+    if (selectedIcNumbersQueuedForVerification.has(normalizedDraftIc)) {
+      failedMessages.push(
+        `Penghuni ${draft.fullName} gagal disahkan kerana No. K/P bertindih dalam pilihan semakan.`,
+      );
+      continue;
+    }
+
+    selectedIcNumbersQueuedForVerification.add(normalizedDraftIc);
 
     let residentId = residentIdByIc.get(normalizedDraftIc) ?? "";
     if (!residentId) {
@@ -95,9 +112,10 @@ export async function verifyPenghuniDrafts(
     successMessages.push(...unitResult.successMessages);
 
     const unitId = unitResult.unitId;
+    const hasUnitToOccupy = Boolean(unitId || unitResult.unitKey);
     const hasMoveInDate = Boolean(normalizePenghuniText(record.tarikhMasuk));
 
-    if (unitId && !hasMoveInDate) {
+    if (hasUnitToOccupy && !hasMoveInDate) {
       failedMessages.push(
         `Penghunian ${draft.fullName} gagal disahkan kerana tarikh masuk belum diisi.`,
       );
@@ -127,7 +145,11 @@ export async function verifyPenghuniDrafts(
       draft,
       normalizedIc: normalizedDraftIc,
       residentId,
-      unitId,
+      unitId: unitResult.unitId,
+      unitKey: unitResult.unitKey,
+      quarterCategoryName: unitResult.categoryName,
+      quarterAddress: unitResult.address,
+      unitCode: unitResult.unitCode,
       moveInDate,
       moveOutDate,
     });
@@ -161,19 +183,23 @@ export async function verifyPenghuniDrafts(
     rowsToVerify,
     existingResidentIds,
   );
+  const quarterCreationMessages = await createMissingPenghuniUnitsForVerifiedRows(
+    tx,
+    rowsToVerify,
+    unitResolutionCache,
+  );
   const additionalAffectedUnitIds = await writePenghuniOccupancies(tx, rowsToVerify);
 
   await tx.residentDraft.deleteMany({
     where: { id: { in: rowsToVerify.map((row) => row.draft.id) } },
   });
 
-  await syncUnitOccupancyStatuses(
-    tx,
-    [
+  await syncUnitOccupancyStatuses(tx, [
+    ...new Set([
       ...rowsToVerify.map((row) => row.unitId).filter(Boolean),
       ...additionalAffectedUnitIds,
-    ],
-  );
+    ]),
+  ]);
 
   const summaryMessages = [
     residentWriteCounts.created > 0
@@ -187,7 +213,11 @@ export async function verifyPenghuniDrafts(
   return {
     verifiedRows: rowsToVerify.length,
     failedMessages,
-    successMessages: [...summaryMessages, ...successMessages],
+    successMessages: [
+      ...summaryMessages,
+      ...successMessages,
+      ...quarterCreationMessages,
+    ],
   };
 }
 
@@ -198,6 +228,10 @@ type PreparedPenghuniDraft = {
   normalizedIc: string;
   residentId: string;
   unitId: string;
+  unitKey: string;
+  quarterCategoryName: string;
+  quarterAddress: string;
+  unitCode: string;
   moveInDate: Date | null;
   moveOutDate: Date | null;
 };
@@ -212,11 +246,12 @@ function filterPenghuniInternalConflicts(
     const candidateMoveInDate = candidate.moveInDate;
 
     if (
-      candidate.unitId &&
+      getPenghuniCandidateUnitConflictKey(candidate) &&
       candidateMoveInDate &&
       acceptedRows.some(
         (accepted) =>
-          accepted.unitId === candidate.unitId &&
+          getPenghuniCandidateUnitConflictKey(accepted) ===
+            getPenghuniCandidateUnitConflictKey(candidate) &&
           accepted.residentId !== candidate.residentId &&
           accepted.moveInDate &&
           dateRangesOverlap(
@@ -475,6 +510,7 @@ async function markOtherCurrentPenghuniOccupanciesPast(
     WHERE occupancy."residentId" = updates."residentId"
       AND occupancy."status" = 'CURRENT'::"OccupancyStatus"
       AND occupancy."unitId" <> updates."unitId"
+      AND occupancy."moveInDate" <= updates."moveInDate"
     RETURNING occupancy."unitId" AS "unitId"
   `;
 
@@ -538,6 +574,10 @@ function buildRecordFromDraft(
 
 type UnitResolutionResult = {
   unitId: string;
+  unitKey: string;
+  categoryName: string;
+  address: string;
+  unitCode: string;
   failedMessage?: string;
   successMessages: string[];
 };
@@ -548,11 +588,47 @@ type PenghuniUnitResolutionCache = {
   unitIdByCategoryUnit: Map<string, string>;
 };
 
-function createPenghuniUnitResolutionCache(): PenghuniUnitResolutionCache {
+async function createPenghuniUnitResolutionCache(
+  tx: Prisma.TransactionClient,
+  records: ExtractedPenghuniRecord[],
+): Promise<PenghuniUnitResolutionCache> {
+  const categoryIdByNameAddress = await findExistingPenghuniCategoryIdsByKey(
+    tx,
+    records,
+  );
+  const existingUnitIdByRecordKey = await findExistingPenghuniUnitIdsByRecordKey(
+    tx,
+    records,
+  );
+  const unitIdByCategoryUnit = new Map<string, string>();
+
+  for (const record of records) {
+    const categoryName = normalizePenghuniText(record.kuarters);
+    const address = normalizePenghuniAddress(record.alamatKuarters);
+    const unitCode = normalizePenghuniText(record.unit);
+
+    if (!categoryName || !unitCode) {
+      continue;
+    }
+
+    const categoryId = categoryIdByNameAddress.get(
+      getPenghuniCategoryKey(categoryName, address),
+    );
+
+    if (!categoryId) {
+      continue;
+    }
+
+    unitIdByCategoryUnit.set(
+      getPenghuniCategoryUnitKey(categoryId, unitCode),
+      existingUnitIdByRecordKey.get(getPenghuniRecordUnitKey(record)) ?? "",
+    );
+  }
+
   return {
-    existingUnitIdByRecordKey: new Map(),
-    categoryIdByNameAddress: new Map(),
-    unitIdByCategoryUnit: new Map(),
+    existingUnitIdByRecordKey,
+    categoryIdByNameAddress,
+    unitIdByCategoryUnit,
   };
 }
 
@@ -562,41 +638,55 @@ async function resolvePenghuniUnit(
   residentName: string,
   cache: PenghuniUnitResolutionCache,
 ): Promise<UnitResolutionResult> {
-  const recordUnitKey = [
-    normalizePenghuniText(record.kuarters).toUpperCase(),
-    normalizePenghuniText(record.alamatKuarters).toUpperCase(),
-    normalizePenghuniText(record.unit).toUpperCase(),
-  ].join("|");
-  let existingUnitId = cache.existingUnitIdByRecordKey.get(recordUnitKey);
-
-  if (existingUnitId === undefined) {
-    existingUnitId = await findUnitIdForPenghuniRecord(tx, record);
-    cache.existingUnitIdByRecordKey.set(recordUnitKey, existingUnitId);
-  }
-
-  if (existingUnitId) {
-    return { unitId: existingUnitId, successMessages: [] };
-  }
-
   const categoryName = normalizePenghuniText(record.kuarters);
-  const address = normalizePenghuniText(record.alamatKuarters);
+  const rawAddress = normalizePenghuniText(record.alamatKuarters);
+  const address = normalizePenghuniAddress(record.alamatKuarters);
   const unitCode = normalizePenghuniText(record.unit);
-  const hasAnyQuarterInfo = Boolean(categoryName || address || unitCode);
+  const hasAnyQuarterInfo = Boolean(categoryName || rawAddress || unitCode);
+  const emptyResult = {
+    unitId: "",
+    unitKey: "",
+    categoryName: "",
+    address: "",
+    unitCode: "",
+    successMessages: [],
+  };
 
   if (!hasAnyQuarterInfo) {
-    return { unitId: "", successMessages: [] };
+    return emptyResult;
   }
 
-  if (!categoryName || !address || !unitCode) {
+  if (!categoryName || !unitCode) {
     return {
       unitId: "",
+      unitKey: "",
+      categoryName: "",
+      address: "",
+      unitCode: "",
       failedMessage: `Penghuni ${residentName} gagal disahkan kerana maklumat kuarters tidak lengkap.`,
       successMessages: [],
     };
   }
 
-  const successMessages: string[] = [];
-  const categoryKey = [categoryName.toUpperCase(), address.toUpperCase()].join("|");
+  const recordUnitKey = getPenghuniRecordUnitKeyFromParts({
+    categoryName,
+    address,
+    unitCode,
+  });
+  const existingUnitId = cache.existingUnitIdByRecordKey.get(recordUnitKey);
+
+  if (existingUnitId) {
+    return {
+      unitId: existingUnitId,
+      unitKey: recordUnitKey,
+      categoryName,
+      address,
+      unitCode,
+      successMessages: [],
+    };
+  }
+
+  const categoryKey = getPenghuniCategoryKey(categoryName, address);
   let categoryId = cache.categoryIdByNameAddress.get(categoryKey);
 
   if (categoryId === undefined) {
@@ -604,50 +694,241 @@ async function resolvePenghuniUnit(
     cache.categoryIdByNameAddress.set(categoryKey, categoryId);
   }
 
-  if (!categoryId) {
-    const category = await tx.quarterCategory.create({
-      data: {
-        categoryName,
-        address,
-        rentalPrice: 0,
-        maintenancePrice: 0,
-        penaltyPrice: 0,
-      },
-      select: { id: true },
-    });
-    categoryId = category.id;
-    cache.categoryIdByNameAddress.set(categoryKey, categoryId);
-    successMessages.push(`Kategori kuarters ${categoryName} ditambah secara automatik.`);
+  let unitId = "";
+
+  if (categoryId) {
+    const unitKey = getPenghuniCategoryUnitKey(categoryId, unitCode);
+    unitId = cache.unitIdByCategoryUnit.get(unitKey) ?? "";
+
+    if (!cache.unitIdByCategoryUnit.has(unitKey)) {
+      unitId = await findUnitByCategoryIdAndCode(tx, categoryId, unitCode);
+      cache.unitIdByCategoryUnit.set(unitKey, unitId);
+    }
   }
 
-  const unitKey = [categoryId, unitCode.toUpperCase()].join("|");
-  let unitId = cache.unitIdByCategoryUnit.get(unitKey);
+  return {
+    unitId,
+    unitKey: recordUnitKey,
+    categoryName,
+    address,
+    unitCode,
+    successMessages: [],
+  };
+}
 
-  if (unitId === undefined) {
-    unitId = await findUnitByCategoryIdAndCode(tx, categoryId, unitCode);
-    cache.unitIdByCategoryUnit.set(unitKey, unitId);
+async function createMissingPenghuniUnitsForVerifiedRows(
+  tx: Prisma.TransactionClient,
+  rowsToVerify: PreparedPenghuniDraft[],
+  cache: PenghuniUnitResolutionCache,
+) {
+  const successMessages: string[] = [];
+
+  for (const row of rowsToVerify) {
+    if (row.unitId || !row.unitKey) {
+      continue;
+    }
+
+    const categoryKey = getPenghuniCategoryKey(
+      row.quarterCategoryName,
+      row.quarterAddress,
+    );
+    let categoryId = cache.categoryIdByNameAddress.get(categoryKey);
+
+    if (categoryId === undefined) {
+      categoryId = await findQuarterCategoryByNameAddress(
+        tx,
+        row.quarterCategoryName,
+        row.quarterAddress,
+      );
+      cache.categoryIdByNameAddress.set(categoryKey, categoryId);
+    }
+
+    if (!categoryId) {
+      const category = await tx.quarterCategory.create({
+        data: {
+          categoryName: row.quarterCategoryName,
+          address: row.quarterAddress,
+          rentalPrice: 0,
+          maintenancePrice: 0,
+          penaltyPrice: 0,
+        },
+        select: { id: true },
+      });
+      categoryId = category.id;
+      cache.categoryIdByNameAddress.set(categoryKey, categoryId);
+      successMessages.push(
+        `Kategori kuarters ${row.quarterCategoryName} ditambah secara automatik.`,
+      );
+    }
+
+    const categoryUnitKey = getPenghuniCategoryUnitKey(categoryId, row.unitCode);
+    let unitId = cache.unitIdByCategoryUnit.get(categoryUnitKey);
+
+    if (unitId === undefined) {
+      unitId = await findUnitByCategoryIdAndCode(tx, categoryId, row.unitCode);
+      cache.unitIdByCategoryUnit.set(categoryUnitKey, unitId);
+    }
+
+    if (!unitId) {
+      const unit = await tx.unit.create({
+        data: {
+          unitCode: row.unitCode,
+          status: "VACANT",
+          categoryId,
+        },
+        select: { id: true },
+      });
+      unitId = unit.id;
+      cache.unitIdByCategoryUnit.set(categoryUnitKey, unitId);
+      cache.existingUnitIdByRecordKey.set(row.unitKey, unitId);
+      successMessages.push(`Unit ${row.unitCode} ditambah secara automatik.`);
+    }
+
+    row.unitId = unitId;
   }
 
-  if (!unitId) {
-    const unit = await tx.unit.create({
-      data: {
-        unitCode,
-        status: "VACANT",
-        categoryId,
-      },
-      select: { id: true },
-    });
-    unitId = unit.id;
-    cache.unitIdByCategoryUnit.set(unitKey, unitId);
-    cache.existingUnitIdByRecordKey.set(recordUnitKey, unitId);
-    successMessages.push(`Unit ${unitCode} ditambah secara automatik.`);
+  return successMessages;
+}
+
+async function findExistingPenghuniCategoryIdsByKey(
+  tx: Prisma.TransactionClient,
+  records: ExtractedPenghuniRecord[],
+) {
+  const payload = records
+    .map((record) => ({
+      key: getPenghuniCategoryKey(
+        normalizePenghuniText(record.kuarters),
+        normalizePenghuniAddress(record.alamatKuarters),
+      ),
+      categoryName: normalizePenghuniText(record.kuarters),
+      address: normalizePenghuniAddress(record.alamatKuarters),
+    }))
+    .filter((record) => record.categoryName);
+  const categoryIdByKey = new Map(payload.map((row) => [row.key, ""]));
+
+  if (payload.length === 0) {
+    return categoryIdByKey;
   }
 
-  return { unitId, successMessages };
+  const uniquePayload = [...new Map(payload.map((row) => [row.key, row])).values()];
+  const rows = await tx.$queryRaw<{ key: string; categoryId: string }[]>`
+    WITH input AS (
+      SELECT *
+      FROM jsonb_to_recordset(${JSON.stringify(uniquePayload)}::jsonb) AS x(
+        "key" text,
+        "categoryName" text,
+        "address" text
+      )
+    )
+    SELECT DISTINCT ON (input."key")
+      input."key",
+      category."id" AS "categoryId"
+    FROM input
+    INNER JOIN "QuarterCategory" category
+      ON UPPER(TRIM(regexp_replace(category."categoryName", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(input."categoryName", '\\s+', ' ', 'g')))
+      AND UPPER(TRIM(regexp_replace(COALESCE(category."address", ''), '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(input."address", '\\s+', ' ', 'g')))
+    ORDER BY input."key", category."createdAt" DESC
+  `;
+
+  for (const row of rows) {
+    categoryIdByKey.set(row.key, row.categoryId);
+  }
+
+  return categoryIdByKey;
+}
+
+async function findExistingPenghuniUnitIdsByRecordKey(
+  tx: Prisma.TransactionClient,
+  records: ExtractedPenghuniRecord[],
+) {
+  const payload = records
+    .map((record) => ({
+      key: getPenghuniRecordUnitKey(record),
+      categoryName: normalizePenghuniText(record.kuarters),
+      address: normalizePenghuniAddress(record.alamatKuarters),
+      unitCode: normalizePenghuniText(record.unit),
+    }))
+    .filter((record) => record.categoryName && record.unitCode);
+  const unitIdByRecordKey = new Map<string, string>();
+
+  if (payload.length === 0) {
+    return unitIdByRecordKey;
+  }
+
+  const uniquePayload = [...new Map(payload.map((row) => [row.key, row])).values()];
+  const rows = await tx.$queryRaw<{ key: string; unitId: string }[]>`
+    WITH input AS (
+      SELECT *
+      FROM jsonb_to_recordset(${JSON.stringify(uniquePayload)}::jsonb) AS x(
+        "key" text,
+        "categoryName" text,
+        "address" text,
+        "unitCode" text
+      )
+    )
+    SELECT DISTINCT ON (input."key")
+      input."key",
+      unit."id" AS "unitId"
+    FROM input
+    INNER JOIN "QuarterCategory" category
+      ON UPPER(TRIM(regexp_replace(category."categoryName", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(input."categoryName", '\\s+', ' ', 'g')))
+      AND UPPER(TRIM(regexp_replace(COALESCE(category."address", ''), '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(input."address", '\\s+', ' ', 'g')))
+    INNER JOIN "Unit" unit
+      ON unit."categoryId" = category."id"
+      AND UPPER(TRIM(regexp_replace(unit."unitCode", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(input."unitCode", '\\s+', ' ', 'g')))
+    ORDER BY input."key", unit."createdAt" DESC
+  `;
+
+  for (const row of rows) {
+    unitIdByRecordKey.set(row.key, row.unitId);
+  }
+
+  return unitIdByRecordKey;
+}
+
+function getPenghuniCategoryKey(categoryName: string, address: string) {
+  return [categoryName.toUpperCase(), address.toUpperCase()].join("|");
+}
+
+function getPenghuniCategoryUnitKey(categoryId: string, unitCode: string) {
+  return [categoryId, unitCode.toUpperCase()].join("|");
+}
+
+function getPenghuniRecordUnitKey(record: ExtractedPenghuniRecord) {
+  return getPenghuniRecordUnitKeyFromParts({
+    categoryName: normalizePenghuniText(record.kuarters),
+    address: normalizePenghuniAddress(record.alamatKuarters),
+    unitCode: normalizePenghuniText(record.unit),
+  });
+}
+
+function getPenghuniRecordUnitKeyFromParts({
+  categoryName,
+  address,
+  unitCode,
+}: {
+  categoryName: string;
+  address: string;
+  unitCode: string;
+}) {
+  return [
+    categoryName.toUpperCase(),
+    address.toUpperCase(),
+    unitCode.toUpperCase(),
+  ].join("|");
 }
 
 function normalizePenghuniText(value: unknown) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function normalizePenghuniAddress(value: unknown) {
+  return normalizePenghuniText(value) || DEFAULT_QUARTER_ADDRESS;
 }
 
 function normalizeSelectedKey(value: string) {
@@ -669,6 +950,10 @@ function dateRangesOverlap(
 
   return firstMoveInDate.getTime() <= secondEndTime &&
     firstEndTime >= secondMoveInDate.getTime();
+}
+
+function getPenghuniCandidateUnitConflictKey(candidate: PreparedPenghuniDraft) {
+  return candidate.unitId || candidate.unitKey;
 }
 
 function isUuid(value: string) {

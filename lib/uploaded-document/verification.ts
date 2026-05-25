@@ -47,9 +47,23 @@ export function parseSelectedKeys(body: unknown) {
       ? (body as { selectedKeys?: unknown }).selectedKeys
       : null;
 
-  return Array.isArray(selectedKeys)
-    ? selectedKeys.filter((key: unknown): key is string => typeof key === "string")
-    : [];
+  if (!Array.isArray(selectedKeys)) {
+    return [];
+  }
+
+  const uniqueKeys: string[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const key of selectedKeys) {
+    if (typeof key !== "string" || seenKeys.has(key)) {
+      continue;
+    }
+
+    uniqueKeys.push(key);
+    seenKeys.add(key);
+  }
+
+  return uniqueKeys;
 }
 
 export async function verifyUploadedDocumentForKind(

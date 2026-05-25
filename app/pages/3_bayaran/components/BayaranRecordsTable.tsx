@@ -1,5 +1,9 @@
+"use client";
+
+import { useRef, useState } from "react";
 import { PatternFormat } from "react-number-format";
 
+import Calender from "@/app/components/Calender/Calender";
 import Icon from "@/app/components/Icon/Icon";
 import { rowBorder, rowText } from "@/lib/payments/bayaran-helpers";
 import type { BayaranRow } from "@/lib/payments/bayaran-types";
@@ -12,8 +16,10 @@ export default function BayaranRecordsTable({
   isLoading = false,
   onAddPayment,
   onNextPaymentMonth,
+  onPaymentMonthSelect,
   onPreviousPaymentMonth,
   onViewPayment,
+  paymentMonthKey,
   paymentMonthLabel,
   canGoNextPaymentMonth = true,
   rows,
@@ -22,11 +28,16 @@ export default function BayaranRecordsTable({
   isLoading?: boolean;
   onAddPayment: (paymentId: string) => void;
   onNextPaymentMonth: () => void;
+  onPaymentMonthSelect: (monthKey: string) => void;
   onPreviousPaymentMonth: () => void;
   onViewPayment: (paymentId: string) => void;
+  paymentMonthKey: string;
   paymentMonthLabel: string;
   rows: BayaranRow[];
 }) {
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const monthPickerRef = useRef<HTMLDivElement | null>(null);
+
   return (
     <table className="w-full">
       <thead>
@@ -49,9 +60,32 @@ export default function BayaranRecordsTable({
                 >
                   <Icon icon="chevron_left" size={15} />
                 </button>
-                <span className="min-w-16 text-center">
-                  {paymentMonthLabel}
-                </span>
+                <div ref={monthPickerRef} className="relative min-w-20">
+                  <button
+                    type="button"
+                    className="min-w-20 rounded px-1.5 py-1 text-center uppercase text-dark-blue transition hover:bg-light-blue"
+                    aria-label={`Pilih bulan bayaran. Bulan semasa ${paymentMonthLabel}`}
+                    title="Pilih bulan"
+                    onClick={() => setIsMonthPickerOpen((isOpen) => !isOpen)}
+                  >
+                    {paymentMonthLabel}
+                  </button>
+                  <div className="absolute left-1/2 top-full z-50 mt-1 w-64 -translate-x-1/2 normal-case">
+                    <Calender
+                      containerRef={monthPickerRef}
+                      disableAbsolutePositioning
+                      isOpen={isMonthPickerOpen}
+                      value={`${paymentMonthKey}-01`}
+                      maxDate={`${getCurrentMonthKey()}-01`}
+                      monthOnly
+                      onChange={(value) => {
+                        onPaymentMonthSelect(value.slice(0, 7));
+                      }}
+                      onClose={() => setIsMonthPickerOpen(false)}
+                      scale={0.88}
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
                   className="grid h-5 w-5 place-items-center rounded text-dark-blue transition hover:bg-light-blue disabled:cursor-not-allowed disabled:text-light-grey"
@@ -149,6 +183,12 @@ function formatIcNumber(value: string) {
       disabled
     />
   );
+}
+
+function getCurrentMonthKey() {
+  const today = new Date();
+
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function LoadingRows() {
