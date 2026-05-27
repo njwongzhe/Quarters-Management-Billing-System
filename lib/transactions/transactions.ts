@@ -16,6 +16,7 @@ export interface TransactionFilterParams {
   endDate?: string;
   categories?: TransactionCategory[];
   statuses?: TransactionStatus[];
+  type?: "DEBIT" | "CREDIT";
   page?: number;
   limit?: number;
 }
@@ -55,7 +56,7 @@ export async function getTransactionsSummary(): Promise<TransactionSummary> {
  * Get the paginated and filtered list of transactions for the main table
  */
 export async function getTransactionsList(params: TransactionFilterParams) {
-  const { search, startDate, endDate, categories, statuses, page = 1, limit = 10 } = params;
+  const { search, startDate, endDate, categories, statuses, type, page = 1, limit = 10 } = params;
   const skip = (page - 1) * limit;
 
   // Build the dynamic WHERE clause cleanly
@@ -65,6 +66,11 @@ export async function getTransactionsList(params: TransactionFilterParams) {
   if (endDate) andConditions.push({ transactionDate: { lte: new Date(endDate) } });
   if (categories && categories.length > 0) andConditions.push({ category: { in: categories } });
   if (statuses && statuses.length > 0) andConditions.push({ status: { in: statuses } });
+  if (type === "DEBIT") {
+    andConditions.push({ debitAmount: { gt: 0 } });
+  } else if (type === "CREDIT") {
+    andConditions.push({ creditAmount: { gt: 0 } });
+  }
 
   if (search) {
     const cleanSearch = search.trim();

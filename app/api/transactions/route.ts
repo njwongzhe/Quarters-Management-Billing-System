@@ -30,12 +30,15 @@ export async function GET(request: NextRequest) {
     const statusesParam = searchParams.get("statuses");
     const statuses = statusesParam ? (statusesParam.split(",") as TransactionStatus[]) : undefined;
 
+    const type = (searchParams.get("type") as "DEBIT" | "CREDIT") || undefined;
+
     const params: TransactionFilterParams = {
       search,
       startDate,
       endDate,
       categories,
       statuses,
+      type,
       page,
       limit,
     };

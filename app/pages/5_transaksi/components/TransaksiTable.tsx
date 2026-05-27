@@ -193,7 +193,7 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
 
                 {/* Penghuni */}
                 <td className={`px-6 py-4 ${isMuted ? 'opacity-50' : ''}`}>
-                  <p className="font-bold text-dark-blue truncate max-w-[150px]">{tx.resident?.fullName || 'Tiada'}</p>
+                  <p className="font-bold text-dark-blue truncate max-w-37.5">{tx.resident?.fullName || 'Tiada'}</p>
                   <p className="text-xs text-gray-400">{tx.resident?.icNumber}</p>
                 </td>
 
@@ -201,7 +201,7 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
                 <td className={`px-6 py-4 text-gray-500 ${isMuted ? 'opacity-50' : ''}`}>{tx.receiptNo || 'N/A'}</td>
 
                 {/* Catatan (Strike-through if muted) */}
-                <td className={`px-6 py-4 text-gray-500 truncate max-w-[150px] ${isMuted ? 'opacity-50 line-through' : ''}`} title={tx.description ?? undefined}>
+                <td className={`px-6 py-4 text-gray-500 truncate max-w-37.5 ${isMuted ? 'opacity-50 line-through' : ''}`} title={tx.description ?? undefined}>
                   {tx.description}
                   {/* Small helper text like Figma */}
                   {["PEMBALIKAN", "PELARASAN"].includes(tx.status) && (

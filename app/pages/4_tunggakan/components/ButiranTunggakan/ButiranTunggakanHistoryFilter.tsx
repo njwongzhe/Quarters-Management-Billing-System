@@ -5,25 +5,25 @@ import { createPortal } from "react-dom";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import FilterDate from "@/app/components/FIlter/FilterDate";
 import { commonIcons } from "@/app/components/Icon/Icon";
-import type { TransactionRecord } from "./PenghuniDetailHistory";
+import type { HistoryData } from "./ButiranTunggakanModal";
 
 type DateFilter = { startDate: string; endDate: string };
 
-type UsePenghuniDetailHistoryFilterResult = {
-    filteredHistory: Array<TransactionRecord & { baki: number }>;
+type UseButiranTunggakanHistoryFilterResult = {
+    filteredHistory: Array<HistoryData & { baki: number }>;
     isDateFilterActive: boolean;
     FilterButton: React.ReactNode;
 };
 
-export function usePenghuniDetailHistoryFilter(
-    records: Array<TransactionRecord & { baki: number }>,
-): UsePenghuniDetailHistoryFilterResult {
+export function useButiranTunggakanHistoryFilter(
+    records: Array<HistoryData & { baki: number }>,
+): UseButiranTunggakanHistoryFilterResult {
     const [dateFilter, setDateFilter] = useState<DateFilter>({ startDate: "", endDate: "" });
     const [isOpen, setIsOpen] = useState(false);
     const [anchorStyle, setAnchorStyle] = useState<CSSProperties>({});
     const buttonRef = useRef<HTMLDivElement>(null);
 
-    // Close panel on outside click (button ref + portal panel both checked via data attr).
+    // Close panel on outside click
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             const target = event.target as Element | null;
@@ -42,8 +42,6 @@ export function usePenghuniDetailHistoryFilter(
     function handleToggle() {
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
-            // Anchor fixed div at the bottom-right of the button.
-            // FilterDate's own `absolute right-0 top-full mt-2` will position relative to this zero-size div.
             setAnchorStyle({
                 position: "fixed",
                 top: rect.bottom,
