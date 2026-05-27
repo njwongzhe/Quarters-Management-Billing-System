@@ -1,5 +1,32 @@
-import Link from "next/link";
+import Icon from "@/app/components/Icon/Icon";
+import { InputBox, InputField, Topic } from "@/app/components/InputField";
+import SearchingDetailDataOverlay from "@/app/components/Loading/SearchingDetailDataOverlay";
 
+import {
+  formatEnumLabel,
+  type AuditLogDetailItem,
+} from "./auditLogClient";
+import { getAuditActionBadgeColor } from "./auditLogActionColor";
+
+function getAuditActionTextClass(actionType: string) {
+  const badgeClass = getAuditActionBadgeColor(actionType);
+  return badgeClass
+    .split(" ")
+    .find((className) => className.startsWith("text-")) ?? "text-slate-800";
+}
+
+export default function AuditLogDetailOverlay({
+  auditLog,
+  isLoading,
+  errorMessage,
+  onRetry,
+  onClose,
+}: {
+  auditLog: AuditLogDetailItem | null;
+  isLoading: boolean;
+  errorMessage: string | null;
+  onRetry: () => void;
+  onClose: () => void;
 import type { AuditLogDetailItem } from "@/lib/audit/audit-logs";
 
 export default function AuditLogDetailOverlay({
@@ -14,35 +41,89 @@ export default function AuditLogDetailOverlay({
   isLoading?: boolean;
 }) {
   return (
-    <div className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-center justify-center bg-black/70 p-6">
+    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
       <section
-        className="max-h-[calc(100vh-6rem)] w-full max-w-260 overflow-hidden rounded-2xl bg-light-blue shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
+        className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full bg-light-blue"
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-details-title"
       >
-        <header className="flex min-h-19 items-center justify-between gap-4 bg-dark-blue px-5 text-white sm:px-6">
-          <div className="min-w-0 space-y-1">
+        <header className="bg-dark-blue p-6 flex items-center justify-between">
+          <div className="min-w-0">
             <h3
               id="audit-details-title"
-              className="truncate text-[19px] font-extrabold uppercase tracking-[-0.02em]"
+              className="font-bold text-lg text-white"
             >
-              Butiran Jejak Audit
+              MAKLUMAT JEJAK AUDIT
             </h3>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-white/70">
-              Rekod Aktiviti Sistem
+            <p className="font-extralight text-xs text-light-grey">
+              REKOD AKTIVITI SISTEM
             </p>
           </div>
-          <Link
-            href={closeHref}
-            className="inline-flex text-[34px] leading-none text-white transition hover:scale-95 hover:opacity-80"
+          <button
+            type="button"
+            onClick={onClose}
+            className="hover:scale-96 active:scale-92 text-white"
             aria-label="Tutup butiran audit"
           >
-            &times;
-          </Link>
+            <Icon icon="close" size={20} />
+          </button>
         </header>
 
         {isLoading ? (
+          <SearchingDetailDataOverlay
+            mode="loading"
+            loadingMessage="Mendapatkan Butiran Jejak Audit..."
+          />
+        ) : errorMessage ? (
+          <SearchingDetailDataOverlay
+            mode="warning"
+            title="Maklumat Tidak Dapat Dipaparkan"
+            message={errorMessage}
+            onRetry={onRetry}
+            retryLabel="Cuba Lagi"
+          />
+        ) : auditLog ? (
+          <div className="p-6 bg-light-blue overflow-y-auto">
+            <div className="flex flex-col gap-8">
+              <section className="flex flex-col gap-4">
+                <Topic content="MAKLUMAT AKTIVITI" />
+                <div className="grid grid-cols-3 gap-4">
+                  <InputField
+                    label="TARIKH & MASA"
+                    value={auditLog.timestampLabel}
+                    state="inactive"
+                    className="col-span-1"
+                  />
+                  <InputField
+                    label="MODUL"
+                    value={auditLog.module}
+                    state="inactive"
+                    className="col-span-1"
+                  />
+                  <InputField
+                    label="JENIS TINDAKAN"
+                    value={formatEnumLabel(auditLog.actionType)}
+                    state="inactive"
+                    inactiveBackgroundClass={`bg-transparent ${getAuditActionTextClass(auditLog.actionType)}`}
+                    className="col-span-1"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <InputField
+                    label="PENGENDALI"
+                    value={auditLog.actor}
+                    state="inactive"
+                    className="col-span-1"
+                  />
+                  <InputField
+                    label="SASARAN DATA"
+                    value={auditLog.targetData ?? auditLog.target}
+                    state="inactive"
+                    className="col-span-1"
+                  />
+                </div>
+              </section>
           <div className="flex min-h-108 items-center justify-center px-5 py-7 sm:px-8 sm:py-8">
             <div className="w-full max-w-md rounded-xl border border-light-grey/20 bg-white p-6 text-center">
               <h4 className="text-lg font-extrabold text-dark-grey">
@@ -80,12 +161,30 @@ export default function AuditLogDetailOverlay({
                 />
               </div>
 
-              <div className="mt-5 grid items-start gap-x-4 gap-y-5 md:grid-cols-12">
-                <ModalField
-                  label="Pengendali"
-                  value={auditLog.actor}
-                  className="md:col-span-4"
+              <section className="flex flex-col gap-4">
+                <Topic content="PENERANGAN PERUBAHAN" />
+                <InputBox
+                  label="CATATAN"
+                  value={auditLog.description || "N/A"}
+                  state="inactive"
+                  className="col-span-2"
+                  inputMinHeight={140}
                 />
+              </section>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 bg-light-blue overflow-y-auto">
+            <div className="flex min-h-108 items-center justify-center">
+              <div className="w-full max-w-md rounded-xl border border-red/20 bg-white p-6 text-center">
+                <h4 className="text-lg font-extrabold text-dark-grey">
+                  Rekod tidak ditemui
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-grey">
+                  Rekod audit ini mungkin telah dipadam atau tidak termasuk dalam
+                  rekod operasi.
+                </p>
+              </div>
                 <ModalField
                   label="Tarikh & Masa"
                   value={auditLog.timestampLabel}

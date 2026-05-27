@@ -28,13 +28,14 @@ type AuditLogExportResponse = {
   };
 };
 
-export default function AuditLogDownloadButton({
+export default function AuditDownload({
   exportHref,
 }: {
   exportHref: string;
 }) {
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Fetch export payload from API and generate the XLSX file client-side.
   async function handleDownload() {
     if (isDownloading) {
       return;
@@ -71,6 +72,7 @@ export default function AuditLogDownloadButton({
 }
 
 function downloadAuditLogs(records: AuditLogExportRecord[]) {
+  // Define spreadsheet header labels and styles once for consistent export format.
   const headers: XlsxCell[] = [
     { value: "Tarikh & Masa", style: "header" },
     { value: "Pengendali", style: "header" },
@@ -80,6 +82,8 @@ function downloadAuditLogs(records: AuditLogExportRecord[]) {
     { value: "Jenis Data", style: "header" },
     { value: "Penerangan", style: "header" },
   ];
+
+  // Map each audit record into a row ordered to match the header columns.
   const rows: XlsxSheet["rows"] = records.map((record) => [
     record.timestampLabel,
     record.actor,
@@ -90,6 +94,7 @@ function downloadAuditLogs(records: AuditLogExportRecord[]) {
     record.description,
   ]);
 
+  // Build a single-sheet workbook with fixed column widths for readability.
   downloadXlsxFile({
     filename: "senarai-jejak-audit",
     sheets: [

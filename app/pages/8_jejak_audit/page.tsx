@@ -1,3 +1,4 @@
+import JejakAuditPageClient from "./components/JejakAuditPageClient";
 import { Suspense } from "react";
 
 import AuditLogPageClient from "./components/AuditLogPageClient";
@@ -14,6 +15,12 @@ const EMPTY_PAGINATION = {
   perPage: 10,
 };
 
+export default async function JejakAuditPage({
+  searchParams,
+}: JejakAuditPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+
+  return <JejakAuditPageClient searchParams={resolvedSearchParams} />;
 export default function JejakAuditPage() {
   return (
     <Suspense fallback={<AuditLogPageShell />}>

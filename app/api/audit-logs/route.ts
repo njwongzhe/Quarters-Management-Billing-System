@@ -18,7 +18,9 @@ export async function GET(request: Request) {
       dateTo: searchParams.get("dateTo") ?? undefined,
       actionType: searchParams.get("actionType") ?? undefined,
       adminId: searchParams.get("adminId") ?? undefined,
+      search: searchParams.get("search") ?? undefined,
     });
+    const [data, filterOptions] = await Promise.all([
     const [auditPage, filterOptions] = await Promise.all([
       getAuditLogPage(page, filters),
       getAuditLogFilterOptions(),
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
+        ...data,
         ...auditPage,
         filterOptions,
       },
