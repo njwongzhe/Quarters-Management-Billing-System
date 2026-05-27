@@ -147,9 +147,9 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
                     <button
                       key={opt}
                       onClick={() => handleCategoryToggle(opt)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? 'bg-dark-blue text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isSelected ? 'bg-dark-blue text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                     >
-                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                      <div className={`w-3 h-3 rounded-full flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
                         {isSelected && <Icon icon="check" size={10} className="text-current" />}
                       </div>
                       {opt.replace(/_/g, ' ')}
@@ -171,9 +171,9 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
                       <button
                         key={opt.value}
                         onClick={() => handleStatusToggle(opt.value)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                       >
-                        <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                        <div className={`w-3 h-3 rounded-full flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
                           {isSelected && <Icon icon="check" size={10} className="text-current" />}
                         </div>
                         {opt.label}
@@ -193,9 +193,9 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
                       <button
                         key={opt.value}
                         onClick={() => handleTypeToggle(opt.value)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                       >
-                        <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                        <div className={`w-3 h-3 rounded-full flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
                           {isSelected && <Icon icon="check" size={10} className="text-current" />}
                         </div>
                         {opt.label}
