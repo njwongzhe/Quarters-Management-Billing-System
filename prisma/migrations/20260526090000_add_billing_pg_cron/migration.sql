@@ -162,7 +162,7 @@ BEGIN
     gen_random_uuid(),
     v_transaction_prefix || '-' || lpad((v_next_transaction_sequence + sequence_offset - 1)::TEXT, 8, '0'),
     "residentId",
-    v_run_time_local,
+    v_billing_month,
     category,
     'NORMAL'::"TransactionStatus",
     amount,
