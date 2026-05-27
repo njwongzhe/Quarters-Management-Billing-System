@@ -9,6 +9,31 @@ import type { TransactionRecord } from "./PenghuniDetailHistory";
 
 type DateFilter = { startDate: string; endDate: string };
 
+function parseRecordDate(value: string): Date | null {
+    const normalizedValue = value.trim();
+
+    const ddmmyyyyMatch = normalizedValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddmmyyyyMatch) {
+        const day = Number(ddmmyyyyMatch[1]);
+        const month = Number(ddmmyyyyMatch[2]);
+        const year = Number(ddmmyyyyMatch[3]);
+        const parsedDate = new Date(year, month - 1, day);
+
+        if (
+            parsedDate.getFullYear() === year &&
+            parsedDate.getMonth() === month - 1 &&
+            parsedDate.getDate() === day
+        ) {
+            return parsedDate;
+        }
+
+        return null;
+    }
+
+    const fallbackDate = new Date(normalizedValue);
+    return Number.isNaN(fallbackDate.getTime()) ? null : fallbackDate;
+}
+
 type UsePenghuniDetailHistoryFilterResult = {
     filteredHistory: Array<TransactionRecord & { baki: number }>;
     isDateFilterActive: boolean;
@@ -58,12 +83,32 @@ export function usePenghuniDetailHistoryFilter(
 
     const filteredHistory = isActive
         ? records.filter((record) => {
-              // Convert DD/MM/YYYY to YYYY-MM-DD for accurate string comparison
-              const parts = record.tarikh.split("/");
-              const formattedTarikh = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : record.tarikh;
+              const recordDate = parseRecordDate(record.tarikh);
 
-              if (dateFilter.startDate && formattedTarikh < dateFilter.startDate) return false;
-              if (dateFilter.endDate && formattedTarikh > dateFilter.endDate) return false;
+              if (!recordDate) {
+                  return false;
+              }
+
+              const recordTime = recordDate.getTime();
+
+              if (dateFilter.startDate) {
+                  const startDate = new Date(dateFilter.startDate);
+                  startDate.setHours(0, 0, 0, 0);
+
+                  if (recordTime < startDate.getTime()) {
+                      return false;
+                  }
+              }
+
+              if (dateFilter.endDate) {
+                  const endDate = new Date(dateFilter.endDate);
+                  endDate.setHours(23, 59, 59, 999);
+
+                  if (recordTime > endDate.getTime()) {
+                      return false;
+                  }
+              }
+
               return true;
           })
         : records;
@@ -93,7 +138,7 @@ export function usePenghuniDetailHistoryFilter(
         <>
             <div ref={buttonRef}>
                 <ToolbarIconButton
-                    icon={commonIcons.filter}
+                    icon={commonIcons.calendar}
                     label="Tapis mengikut tarikh"
                     isActive={isActive}
                     onClick={handleToggle}
