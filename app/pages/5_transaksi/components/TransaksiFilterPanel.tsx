@@ -137,30 +137,8 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
           {/* Row 2: Status, Category & Type Checkboxes */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
             
-            {/* Status Filter */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Status Transaksi</label>
-              <div className="flex flex-wrap gap-3">
-                {STATUS_OPTIONS.map(opt => {
-                  const isSelected = filters.statuses.includes(opt.value);
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => handleStatusToggle(opt.value)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                    >
-                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
-                        {isSelected && <Icon icon="check" size={10} className="text-current" />}
-                      </div>
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div>
+            {/* Category Filter (spans 2 columns on medium screens for better spacing) */}
+            <div className="md:col-span-2">
               <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Kategori Transaksi</label>
               <div className="flex flex-wrap gap-3">
                 {CATEGORY_OPTIONS.map(opt => {
@@ -181,27 +159,53 @@ export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiF
               </div>
             </div>
 
-            {/* Type Filter */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Jenis Transaksi</label>
-              <div className="flex flex-wrap gap-3">
-                {TYPE_OPTIONS.map(opt => {
-                  const isSelected = filters.types.includes(opt.value);
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => handleTypeToggle(opt.value)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                    >
-                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
-                        {isSelected && <Icon icon="check" size={10} className="text-current" />}
-                      </div>
-                      {opt.label}
-                    </button>
-                  )
-                })}
+            {/* Right column: Status & Type Filters stacked vertically */}
+            <div className="flex flex-col gap-6">
+              {/* Status Filter */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Status Transaksi</label>
+                <div className="flex flex-wrap gap-3">
+                  {STATUS_OPTIONS.map(opt => {
+                    const isSelected = filters.statuses.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleStatusToggle(opt.value)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                          {isSelected && <Icon icon="check" size={10} className="text-current" />}
+                        </div>
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Type Filter */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Jenis Transaksi</label>
+                <div className="flex flex-wrap gap-3">
+                  {TYPE_OPTIONS.map(opt => {
+                    const isSelected = filters.types.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleTypeToggle(opt.value)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
+                          {isSelected && <Icon icon="check" size={10} className="text-current" />}
+                        </div>
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
+
           </div>
 
           {/* Action Buttons */}
