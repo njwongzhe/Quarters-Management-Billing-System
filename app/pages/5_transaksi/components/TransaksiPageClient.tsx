@@ -8,7 +8,7 @@ import TransaksiTable from "./TransaksiTable";
 import TransaksiReverseModal from "./TransaksiReverseModal";
 import TransaksiAdjustModal from "./TransaksiAdjustModal";
 import Icon from "../../../components/Icon"; 
-import TransaksiViewModal from "./TransaksiViewModal";
+import TransaksiViewModal from "./TransaksiView/TransaksiViewModal";
 import { downloadXlsxFile } from "@/lib/download/xlsx-export";
 
 interface SummaryData {
