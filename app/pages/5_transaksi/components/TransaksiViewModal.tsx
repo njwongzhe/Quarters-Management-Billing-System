@@ -6,17 +6,20 @@ import Icon from "../../../components/Icon";
 interface TransaksiViewModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transaction: any;
 }
 
 export default function TransaksiViewModal({ isOpen, onClose, transaction }: TransaksiViewModalProps) {
   const [activeTab, setActiveTab] = useState<"maklumat" | "berkaitan">("maklumat");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [residentDetails, setResidentDetails] = useState<any>(null);
   const [loadingResident, setLoadingResident] = useState(false);
 
   useEffect(() => {
     const residentId = transaction?.residentId || transaction?.resident?.id;
     if (isOpen && residentId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingResident(true);
       fetch(`/api/residents/${residentId}/read`)
         .then((res) => res.json())
@@ -63,6 +66,7 @@ export default function TransaksiViewModal({ isOpen, onClose, transaction }: Tra
   };
 
   // Determine what the "Related" transactions are
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let relatedRecords: any[] = [];
   if (transaction.childTransactions && transaction.childTransactions.length > 0) {
       // This is a parent record, show its children
@@ -73,31 +77,33 @@ export default function TransaksiViewModal({ isOpen, onClose, transaction }: Tra
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-      <div className="w-full max-w-[900px] bg-[#EFF4FF] rounded-xl overflow-hidden shadow-[0_10px_25px_rgba(0,0,0,0.2)] flex flex-col max-h-[90vh]">
+    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
+      <div className="bg-light-blue rounded-lg shadow-2xl w-full max-w-[900px] overflow-hidden flex flex-col max-h-full">
         
         {/* Header */}
-        <header className="bg-[#151E66] px-8 py-6 flex justify-between items-start text-white shrink-0">
+        <header className="bg-[#151E66] px-8 py-5 flex justify-between items-start text-white shrink-0">
           <div className="flex flex-col">
-            <h1 className="text-[20px] font-bold tracking-[0.5px] mb-1 uppercase">Butiran Transaksi</h1>
-            <p className="text-[13px] opacity-80 tracking-[0.3px] uppercase">MAKLUMAT TERPERINCI TRANSAKSI SEMASA</p>
+            <h1 className="text-[1.1rem] font-bold uppercase tracking-wide">Butiran Transaksi</h1>
+            <p className="text-[10px] font-semibold text-blue-200 mt-1 uppercase tracking-widest">
+              Maklumat Terperinci Transaksi Semasa
+            </p>
           </div>
-          <button onClick={onClose} className="text-white text-2xl opacity-70 hover:opacity-100 cursor-pointer transition-opacity">
+          <button onClick={onClose} className="hover:bg-white/10 p-1 rounded transition-colors text-white text-lg">
             ✕
           </button>
         </header>
 
         {/* Tabs */}
-        <nav className="bg-white flex border-b border-black/5 shrink-0">
+        <nav className="bg-white flex justify-center gap-8 border-b border-light-grey/20 shrink-0">
           <button 
             onClick={() => setActiveTab("maklumat")}
-            className={`px-8 py-4 text-[14px] font-bold cursor-pointer uppercase transition-colors ${activeTab === "maklumat" ? "text-[#151E66] border-b-[3px] border-[#151E66]" : "text-[#767682] border-b-[3px] border-transparent"}`}
+            className={`py-4 text-xs font-bold uppercase tracking-widest border-b-4 transition-colors duration-200 ${activeTab === "maklumat" ? "border-dark-blue text-dark-blue" : "border-transparent text-light-grey hover:text-dark-blue"}`}
           >
             Maklumat Transaksi
           </button>
           <button 
             onClick={() => setActiveTab("berkaitan")}
-            className={`px-8 py-4 text-[14px] font-bold cursor-pointer uppercase transition-colors flex items-center gap-2 ${activeTab === "berkaitan" ? "text-[#151E66] border-b-[3px] border-[#151E66]" : "text-[#767682] border-b-[3px] border-transparent"}`}
+            className={`py-4 text-xs font-bold uppercase tracking-widest border-b-4 transition-colors duration-200 flex items-center gap-2 ${activeTab === "berkaitan" ? "border-dark-blue text-dark-blue" : "border-transparent text-light-grey hover:text-dark-blue"}`}
           >
             Transaksi Berkaitan
             {relatedRecords.length > 0 && (
@@ -107,136 +113,139 @@ export default function TransaksiViewModal({ isOpen, onClose, transaction }: Tra
         </nav>
 
         {/* Body Content */}
-        <main className="p-8 overflow-y-auto custom-scrollbar flex-grow">
+        <main className="p-8 overflow-y-auto flex-1 bg-light-blue relative min-h-75">
           
           {/* TAB 1: Maklumat */}
           {activeTab === "maklumat" && (
-            <div className="animate-in slide-in-from-left-4 duration-300">
+            <div className="animate-in slide-in-from-left-4 duration-300 space-y-8">
                 
                 {/* Section 1: Maklumat Penghuni */}
-                <div className="flex justify-between items-center mb-5">
-                  <div className="flex items-center text-[14px] font-extrabold text-[#151E66] uppercase tracking-[1px]">
-                    <span className="inline-block w-1 h-[18px] bg-[#151E66] mr-3 rounded-sm"></span>
-                    Maklumat Penghuni
+                <div>
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex items-center text-xs font-bold text-dark-blue uppercase tracking-widest">
+                      <span className="inline-block w-1 h-[18px] bg-dark-blue mr-3 rounded-sm"></span>
+                      Maklumat Penghuni
+                    </div>
+                    {(transaction?.residentId || transaction?.resident?.id) && (
+                      <a href={`/pages/6_penghuni/${transaction?.residentId || transaction?.resident?.id}`} className="text-[10px] font-bold text-dark-blue flex items-center gap-1 hover:underline uppercase tracking-wider">
+                        Profil Penuh <Icon icon="chevronRight" size={16} />
+                      </a>
+                    )}
                   </div>
-                  {(transaction?.residentId || transaction?.resident?.id) && (
-                    <a href={`/pages/6_penghuni/${transaction?.residentId || transaction?.resident?.id}`} className="text-[12px] font-bold text-[#151E66] no-underline uppercase hover:underline">
-                      Profil Penuh &rsaquo;
-                    </a>
-                  )}
-                </div>
 
-                <div className="grid grid-cols-3 gap-5 mb-10">
-                    <div className="flex flex-col col-span-2">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Nama Penghuni</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.fullName || transaction.resident?.fullName || 'Tiada')}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">No. Kad Pengenalan</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.icNumber || transaction.resident?.icNumber || 'Tiada')}
-                        </div>
-                    </div>
+                  <div className="grid grid-cols-12 gap-5">
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Nama Penghuni</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.fullName || transaction.resident?.fullName || 'Tiada')}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-4">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">No. Kad Pengenalan</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.icNumber || transaction.resident?.icNumber || 'Tiada')}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-2">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Umur</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {loadingResident ? 'Memuatkan...' : getAgeFromIc(residentDetails?.icNumber || transaction.resident?.icNumber)}
+                          </div>
+                      </div>
 
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Kelas</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.quarterName || 'N/A')}
-                            {!loadingResident && <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14' /%3E%3C/svg%3E" className="w-3.5 h-3.5 opacity-30" alt="" />}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Unit Kuarters</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] font-bold text-[#151E66] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.unitCode || 'N/A')}
-                            {!loadingResident && <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14' /%3E%3C/svg%3E" className="w-3.5 h-3.5 opacity-30" alt="" />}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Umur</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : getAgeFromIc(residentDetails?.icNumber || transaction.resident?.icNumber)}
-                        </div>
-                    </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Kelas</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.quarterName || 'N/A')}
+                              {!loadingResident && <Icon icon="externalLink" size={16} className="text-light-grey" />}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Unit Kuarters</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm font-bold text-[#151E66] min-h-[48px] flex items-center justify-between">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.unitCode || 'N/A')}
+                              {!loadingResident && <Icon icon="externalLink" size={16} className="text-[#151E66]" />}
+                          </div>
+                      </div>
 
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Tarikh Masuk</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.moveInDate ? new Date(residentDetails.quarters.moveInDate).toLocaleDateString("en-GB") : 'N/A')}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Tarikh Keluar</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#A0AEC0] min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.moveOutDate ? new Date(residentDetails.quarters.moveOutDate).toLocaleDateString("en-GB") : 'N/A')}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Status Penghuni</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#059669] font-bold min-h-[48px] flex items-center justify-between">
-                            {loadingResident ? 'Memuatkan...' : (residentDetails?.status === 'VERIFIED' ? 'Aktif' : residentDetails?.status || 'N/A')}
-                        </div>
-                    </div>
+                      <div className="flex flex-col col-span-3">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Tarikh Masuk</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.moveInDate ? new Date(residentDetails.quarters.moveInDate).toLocaleDateString("en-GB") : 'N/A')}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-3">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Tarikh Keluar</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#A0AEC0] min-h-[48px] flex items-center justify-between font-bold">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.quarters?.moveOutDate ? new Date(residentDetails.quarters.moveOutDate).toLocaleDateString("en-GB") : 'N/A')}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Status Penghuni</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#059669] font-bold min-h-[48px] flex items-center justify-between">
+                              {loadingResident ? 'Memuatkan...' : (residentDetails?.status === 'VERIFIED' ? 'Aktif' : residentDetails?.status || 'N/A')}
+                          </div>
+                      </div>
+                  </div>
                 </div>
 
                 {/* Section 2: Maklumat Transaksi */}
-                <div className="flex justify-between items-center mb-5">
-                  <div className="flex items-center text-[14px] font-extrabold text-[#151E66] uppercase tracking-[1px]">
-                    <span className="inline-block w-1 h-[18px] bg-[#151E66] mr-3 rounded-sm"></span>
-                    Maklumat Transaksi
+                <div>
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex items-center text-xs font-bold text-dark-blue uppercase tracking-widest">
+                      <span className="inline-block w-1 h-[18px] bg-dark-blue mr-3 rounded-sm"></span>
+                      Maklumat Transaksi
+                    </div>
+                    {getStatusBadge(transaction.status)}
                   </div>
-                  {getStatusBadge(transaction.status)}
-                </div>
 
-                <div className="grid grid-cols-3 gap-5 mb-4">
-                    <div className="flex flex-col col-span-2">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Tarikh</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {new Date(transaction.transactionDate).toLocaleDateString("en-GB")}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">ID</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {transaction.transactionNo || transaction.id.split('-')[0]+'...'}
-                        </div>
-                    </div>
+                  <div className="grid grid-cols-12 gap-5">
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Tarikh</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {new Date(transaction.transactionDate).toLocaleDateString("en-GB")}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">ID</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {transaction.transactionNo || transaction.id.split('-')[0]+'...'}
+                          </div>
+                      </div>
 
-                    <div className="flex flex-col col-span-2">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Kategori</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between capitalize">
-                            {transaction.category.replace(/_/g, ' ')}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">No Resit</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {transaction.receiptNo || 'Tiada'}
-                        </div>
-                    </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Kategori</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between capitalize font-bold">
+                              {transaction.category.replace(/_/g, ' ')}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">No Resit</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {transaction.receiptNo || 'Tiada'}
+                          </div>
+                      </div>
 
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Debit (RM)</span>
-                        <div className={`bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] min-h-[48px] flex items-center justify-between ${Number(transaction.debitAmount) > 0 ? 'text-[#DC2626] font-bold' : 'text-[#0B1C30]'}`}>
-                            {Number(transaction.debitAmount) > 0 ? formatRM(transaction.debitAmount) : '0.00'}
-                        </div>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Kredit (RM)</span>
-                        <div className={`bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] min-h-[48px] flex items-center justify-between ${Number(transaction.creditAmount) > 0 ? 'text-[#059669] font-bold' : 'text-[#0B1C30]'}`}>
-                            {Number(transaction.creditAmount) > 0 ? formatRM(transaction.creditAmount) : '0.00'}
-                        </div>
-                    </div>
-                    <div></div> {/* Empty Alignment Cell */}
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Debit (RM)</span>
+                          <div className={`bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm min-h-[48px] flex items-center justify-between ${Number(transaction.debitAmount) > 0 ? 'text-[#DC2626] font-bold' : 'text-[#0B1C30] font-bold'}`}>
+                              {Number(transaction.debitAmount) > 0 ? formatRM(transaction.debitAmount) : '0.00'}
+                          </div>
+                      </div>
+                      <div className="flex flex-col col-span-6">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Kredit (RM)</span>
+                          <div className={`bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm min-h-[48px] flex items-center justify-between ${Number(transaction.creditAmount) > 0 ? 'text-[#059669] font-bold' : 'text-[#0B1C30] font-bold'}`}>
+                              {Number(transaction.creditAmount) > 0 ? formatRM(transaction.creditAmount) : '0.00'}
+                          </div>
+                      </div>
 
-                    <div className="flex flex-col col-span-3">
-                        <span className="text-[11px] font-bold text-[#767682] mb-2 uppercase tracking-[0.5px]">Catatan</span>
-                        <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-[14px] text-[#0B1C30] min-h-[48px] flex items-center justify-between">
-                            {transaction.description || 'Tiada catatan'}
-                        </div>
-                    </div>
+                      <div className="flex flex-col col-span-12">
+                          <span className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider pl-1">Catatan</span>
+                          <div className="bg-[#F9FBFF] border border-[#C6C5D2]/40 rounded-lg px-4 py-[14px] text-sm text-[#0B1C30] min-h-[48px] flex items-center justify-between font-bold">
+                              {transaction.description || 'Tiada catatan'}
+                          </div>
+                      </div>
+                  </div>
                 </div>
             </div>
           )}
