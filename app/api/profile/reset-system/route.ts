@@ -20,6 +20,7 @@ const resetTables = [
   "Unit",
   "QuarterCategory",
   "Resident",
+  "BillingCycle",
 ] as const;
 
 export async function POST(request: Request) {
