@@ -131,6 +131,7 @@ export default function AuthLogin({ onSwitchToRegister, onForgotPassword }: Auth
                     STORAGE_KEY,
                     JSON.stringify({
                         email: trimmedEmail,
+                        password: loginPassword,
                         rememberMe: true,
                     })
                 );
