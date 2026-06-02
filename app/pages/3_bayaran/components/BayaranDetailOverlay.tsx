@@ -20,6 +20,7 @@ import type {
 
 type BayaranDetailOverlayProps = {
   initialPaymentDetails?: BayaranDetail;
+  paymentMonthKey: string;
   paymentId: string;
   onClose: () => void;
 };
@@ -63,6 +64,7 @@ function TabButton({
 
 export default function BayaranDetailOverlay({
   initialPaymentDetails,
+  paymentMonthKey,
   paymentId,
   onClose,
 }: BayaranDetailOverlayProps) {
@@ -107,7 +109,10 @@ export default function BayaranDetailOverlay({
       setErrorMessage(null);
 
       try {
-        const response = await fetch(`/api/payments/${paymentId}`, {
+        const queryParams = new URLSearchParams({
+          paymentMonth: paymentMonthKey,
+        });
+        const response = await fetch(`/api/payments/${paymentId}?${queryParams.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -150,6 +155,7 @@ export default function BayaranDetailOverlay({
     hasLoadedHistory,
     initialPaymentDetails,
     paymentId,
+    paymentMonthKey,
     reloadToken,
   ]);
 

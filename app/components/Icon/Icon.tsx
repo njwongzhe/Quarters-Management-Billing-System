@@ -1,5 +1,3 @@
-import { log } from "console";
-import { send } from "process";
 import type { ComponentPropsWithoutRef, CSSProperties } from "react";
 
 export const commonIcons = {

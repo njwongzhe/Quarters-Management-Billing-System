@@ -559,7 +559,6 @@ export default function KuartersReviewTable({
           onStartEdit={startUnitEdit}
           onSaveUnit={saveUnit}
           onDeleteUnit={deleteUnit}
-          onCancelEdit={cancelEditing}
         />
       </div>
       <GlobalFixedMessage notice={notice} onDismiss={() => setNotice(null)} />

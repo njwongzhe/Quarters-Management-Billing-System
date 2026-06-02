@@ -7,7 +7,7 @@ import {
   TableInputField,
 } from "@/app/components/InputField";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
-import { PaginationControls } from "@/app/components/Pagination/Pagination";
+import { PaginationControls, usePaginationLogic } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadQuarterCategoryRates } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
 
@@ -23,25 +23,18 @@ type KuartersCategoryRatesPanelProps = {
   rates: QuarterCategoryRecord[];
   exportRates: QuarterCategoryRecord[];
   isLoading: boolean;
-  currentPage: number;
   editor: KuartersEditorState | null;
   filterQuery: string;
   hasActiveFilters: boolean;
   onCancelEdit: () => void;
   pendingAction: "save" | "delete" | null;
   pendingRowId: string | null;
-  paginationItems: (number | "ellipsis")[];
-  startIndex: number;
-  endIndex: number;
-  totalRecords: number;
-  totalPages: number;
   onAddRow: () => void;
   onClearFilter: () => void;
   onDeleteRow: (rowId: string) => void;
   onDraftChange: (field: keyof QuarterCategoryDraft, value: string) => void;
   onEditRow: (quarterCategory: QuarterCategoryRecord) => void;
   onFilterQueryChange: (value: string) => void;
-  onPageChange: (page: number) => void;
   onSaveRow: () => void;
   onViewRow: (quarterCategory: QuarterCategoryRecord) => void;
 };
@@ -75,7 +68,6 @@ function ActionButton({
 
 export default function KuartersCategoryRatesPanel({
   isLoading,
-  currentPage,
   editor,
   exportRates,
   filterQuery,
@@ -87,18 +79,23 @@ export default function KuartersCategoryRatesPanel({
   onDraftChange,
   onEditRow,
   onFilterQueryChange,
-  onPageChange,
   onSaveRow,
   onViewRow,
   pendingAction,
   pendingRowId,
-  paginationItems,
   rates,
-  startIndex,
-  endIndex,
-  totalRecords,
-  totalPages,
 }: KuartersCategoryRatesPanelProps) {
+  const itemsPerPage = 10;
+  const {
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    handlePageChange,
+    paginationItems,
+  } = usePaginationLogic(rates.length, itemsPerPage);
+  const paginatedRates = rates.slice(startIndex, endIndex);
+
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
   const searchInputRef = useRef<HTMLDivElement | null>(null);
@@ -156,29 +153,6 @@ export default function KuartersCategoryRatesPanel({
   function handleClearSearch() {
     onClearFilter();
     setIsSearchOpen(false);
-  }
-
-  function handlePaginationChange(
-    action: "prev" | "next" | "goto",
-    pageNum?: number,
-  ) {
-    if (pendingAction) {
-      return;
-    }
-
-    if (action === "prev") {
-      onPageChange(Math.max(currentPage - 1, 1));
-      return;
-    }
-
-    if (action === "next") {
-      onPageChange(Math.min(currentPage + 1, totalPages));
-      return;
-    }
-
-    if (action === "goto" && pageNum !== undefined) {
-      onPageChange(pageNum);
-    }
   }
 
   function renderActionCell(rowId: string, isEditing: boolean) {
@@ -400,7 +374,7 @@ export default function KuartersCategoryRatesPanel({
                 </tr>
               ) : null}
 
-              {!isLoading && rates.map((rate) => {
+              {!isLoading && paginatedRates.map((rate) => {
                 const isEditing = editor?.mode === "edit" && editor.rowId === rate.id;
                 const isCurrentRowPending = pendingRowId === rate.id;
 
@@ -525,9 +499,9 @@ export default function KuartersCategoryRatesPanel({
             totalPages={totalPages}
             startIndex={startIndex}
             endIndex={endIndex}
-            totalRecords={totalRecords}
+            totalRecords={rates.length}
             paginationItems={paginationItems}
-            onPageChange={handlePaginationChange}
+            onPageChange={handlePageChange}
           />
         </div>
       </div>

@@ -88,7 +88,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
       } else {
         setError(result.message);
       }
-    } catch (err) {
+    } catch {
       setError("Ralat rangkaian. Sila cuba lagi.");
     } finally {
       setIsSubmitting(false);

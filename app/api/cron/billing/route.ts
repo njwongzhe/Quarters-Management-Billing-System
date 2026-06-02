@@ -6,18 +6,52 @@ import {
   getPreviousBillingPeriod,
   isSameBillingMonth
 } from "@/lib/billing/billing-period";
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { generateTransactionNos } from "@/lib/transactions/transactions"; // Ensure this path is correct
 
-// Vercel Cron Jobs send a GET request
-export async function GET() {
-  try {
-    //todo
-    // 1. SECURE THE ROUTE (Optional but recommended for Vercel)
-    // const authHeader = request.headers.get('authorization');
-    // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    //   return new NextResponse('Unauthorized', { status: 401 });
-    // }
+// Vercel Cron Jobs send a GET request with Authorization: Bearer <CRON_SECRET>.
+export async function GET(request: Request) {
+  const cronSecret = process.env.CRON_SECRET;
 
+  if (!cronSecret) {
+    return NextResponse.json(
+      { ok: false, message: "CRON_SECRET belum ditetapkan dalam .env." },
+      { status: 500 },
+    );
+  }
+
+  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return NextResponse.json(
+      { ok: false, message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  return runBillingGeneration(null);
+}
+
+// Manual generation from the Tunggakan page uses the normal authenticated session.
+export async function POST() {
+  const currentAdmin = await getCurrentAdmin();
+
+  if (!currentAdmin) {
+    return NextResponse.json(
+      { ok: false, message: "Sesi tamat. Sila log masuk semula." },
+      { status: 401 },
+    );
+  }
+
+  return runBillingGeneration(currentAdmin);
+}
+
+async function runBillingGeneration(
+  actor: Awaited<ReturnType<typeof getCurrentAdmin>>,
+) {
+  try {
     // 2. IDENTIFY THE TARGET BILLING MONTH
     const today = new Date();
     const {
@@ -237,6 +271,23 @@ export async function GET() {
         success: true,
         recordsBilled: recordsProcessed
       }
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await recordDataAuditLog(tx, {
+        actor,
+        moduleName: "Tunggakan",
+        actionType: "CREATE",
+        target: formatAuditTarget(["Jana Bil Bulanan", billingMonthLabel]),
+        entityType: "MONTHLY_CHARGE",
+        entityId: null,
+        summary: `Menjana caj bulanan untuk bulan ${billingMonthLabel}.`,
+        details: [
+          `Bilangan penghuni diproses: ${recordsProcessed}.`,
+          `Bilangan transaksi caj dijana: ${transactionCount}.`,
+          actor ? "Dijalankan secara manual oleh admin." : "Dijalankan melalui jadual cron sistem.",
+        ],
+      });
     });
 
     return NextResponse.json({ 

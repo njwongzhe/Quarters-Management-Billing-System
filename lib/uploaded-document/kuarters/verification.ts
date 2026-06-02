@@ -430,7 +430,12 @@ async function createKuartersUnits(
   }
 
   await tx.unit.createMany({
-    data: rows.map(({ draftId: _draftId, ...row }) => row),
+    data: rows.map((row) => ({
+      id: row.id,
+      unitCode: row.unitCode,
+      status: row.status,
+      categoryId: row.categoryId,
+    })),
     skipDuplicates: true,
   });
 }

@@ -1,13 +1,21 @@
 import { prisma } from "@/lib/prisma";
+import {
+  getAppTimeZoneDateParts,
+  getMonthStartInAppTimeZone,
+} from "@/lib/date-time";
 import type {
   BayaranDetail,
   BayaranPaymentHistoryRow,
   BayaranStatusFilter,
 } from "@/lib/payments/bayaran-types";
 
-export async function getBayaranPaymentDetail(recordId: string) {
+export async function getBayaranPaymentDetail(
+  recordId: string,
+  paymentMonth = new Date(),
+) {
   const details = await getBayaranPaymentDetailsByIds([recordId], {
     includeHistory: true,
+    paymentMonth,
   });
 
   return details[recordId] ?? null;
@@ -15,6 +23,7 @@ export async function getBayaranPaymentDetail(recordId: string) {
 
 type BayaranDetailOptions = {
   includeHistory?: boolean;
+  paymentMonth?: Date;
 };
 
 export async function getBayaranPaymentDetailsByIds(
@@ -23,6 +32,8 @@ export async function getBayaranPaymentDetailsByIds(
 ) {
   const uniqueRecordIds = Array.from(new Set(recordIds)).filter(Boolean);
   const includeHistory = options.includeHistory ?? true;
+  const selectedMonthStart = getMonthStart(options.paymentMonth ?? new Date());
+  const selectedNextMonthStart = getNextMonthStart(selectedMonthStart);
 
   if (uniqueRecordIds.length === 0) {
     return {};
@@ -100,8 +111,8 @@ export async function getBayaranPaymentDetailsByIds(
         in: residentIds,
       },
       paymentDate: {
-        gte: getCurrentMonthStart(),
-        lt: getNextMonthStart(),
+        gte: selectedMonthStart,
+        lt: selectedNextMonthStart,
       },
     },
     _sum: {
@@ -215,16 +226,14 @@ export async function getBayaranPaymentDetailsByIds(
   }, {});
 }
 
-function getCurrentMonthStart() {
-  const now = new Date();
-
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+function getMonthStart(value: Date) {
+  return getMonthStartInAppTimeZone(value);
 }
 
-function getNextMonthStart() {
-  const now = new Date();
+function getNextMonthStart(value: Date) {
+  const { year, month } = getAppTimeZoneDateParts(value);
 
-  return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return new Date(Date.UTC(year, month, 1));
 }
 
 function getResidentStatusLabel(status: string) {

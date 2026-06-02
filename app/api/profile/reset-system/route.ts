@@ -20,6 +20,7 @@ const resetTables = [
   "Unit",
   "QuarterCategory",
   "Resident",
+  "BillingCycle",
 ] as const;
 
 export async function POST(request: Request) {
@@ -57,19 +58,25 @@ export async function POST(request: Request) {
     }
 
     await prisma.$transaction(async (tx) => {
-      await createAuditLog(tx, {
-        actor: currentAdmin,
-        moduleName: "Profil",
-        targetData: "Data operasi sistem",
-        actionType: "DELETE",
-        description: "Admin menjalankan set semula sistem.",
-      });
-
       await tx.$executeRawUnsafe(
         `TRUNCATE TABLE ${resetTables
           .map((table) => `"${table}"`)
           .join(", ")} RESTART IDENTITY CASCADE`,
       );
+
+      const deletedAuditLogs = await tx.auditLog.deleteMany({});
+
+      await createAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Profil",
+        targetData: "Set Semula Sistem",
+        actionType: "DELETE",
+        description: [
+          "Ringkasan: Admin menjalankan set semula sistem dan memadam semua data operasi.",
+          "Sasaran Data: Semua data operasi sistem dan rekod jejak audit terdahulu.",
+          `Butiran: Jadual operasi dikosongkan: ${resetTables.join(", ")}. Jumlah rekod jejak audit terdahulu dipadam: ${deletedAuditLogs.count}. Rekod ini dicipta selepas pembersihan jejak audit selesai sebagai bukti tindakan set semula sistem.`,
+        ].join("\n"),
+      });
     });
 
     return NextResponse.json({

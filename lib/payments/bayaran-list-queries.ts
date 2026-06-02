@@ -1,5 +1,9 @@
 import { Prisma } from "@prisma/client";
 
+import {
+  getAppTimeZoneDateParts,
+  getMonthStartInAppTimeZone,
+} from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
 import type {
   PaymentQueryRow,
@@ -107,11 +111,13 @@ function bayaranResidentsCte(monthStart: Date, nextMonthStart: Date) {
 }
 
 function getMonthStart(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), 1);
+  return getMonthStartInAppTimeZone(value);
 }
 
 function getNextMonthStart(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth() + 1, 1);
+  const { year, month } = getAppTimeZoneDateParts(value);
+
+  return new Date(Date.UTC(year, month, 1));
 }
 
 function bayaranPaymentBaseJoins() {

@@ -168,7 +168,9 @@ export default function TunggakanPageClient() {
     
     setIsBillingRunning(true);
     try {
-      const response = await fetch("/api/cron/billing");
+      const response = await fetch("/api/cron/billing", {
+        method: "POST",
+      });
       const result = await response.json();
       
       alert(result.message);
@@ -177,7 +179,7 @@ export default function TunggakanPageClient() {
         fetchBillingStatus();
         fetchTunggakanData();
       }
-    } catch (error) {
+    } catch {
       alert("Ralat sistem berlaku semasa menjana bil.");
     } finally {
       setIsBillingRunning(false);

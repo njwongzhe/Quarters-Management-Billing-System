@@ -10,7 +10,6 @@ const SUPABASE_KEY =
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   // Do not throw at import time in case environment is configured differently in tests,
   // but log so developers notice missing keys.
-  // eslint-disable-next-line no-console
   console.warn(
     "Supabase not fully configured. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or ANON key) are set."
   );

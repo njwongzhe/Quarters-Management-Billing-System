@@ -1,7 +1,28 @@
 import { useEffect, useState } from "react";
 import Icon from "@/app/components/Icon/Icon";
 
-// Pagination management function.
+// Helper function to build pagination items based on the current page and total pages.
+export function buildPaginationItems(
+    currentPage: number,
+    totalPages: number,
+): (number | "ellipsis")[] {
+    if (totalPages <= 5) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 3) {
+        return currentPage === 3
+            ? [1, 2, 3, 4, "ellipsis", totalPages]
+            : [1, 2, 3, "ellipsis", totalPages];
+    }
+    if (currentPage >= totalPages - 2) {
+        return currentPage === totalPages - 2
+            ? [1, "ellipsis", totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+            : [1, "ellipsis", totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages];
+}
+
+// Helper function to manage pagination state and logic.
 export function usePaginationLogic(totalItems: number, itemsPerPage: number) {
     const [currentPage, setCurrentPage] = useState(1);
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -25,30 +46,13 @@ export function usePaginationLogic(totalItems: number, itemsPerPage: number) {
         }
     };
 
-    const getPaginationItems = () => {
-        if (totalPages <= 5) {
-            return Array.from({ length: totalPages }, (_, i) => i + 1);
-        }
-        if (currentPage <= 3) {
-            return currentPage === 3
-                ? [1, 2, 3, 4, "ellipsis", totalPages]
-                : [1, 2, 3, "ellipsis", totalPages];
-        }
-        if (currentPage >= totalPages - 2) {
-            return currentPage === totalPages - 2
-                ? [1, "ellipsis", totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
-                : [1, "ellipsis", totalPages - 2, totalPages - 1, totalPages];
-        }
-        return [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages];
-    };
-
     return {
         currentPage,
         totalPages,
         startIndex,
         endIndex,
         handlePageChange,
-        paginationItems: getPaginationItems() as (number | "ellipsis")[],
+        paginationItems: buildPaginationItems(currentPage, totalPages),
     };
 }
 

@@ -4,7 +4,10 @@ import type { Prisma } from "@prisma/client";
 import {
   mapUploadedDocumentForReview,
 } from "@/lib/uploaded-document/documents";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -65,12 +68,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
         await tx.uploadedDocument.delete({ where: { id } });
 
-        await createAuditLog(tx, {
+        await recordDataAuditLog(tx, {
           actor: currentAdmin,
           moduleName: "Muat Naik",
-          targetData: `${document?.category ?? "DOKUMEN"} / ${document?.originalName ?? document?.fileName ?? id}`,
           actionType: "DELETE",
-          description: `Memadam dokumen belum disahkan ${document?.category ?? "DOKUMEN"}: ${document?.originalName ?? document?.fileName ?? id}.`,
+          target: formatAuditTarget([
+            document?.category ?? "DOKUMEN",
+            document?.originalName ?? document?.fileName ?? id,
+          ]),
+          summary: "Memadam dokumen draf yang belum disahkan.",
+          details: [
+            `Kategori dokumen: ${document?.category ?? "DOKUMEN"}.`,
+            `Nama fail: ${document?.originalName ?? document?.fileName ?? id}.`,
+            "Semua rekod draf berkaitan dipadam bersama dokumen ini.",
+          ],
         });
       },
       uploadedDocumentTransactionOptions,

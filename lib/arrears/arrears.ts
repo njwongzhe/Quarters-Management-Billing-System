@@ -2,13 +2,14 @@ import type {
   Resident, 
   QuarterCategory, 
   Unit, 
-  Transaction,
   MonthlyCharge,
   AdditionalCharge,
   Rebate,
   UnitOccupancy,
   ArrearsSummary
 } from "@prisma/client";
+
+import { parseDateOnlyInAppTimeZone } from "@/lib/date-time";
 
 // --- TYPES ---
 
@@ -65,13 +66,13 @@ export type ResidentTunggakanDetails = {
 // --- API INPUT VALIDATION TYPES ---
 
 export type TambahanChargeInput = {
-  tarikh: string;
+  tarikh: Date;
   catatan: string;
   amaun: number;
 };
 
 export type RebatInput = {
-  tarikh: string;
+  tarikh: Date;
   catatan: string;
   amaun: number;
 };
@@ -113,13 +114,11 @@ export function mapTunggakanForApi(
   let penalti = 0;
   let tambahan = 0;
   let rebat = 0;
-  let bayaran = 0; // <-- 1. ADD THIS VARIABLE TO TRACK PAYMENTS
 
   resident.monthlyCharges.forEach(charge => {
       sewa += Number(charge.rentalAmount);
       senggara += Number(charge.maintenanceAmount);
       penalti += Number(charge.penaltyAmount);
-      bayaran += Number(charge.paymentReceived); // <-- 2. ADD UP ALL PAYMENTS RECEIVED
       
       charge.additionalCharges.forEach(add => { tambahan += Number(add.amount) });
       charge.rebates.forEach(r => { rebat += Number(r.amount) });
@@ -201,7 +200,12 @@ function parseChargeItem(item: unknown, label: string): ParseSuccess<TambahanCha
   }
   const data = item as Record<string, unknown>;
 
-  if (typeof data.tarikh !== "string" || isNaN(Date.parse(data.tarikh))) {
+  const parsedDate =
+      typeof data.tarikh === "string"
+          ? parseDateOnlyInAppTimeZone(data.tarikh.slice(0, 10))
+          : null;
+
+  if (!parsedDate) {
       return { ok: false, message: `Tarikh untuk ${label} tidak sah.` };
   }
 
@@ -215,7 +219,7 @@ function parseChargeItem(item: unknown, label: string): ParseSuccess<TambahanCha
   return {
       ok: true,
       data: {
-          tarikh: data.tarikh,
+          tarikh: parsedDate,
           catatan: data.catatan.trim(),
           amaun: parsedAmount.data
       }

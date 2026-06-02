@@ -8,6 +8,7 @@ import { usePenghuniDetailHistoryFilter } from "./PenghuniDetailHistoryFilter";
 
 export type TransactionRecord = {
     id: string;
+    transactionNo?: string | null;
     tarikh: string;
     kategori: string;
     catatan: string;
@@ -148,7 +149,7 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
                             currentHistory.map((row) => (
                                 <tr key={row.id} className="text-sm border-b border-b-light-grey/20 transition-colors">
                                     <td className="px-4 py-3 text-left font-medium">{row.tarikh}</td>
-                                    <td className="px-4 py-3 text-left">{row.id}</td>
+                                    <td className="px-4 py-3 text-left">{row.transactionNo || row.id}</td>
                                     <td className="px-4 py-3 text-left">{row.kategori}</td>
                                     <td className="px-4 py-3 text-left">{row.catatan}</td>
                                     <td className="px-4 py-3 text-right text-red">{row.debit > 0 ? formatCurrency(row.debit) : "-"}</td>

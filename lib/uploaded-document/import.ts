@@ -5,7 +5,11 @@ import type {
   ExtractResult,
   ProcessingDraft,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 import { createPendingBayaranRows } from "@/lib/uploaded-document/bayaran/import";
@@ -108,12 +112,18 @@ export async function createUploadedDocumentForKind({
         include: { uploadedBy: { select: { fullName: true } } },
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Muat Naik",
-        targetData: `${documentCategoryForKind(kind)} / ${payload.fileName}`,
         actionType: "IMPORT_EXTRACT",
-        description: `Muat naik dokumen ${documentCategoryForKind(kind)}: ${payload.fileName}.`,
+        target: formatAuditTarget([documentCategoryForKind(kind), payload.fileName]),
+        summary: "Muat naik dokumen dan menyimpan data ekstrak sebagai draf semakan.",
+        details: [
+          `Jenis fail: ${payload.fileType}.`,
+          `Saiz fail: ${formatAuditValue(payload.fileSize)} bait.`,
+          `Jumlah rekod diekstrak: ${formatAuditValue(payload.extractResult.records.length)}.`,
+          "Status dokumen: menunggu semakan dan pengesahan data ekstrak.",
+        ],
       });
 
       return updatedDocument;

@@ -9,7 +9,11 @@ import {
   mapQuarterCategoryForApi,
   parseQuarterCategoryUpdateBody,
 } from "@/lib/quarters/quarter-categories";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  buildAuditChanges,
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -178,14 +182,37 @@ export async function PATCH(request: Request, context: RouteContext) {
         },
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `${quarterCategory.categoryName}${quarterCategory.address ? ` / ${quarterCategory.address}` : ""}`,
         actionType: "UPDATE",
+        target: formatAuditTarget([quarterCategory.categoryName, quarterCategory.address]),
         entityType: "QUARTER_CATEGORY",
         entityId: quarterCategory.id,
-        description: `Mengemaskini kategori kuarters ${quarterCategory.categoryName}. Medan berubah: ${changedFields.join(", ")}.`,
+        summary: "Mengemaskini maklumat kategori kuarters.",
+        changes: buildAuditChanges(
+          {
+            categoryName: existingQuarterCategory.categoryName,
+            address: existingQuarterCategory.address,
+            rentalPrice: Number(existingQuarterCategory.rentalPrice).toFixed(2),
+            maintenancePrice: Number(existingQuarterCategory.maintenancePrice).toFixed(2),
+            penaltyPrice: Number(existingQuarterCategory.penaltyPrice).toFixed(2),
+          },
+          {
+            categoryName: quarterCategory.categoryName,
+            address: quarterCategory.address,
+            rentalPrice: Number(quarterCategory.rentalPrice).toFixed(2),
+            maintenancePrice: Number(quarterCategory.maintenancePrice).toFixed(2),
+            penaltyPrice: Number(quarterCategory.penaltyPrice).toFixed(2),
+          },
+          {
+            categoryName: "Nama kategori",
+            address: "Alamat",
+            rentalPrice: "Harga sewa",
+            maintenancePrice: "Caj penyelenggaraan",
+            penaltyPrice: "Caj penalti",
+          },
+        ),
       });
 
       return quarterCategory;
@@ -285,14 +312,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
         where: { id },
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `${existingQuarterCategory.categoryName}${existingQuarterCategory.address ? ` / ${existingQuarterCategory.address}` : ""}`,
         actionType: "DELETE",
+        target: formatAuditTarget([
+          existingQuarterCategory.categoryName,
+          existingQuarterCategory.address,
+        ]),
         entityType: "QUARTER_CATEGORY",
         entityId: existingQuarterCategory.id,
-        description: `Memadam kategori kuarters ${existingQuarterCategory.categoryName}${existingQuarterCategory.address ? ` di ${existingQuarterCategory.address}` : ""}.`,
+        summary: "Memadam kategori kuarters.",
+        details: [
+          `Jumlah unit sebelum dipadam: ${existingQuarterCategory._count.units}.`,
+        ],
       });
     });
 

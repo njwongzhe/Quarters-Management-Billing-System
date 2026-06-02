@@ -52,7 +52,7 @@ export default function TransaksiReverseModal({ isOpen, onClose, transaction, on
       } else {
         setError(result.message);
       }
-    } catch (err) {
+    } catch {
       setError("Ralat rangkaian. Sila cuba lagi.");
     } finally {
       setIsSubmitting(false);

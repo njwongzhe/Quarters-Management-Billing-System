@@ -14,7 +14,11 @@ import {
   parseQuarterUnitCreateBody,
   resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -268,14 +272,22 @@ export async function POST(request: Request, context: RouteContext) {
         include: buildQuarterUnitCurrentOccupancyInclude(),
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `${quarterCategory.categoryName} / Unit ${unit.unitCode}`,
         actionType: "CREATE",
+        target: formatAuditTarget([quarterCategory.categoryName, `Unit ${unit.unitCode}`]),
         entityType: "UNIT",
         entityId: unit.id,
-        description: `Menambah unit ${unit.unitCode} dalam kategori ${quarterCategory.categoryName}${resident ? ` dan menetapkan penghuni ${resident.fullName}` : ""}.`,
+        summary: "Menambah unit kuarters baharu.",
+        details: [
+          `Status unit: ${formatAuditValue(unit.status)}.`,
+          resident
+            ? `Penghuni ditetapkan: ${resident.fullName} (No. KP ${resident.icNumber}).`
+            : "Tiada penghuni ditetapkan semasa unit dicipta.",
+          resident ? `Tarikh masuk: ${formatAuditValue(moveInDate)}.` : null,
+          resident ? `Tarikh keluar: ${formatAuditValue(moveOutDate)}.` : null,
+        ],
       });
 
       return unit;

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -245,9 +244,7 @@ export default function TransaksiPageClient() {
 
   // Fetch whenever the page number OR the active filters change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTransactions(activeFilters, currentPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]); // We only watch currentPage here to trigger pagination fetches
 
   // Custom handler to reset to Page 1 when a NEW search is made

@@ -295,6 +295,7 @@ export default function BayaranPageClient() {
         <BayaranDetailOverlay
           key={selectedPaymentId}
           initialPaymentDetails={data.detailsByPaymentId[selectedPaymentId]}
+          paymentMonthKey={paymentMonthKey}
           paymentId={selectedPaymentId}
           onClose={() => setSelectedPaymentId(null)}
         />

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const stats = buildStats(paymentStats);
     const detailsByPaymentId = await getBayaranPaymentDetailsByIds(
       rows.map((row) => row.id),
-      { includeHistory: false },
+      { includeHistory: false, paymentMonth },
     );
 
     return NextResponse.json({

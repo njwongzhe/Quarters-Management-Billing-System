@@ -248,3 +248,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM cron.job
+    WHERE jobname = 'monthly-billing-generation'
+  ) THEN
+    PERFORM cron.unschedule('monthly-billing-generation');
+  END IF;
+
+  -- pg_cron runs in UTC. This runs daily at 16:05 UTC and only executes
+  -- when the Malaysia calendar date is the 1st, i.e. 00:05 MYT.
+  PERFORM cron.schedule(
+    'monthly-billing-generation',
+    '5 16 * * *',
+    $cron$
+      SELECT run_monthly_billing()
+      WHERE EXTRACT(DAY FROM now() AT TIME ZONE 'Asia/Kuala_Lumpur') = 1;
+    $cron$
+  );
+END $$;

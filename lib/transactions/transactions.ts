@@ -1,5 +1,10 @@
 import { Prisma, TransactionStatus, TransactionCategory } from "@prisma/client";
 import { prisma } from "../prisma";
+import {
+  formatDatePrefixInAppTimeZone,
+  getDateOnlyRangeInAppTimeZone,
+  getMonthStartInAppTimeZone,
+} from "@/lib/date-time";
 
 type TransactionNoClient = Pick<
   Prisma.TransactionClient,
@@ -62,8 +67,18 @@ export async function getTransactionsList(params: TransactionFilterParams) {
   // Build the dynamic WHERE clause cleanly
   const andConditions: Prisma.TransactionWhereInput[] = [];
 
-  if (startDate) andConditions.push({ transactionDate: { gte: new Date(startDate) } });
-  if (endDate) andConditions.push({ transactionDate: { lte: new Date(endDate) } });
+  if (isDateInput(startDate)) {
+    const range = getDateOnlyRangeInAppTimeZone(startDate);
+    if (range) {
+      andConditions.push({ transactionDate: { gte: range.start } });
+    }
+  }
+  if (isDateInput(endDate)) {
+    const range = getDateOnlyRangeInAppTimeZone(endDate);
+    if (range) {
+      andConditions.push({ transactionDate: { lte: range.end } });
+    }
+  }
   if (categories && categories.length > 0) andConditions.push({ category: { in: categories } });
   if (statuses && statuses.length > 0) andConditions.push({ status: { in: statuses } });
   if (type === "DEBIT") {
@@ -120,6 +135,10 @@ export async function getTransactionsList(params: TransactionFilterParams) {
   ]);
 
   return { data, total, page, totalPages: Math.ceil(total / limit) };
+}
+
+function isDateInput(value: string | undefined): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
 // ==========================================
@@ -315,13 +334,7 @@ export async function generateTransactionNos(
     Prisma.sql`SELECT pg_advisory_xact_lock(724019337)`,
   );
 
-  const today = new Date();
-  
-  // Format date as YYYYMMDD
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const datePrefix = `${year}${month}${day}`;
+  const datePrefix = formatDatePrefixInAppTimeZone();
 
   // Find the last transaction created today
   const lastTransaction = await txClient.transaction.findFirst({
@@ -360,10 +373,6 @@ export async function generateTransactionNos(
 // 4. SYNC HELPER (LEDGER TO BILLING ENGINE)
 // ==========================================
 
-function getUtcMonthStart(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
 /**
  * Ensures that any reversal or adjustment applied to the Ledger (Transactions)
  * is accurately mathematically mirrored in the MonthlyCharge and Arrears tables.
@@ -378,8 +387,8 @@ async function applyFinancialDeltaToBilling(
 ) {
   if (!residentId || deltaAmount === 0) return;
 
-  // 1. Force the date to the UTC 1st of the transaction's month to find the correct MonthlyCharge.
-  const chargeMonth = getUtcMonthStart(transactionDate);
+  // 1. Force the date to the first day of the app timezone month to find the correct MonthlyCharge.
+  const chargeMonth = getMonthStartInAppTimeZone(transactionDate);
 
   let monthlyCharge = await tx.monthlyCharge.findUnique({
     where: { residentId_chargeMonth: { residentId, chargeMonth } }

@@ -4,6 +4,7 @@ import type {
   ExtractedPenghuniRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import { parseFlexibleDateOnlyInAppTimeZone } from "@/lib/date-time";
 import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 import { findExactPenghuniMatch } from "@/lib/uploaded-document/penghuni/queries";
 
@@ -57,17 +58,5 @@ export async function createPendingPenghuniRows(
 }
 
 function parseNullableDate(value: string | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const normalizedValue = value.trim();
-  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  const date = dayFirstMatch
-    ? new Date(
-        `${dayFirstMatch[3]}-${dayFirstMatch[2]}-${dayFirstMatch[1]}T00:00:00.000Z`,
-      )
-    : new Date(`${normalizedValue.slice(0, 10)}T00:00:00.000Z`);
-
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseFlexibleDateOnlyInAppTimeZone(value);
 }

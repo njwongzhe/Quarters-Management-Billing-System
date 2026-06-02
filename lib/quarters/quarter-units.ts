@@ -5,6 +5,10 @@ import type {
   UnitStatus,
 } from "@prisma/client";
 
+import {
+  getTodayDateInAppTimeZone,
+  parseDateOnlyInAppTimeZone,
+} from "@/lib/date-time";
 import { buildQuarterCategorySummary, type QuarterCategorySummary } from "./quarter-categories";
 
 type ParseSuccess<T> = {
@@ -322,19 +326,7 @@ export function isDateWithinOccupancy({
 }
 
 export function getTodayStartInMalaysia() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day), 0, 0, 0, 0),
-  );
+  return getTodayDateInAppTimeZone();
 }
 
 export function parseQuarterUnitCreateBody(
@@ -692,27 +684,9 @@ function parseOccupancyDate(
     };
   }
 
-  const [yearRaw, monthRaw, dayRaw] = value.split("-");
-  const year = Number(yearRaw);
-  const month = Number(monthRaw);
-  const day = Number(dayRaw);
+  const date = parseDateOnlyInAppTimeZone(value);
 
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    !Number.isInteger(day)
-  ) {
-    return {
-      ok: false,
-      message: `${options.label} mesti dalam format tarikh yang sah.`,
-    };
-  }
-
-  // Store as UTC midnight for the selected calendar date to avoid day shifting
-  // when viewing raw DB values in UTC.
-  const date = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-
-  if (Number.isNaN(date.getTime())) {
+  if (!date) {
     return {
       ok: false,
       message: `${options.label} mesti dalam format tarikh yang sah.`,

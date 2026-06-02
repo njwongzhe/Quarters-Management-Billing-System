@@ -144,7 +144,6 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     <PenghuniFilter
                         selectedValues={selectedStatuses}
                         onSelect={handleStatusFilterChange}
-                        isSearchFilterActive={isSearchFilterActive}
                     />
                     <PenghuniDownload residents={filteredResidents} />
                 </div>

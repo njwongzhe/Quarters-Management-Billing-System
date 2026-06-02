@@ -62,8 +62,6 @@ export default function AuthForgot({ onClose }: AuthForgotProps) {
 				}),
 			});
 
-			const result = await response.json();
-
 			if (!response.ok) {
 				throw new Error("Gagal menghantar OTP.");
 			}
@@ -102,8 +100,6 @@ export default function AuthForgot({ onClose }: AuthForgotProps) {
 					password,
 				}),
 			});
-
-			const result = await response.json();
 
 			if (!response.ok) {
 				throw new Error("Gagal menetapkan semula kata laluan.");

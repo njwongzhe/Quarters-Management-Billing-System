@@ -4,11 +4,14 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import Icon from "@/app/components/Icon/Icon";
-import type { AuditLogFilters, AuditLogListItem } from "@/lib/audit/audit-logs";
-import AuditActionBadge from "./AuditActionBadge";
-import AuditLogDownloadButton from "./AuditLogDownloadButton";
-import AuditLogFilterPanel from "./AuditLogFilterPanel";
+import { InputField as SharedInputField } from "@/app/components/InputField";
+import AuditDownload from "./Button/AuditDownload";
+import AuditFilter from "./Button/AuditFilter";
 import AuditLogPagination from "./AuditLogPagination";
+import AuditSearch, { useAuditSearchController } from "./Button/AuditSearch";
+import type { AuditLogFilters, AuditLogListItem } from "./auditLogClient";
+import AuditFilterDate from "./Button/AuditFilterDate";
+import { getAuditActionBadgeColor } from "./auditLogActionColor";
 
 type AuditPagination = {
   currentPage: number;
@@ -37,6 +40,8 @@ export default function AuditLogTablePanel({
   initialErrorMessage = "",
   isInitialLoading = false,
   pagination,
+  isBootstrapping = false,
+  bootstrapError = "",
 }: {
   auditRows: AuditLogListItem[];
   dataKey: string;
@@ -55,7 +60,11 @@ export default function AuditLogTablePanel({
   initialErrorMessage?: string;
   isInitialLoading?: boolean;
   pagination: AuditPagination;
+  isBootstrapping?: boolean;
+  bootstrapError?: string;
 }) {
+  void hasActiveFilters;
+
   const [pageData, setPageData] = useState<{
     dataKey: string;
     rows: AuditLogListItem[];
@@ -66,6 +75,20 @@ export default function AuditLogTablePanel({
     dataKey: string;
     message: string;
   } | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(Boolean(filters.search?.trim()));
+
+  const {
+    searchInputRef,
+    searchQuery,
+    setSearchQuery,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useAuditSearchController({
+    filters,
+    isOpen: isSearchOpen,
+    onOpenChange: setIsSearchOpen,
+  });
+
   const activePageData = pageData?.dataKey === dataKey ? pageData : null;
   const rows = activePageData?.rows ?? auditRows;
   const currentPagination = activePageData?.pagination ?? pagination;
@@ -121,24 +144,26 @@ export default function AuditLogTablePanel({
   }
 
   return (
-    <section className="min-h-0 flex-1 rounded-[7px] bg-[#EDF3FF] p-7 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
-      <div className="mb-7 flex items-start justify-between gap-4">
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
+      <div className="flex items-start justify-between gap-4 px-3 pt-3">
         <div>
-          <h2 className="text-[21px] font-bold text-dark-grey">
+          <h2 className="text-lg font-bold text-dark-grey">
             Senarai Aktiviti Sistem
           </h2>
-          <p className="mt-1.5 text-[15px] text-grey">
+          <p className="text-xs text-grey/70">
             Rekod terperinci bagi setiap aktiviti sistem.
           </p>
         </div>
 
         <div className="flex items-center gap-4 text-[#607083]">
-          <AuditLogFilterPanel
+          <AuditSearch
             filters={filters}
-            hasActiveFilters={hasActiveFilters}
-            options={filterOptions}
+            isOpen={isSearchOpen}
+            onToggle={handleToggleSearch}
           />
-          <AuditLogDownloadButton
+          <AuditFilterDate filters={filters} onBeforeOpen={() => {}} />
+          <AuditFilter filters={filters} options={filterOptions} />
+          <AuditDownload
             exportHref={`/api/audit-logs/export${buildAuditLogQueryString(
               filters,
             )}`}
@@ -146,8 +171,51 @@ export default function AuditLogTablePanel({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg bg-white">
-        {currentPageError || initialErrorMessage ? (
+      {isSearchOpen ? (
+        <div className="mt-3 px-3">
+          <div className="rounded-lg bg-white p-4 shadow">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div ref={searchInputRef} className="flex-1">
+                <SharedInputField
+                  label="CARIAN KATA KUNCI MERENTASI SEMUA MEDAN REKOD AUDIT"
+                  value={searchQuery}
+                  state="active"
+                  onChange={(value) => {
+                    setSearchQuery(value);
+                  }}
+                  placeholder="Contoh: Ahmad, Tunggakan atau UPDATE"
+                  showLabel
+                  leadingIcon={(
+                    <Icon icon="search" size={18} className="text-light-grey" />
+                  )}
+                  className="w-full"
+                  activeBackgroundClass="bg-light-blue"
+                  inputFontSize={12}
+                  inputMinHeight={40}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 self-start lg:self-end">
+                <button
+                  type="button"
+                  className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!searchQuery.trim().length && !filters.search?.trim()}
+                  onClick={handleClearSearch}
+                >
+                  Kosongkan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">
+        {bootstrapError ? (
+          <div className="border-b border-light-grey/20 bg-[#FFF4F4] px-4 py-3 text-sm font-semibold text-[#B42318]">
+            {bootstrapError}
+          </div>
+        ) : currentPageError || initialErrorMessage ? (
           <div className="border-b border-light-grey/20 bg-[#FFF4F4] px-4 py-3 text-sm font-semibold text-[#B42318]">
             {currentPageError || initialErrorMessage}
           </div>
@@ -163,17 +231,22 @@ export default function AuditLogTablePanel({
                 <AuditHeader>Tarikh & Masa</AuditHeader>
                 <AuditHeader>Pengendali</AuditHeader>
                 <AuditHeader>Modul</AuditHeader>
-                <AuditHeader className="text-center!">
-                  Jenis Tindakan
-                </AuditHeader>
+                <AuditHeader className="text-center!">Jenis Tindakan</AuditHeader>
                 <AuditHeader>Sasaran Data</AuditHeader>
-                <AuditHeader className="text-center!">
-                  Butiran
-                </AuditHeader>
+                <th className="w-[0%] text-center p-3 whitespace-nowrap">Tindakan</th>
               </tr>
             </thead>
             <tbody className="bg-white">
-              {isInitialLoading ? (
+              {isBootstrapping ? (
+                <tr className="border-t border-light-grey/20">
+                  <td
+                    colSpan={6}
+                    className="px-3 py-4 text-center text-sm font-medium text-grey"
+                  >
+                    Sedang membaca rekod jejak audit...
+                  </td>
+                </tr>
+              ) : isInitialLoading ? (
                 <AuditLoadingRows />
               ) : rows.length > 0 ? (
                 rows.map((row) => (
@@ -185,7 +258,11 @@ export default function AuditLogTablePanel({
                     <AuditCell strong>{row.actor}</AuditCell>
                     <AuditCell>{row.module}</AuditCell>
                     <AuditCell className="text-center">
-                      <AuditActionBadge actionType={row.actionType} />
+                      <span
+                        className={`inline-flex h-6 max-w-full items-center rounded-[5px] px-2.5 text-[10px] font-bold ${getAuditActionBadgeColor(row.actionType)}`}
+                      >
+                        {row.actionTypeLabel}
+                      </span>
                     </AuditCell>
                     <AuditCell strong>{row.target}</AuditCell>
                     <AuditCell className="text-center">
@@ -209,7 +286,7 @@ export default function AuditLogTablePanel({
                 <tr className="border-t border-light-grey/20">
                   <td
                     colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-semibold text-grey"
+                    className="px-3 py-4 text-center text-sm font-medium text-grey"
                   >
                     Tiada rekod audit operasi ditemui.
                   </td>

@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+
+import { ROUTES } from "@/app/constants/routes";
+
 export default function HomePage() {
-  return <div>home</div>;
+  redirect(ROUTES.lamanUtama);
 }

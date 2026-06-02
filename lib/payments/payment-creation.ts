@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 
 import { Prisma } from "@prisma/client";
 
+import { getMonthStartInAppTimeZone } from "@/lib/date-time";
 import { generateTransactionNos } from "@/lib/transactions/transactions";
 
 const UPLOADED_PAYMENT_DESCRIPTION = "Bayaran daripada muat naik.";
@@ -227,7 +228,7 @@ async function applyPaymentToResidentBalance(
   columns: BalanceTableColumns,
 ) {
   const amount = normalizePaymentAmount(entry.amount);
-  const chargeMonth = getMonthStart(entry.paymentDate);
+  const chargeMonth = getMonthStartInAppTimeZone(entry.paymentDate);
   const activeOccupancy = await tx.unitOccupancy.findFirst({
     where: {
       residentId: entry.residentId,
@@ -395,10 +396,6 @@ async function getBalanceTableColumns(client: SchemaClient) {
   ]);
 
   return { monthlyCharge, arrearsSummary };
-}
-
-function getMonthStart(value: Date) {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
 }
 
 async function getTableColumns(client: SchemaClient, tableName: string) {

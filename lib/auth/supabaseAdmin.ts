@@ -5,7 +5,6 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 	// Keep module loading safe in tests or partial environments; the getter will fail when used.
-	// eslint-disable-next-line no-console
 	console.warn("Supabase admin client is not fully configured.");
 }
 

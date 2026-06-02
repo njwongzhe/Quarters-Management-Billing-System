@@ -7,7 +7,10 @@ import {
   TableInputField,
   TablePickerField,
 } from "@/app/components/InputField";
-import FilterOption from "@/app/components/FIlter/FilterOption";
+import FilterOption, {
+  areAllFilterOptionsSelected,
+  normalizeSelectedValuesForOptions,
+} from "@/app/components/FIlter/FilterOption";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import { PaginationControls } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
@@ -108,8 +111,19 @@ const STATUS_LABELS: Record<QuarterUnitStatusFilter, string> = {
 };
 
 function getStatusFilterLabel(statuses: QuarterUnitStatusFilter[]) {
-  if (statuses.length === 0) return "Semua Status";
-  return statuses.map((s) => STATUS_LABELS[s]).join(", ");
+  const normalizedStatuses = normalizeSelectedValuesForOptions(
+    statusFilterOptions,
+    statuses,
+  );
+  const isAllSelected = areAllFilterOptionsSelected(
+    statusFilterOptions,
+    normalizedStatuses,
+  );
+
+  if (isAllSelected) return "Semua Status";
+  if (normalizedStatuses.length === 0) return "Tiada Status";
+
+  return normalizedStatuses.map((s) => STATUS_LABELS[s]).join(", ");
 }
 
 const statusFilterOptions: Array<{
@@ -170,8 +184,11 @@ export default function KuartersUnitsPanel({
   );
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const isSearchFilterActive = filterQuery.trim().length > 0;
-  const isStatusFilterActive = statusFilter.length !== 2;
-  const isFilterButtonActive = isFilterMenuOpen || isSearchFilterActive || isStatusFilterActive;
+  const isStatusFilterActive = !areAllFilterOptionsSelected(
+    statusFilterOptions,
+    statusFilter,
+  );
+  const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
   const filteredResidentOccupancyRanges = selectedResidentOccupancyRanges.filter(
     (range) => range.unitId !== editor?.rowId,
   );
@@ -469,12 +486,19 @@ export default function KuartersUnitsPanel({
 
             {isFilterMenuOpen ? (
               <FilterOption
-                title="Status Unit"
-                description="Pilih unit yang ingin dipaparkan."
                 ariaLabel="Tapisan status unit"
-                options={statusFilterOptions}
-                selectedValues={statusFilter}
-                onSelect={handleSelectStatusFilter}
+                defaultLabel="Semua Status"
+                optionSets={[
+                  {
+                    title: "Status Unit",
+                    options: statusFilterOptions,
+                    selectedValues: statusFilter,
+                  },
+                ]}
+                onChange={(sets) => {
+                  // Only one set, so update parent with its selectedValues
+                  handleSelectStatusFilter(sets[0]?.selectedValues ?? []);
+                }}
               />
             ) : null}
           </div>

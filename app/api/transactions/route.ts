@@ -3,6 +3,10 @@ import { getTransactionsList, getTransactionsSummary, TransactionFilterParams } 
 import { TransactionCategory, TransactionStatus } from "@prisma/client";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 
+const transactionCategories = new Set(Object.values(TransactionCategory));
+const transactionStatuses = new Set(Object.values(TransactionStatus));
+const transactionTypes = new Set(["DEBIT", "CREDIT"]);
+
 export async function GET(request: NextRequest) {
   try {
     // 1. SECURITY CHECK: Ensure only logged-in admins can view the ledger
@@ -20,17 +24,35 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || undefined;
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "10", 10) || 10),
+    );
 
     // Handle Enums arrays (e.g., categories=BAYARAN,CAJ_SEWA)
     const categoriesParam = searchParams.get("categories");
-    const categories = categoriesParam ? (categoriesParam.split(",") as TransactionCategory[]) : undefined;
+    const categories = categoriesParam
+      ? categoriesParam
+          .split(",")
+          .filter((value): value is TransactionCategory =>
+            transactionCategories.has(value as TransactionCategory),
+          )
+      : undefined;
 
     const statusesParam = searchParams.get("statuses");
-    const statuses = statusesParam ? (statusesParam.split(",") as TransactionStatus[]) : undefined;
+    const statuses = statusesParam
+      ? statusesParam
+          .split(",")
+          .filter((value): value is TransactionStatus =>
+            transactionStatuses.has(value as TransactionStatus),
+          )
+      : undefined;
 
-    const type = (searchParams.get("type") as "DEBIT" | "CREDIT") || undefined;
+    const rawType = searchParams.get("type");
+    const type = rawType && transactionTypes.has(rawType)
+      ? (rawType as "DEBIT" | "CREDIT")
+      : undefined;
 
     const params: TransactionFilterParams = {
       search,

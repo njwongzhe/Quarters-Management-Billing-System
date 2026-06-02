@@ -3,7 +3,13 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { ROUTES } from "@/app/constants/routes";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import { parseDateOnlyInAppTimeZone } from "@/lib/date-time";
 import { getBayaranPaymentDetail } from "@/lib/payments/bayaran-detail";
 import { createPaymentRecords } from "@/lib/payments/payment-creation";
 import { prisma } from "@/lib/prisma";
@@ -108,6 +114,40 @@ export async function POST(request: Request, context: RouteContext) {
           verifiedById: currentAdmin.profile.id,
         })),
       );
+
+      const resident = await tx.resident.findUnique({
+        where: { id: residentId },
+        select: {
+          fullName: true,
+          icNumber: true,
+        },
+      });
+      const totalAmount = parsedRecords.records.reduce(
+        (sum, record) => sum + record.amount,
+        0,
+      );
+
+      await recordDataAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Semakan Bayaran",
+        actionType: "CREATE",
+        target: formatAuditTarget([
+          resident?.fullName ?? "Penghuni",
+          resident?.icNumber ? `No. KP ${resident.icNumber}` : null,
+        ]),
+        entityType: "PAYMENT",
+        entityId: null,
+        summary: `Menambah ${parsedRecords.records.length} rekod bayaran manual.`,
+        details: [
+          `Jumlah bayaran ditambah: RM ${totalAmount.toFixed(2)}.`,
+          `Tarikh bayaran: ${parsedRecords.records
+            .map((record) => formatAuditValue(record.paymentDate))
+            .join(", ")}.`,
+          `No. resit: ${parsedRecords.records
+            .map((record) => formatAuditValue(record.receiptNo))
+            .join(", ")}.`,
+        ],
+      });
     });
 
     const payment = await getBayaranPaymentDetail(id);
@@ -231,25 +271,7 @@ function parsePaymentDate(value: unknown) {
     return null;
   }
 
-  const [yearRaw, monthRaw, dayRaw] = value.split("-");
-  const year = Number(yearRaw);
-  const month = Number(monthRaw);
-  const day = Number(dayRaw);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    !Number.isInteger(day) ||
-    Number.isNaN(date.getTime()) ||
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-
-  return date;
+  return parseDateOnlyInAppTimeZone(value);
 }
 
 function parsePaymentAmount(value: unknown) {

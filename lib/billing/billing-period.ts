@@ -1,4 +1,12 @@
-const BILLING_TIME_ZONE = "Asia/Kuala_Lumpur";
+import {
+  APP_TIME_ZONE,
+  getAppTimeZoneDateParts,
+  getDateKeyInAppTimeZone,
+  getDayOfMonthInAppTimeZone,
+  getMonthEndInAppTimeZone,
+  getMonthStartInAppTimeZone,
+  isSameMonthInAppTimeZone,
+} from "@/lib/date-time";
 
 type BillingPeriod = {
   billingMonth: Date;
@@ -9,70 +17,36 @@ type BillingPeriod = {
   label: string;
 };
 
-function getTimeZoneDateParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: BILLING_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const value = (type: "year" | "month" | "day") => {
-    const part = parts.find((item) => item.type === type)?.value;
-    if (!part) throw new Error(`Unable to calculate billing ${type}.`);
-    return Number(part);
-  };
-
-  return {
-    year: value("year"),
-    month: value("month"),
-    day: value("day"),
-  };
-}
-
 export function getPreviousBillingPeriod(date = new Date()): BillingPeriod {
-  const malaysiaDate = getTimeZoneDateParts(date);
-  const billingMonth = new Date(Date.UTC(malaysiaDate.year, malaysiaDate.month - 2, 1));
-  const billingMonthEnd = new Date(Date.UTC(
-    billingMonth.getUTCFullYear(),
-    billingMonth.getUTCMonth() + 1,
-    0,
-    23,
-    59,
-    59,
-    999
-  ));
+  const malaysiaDate = getAppTimeZoneDateParts(date);
+  const previousMonthDate = new Date(
+    Date.UTC(malaysiaDate.year, malaysiaDate.month - 2, 1),
+  );
+  const billingMonth = getMonthStartInAppTimeZone(previousMonthDate);
+  const billingMonthEnd = getMonthEndInAppTimeZone(previousMonthDate);
 
   return {
     billingMonth,
     billingMonthEnd,
-    startDateKey: billingMonth.getUTCFullYear() * 10000 + (billingMonth.getUTCMonth() + 1) * 100 + 1,
-    endDateKey: billingMonthEnd.getUTCFullYear() * 10000 +
-      (billingMonthEnd.getUTCMonth() + 1) * 100 +
-      billingMonthEnd.getUTCDate(),
-    totalDaysInMonth: billingMonthEnd.getUTCDate(),
+    startDateKey: getDateKeyInAppTimeZone(billingMonth),
+    endDateKey: getDateKeyInAppTimeZone(billingMonthEnd),
+    totalDaysInMonth: getDayOfMonthInAppTimeZone(billingMonthEnd),
     label: new Intl.DateTimeFormat("ms-MY", {
       month: "long",
       year: "numeric",
-      timeZone: "UTC",
+      timeZone: APP_TIME_ZONE,
     }).format(billingMonth),
   };
 }
 
 export function isSameBillingMonth(date: Date, billingMonth: Date) {
-  const dateParts = getTimeZoneDateParts(date);
-
-  return (
-    dateParts.year === billingMonth.getUTCFullYear() &&
-    dateParts.month === billingMonth.getUTCMonth() + 1
-  );
+  return isSameMonthInAppTimeZone(date, billingMonth);
 }
 
 export function getBillingDayOfMonth(date: Date) {
-  return getTimeZoneDateParts(date).day;
+  return getDayOfMonthInAppTimeZone(date);
 }
 
 export function getBillingDateKey(date: Date) {
-  const dateParts = getTimeZoneDateParts(date);
-  return dateParts.year * 10000 + dateParts.month * 100 + dateParts.day;
+  return getDateKeyInAppTimeZone(date);
 }

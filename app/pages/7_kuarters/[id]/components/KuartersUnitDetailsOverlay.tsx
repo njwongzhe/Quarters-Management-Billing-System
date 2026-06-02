@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import Icon from "@/app/components/Icon/Icon";
+import SearchingDetailDataOverlay from "@/app/components/Loading/SearchingDetailDataOverlay";
 import type { QuarterUnitDetails } from "@/lib/quarters/quarter-units";
 
 import KuartersUnitDetailsHistoryTab from "./KuartersUnitDetailsHistoryTab";
@@ -178,33 +179,18 @@ export default function KuartersUnitDetailsOverlay({
 
         <div className="p-6 bg-light-blue overflow-y-auto">
           {isLoading ? (
-            <div className="flex min-h-108 items-center justify-center">
-              <div className="text-center">
-                <div
-                  className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-dark-blue/20 border-t-dark-blue"
-                  aria-hidden="true"
-                />
-                <p className="mt-4 text-sm font-semibold text-grey">
-                  Mendapatkan Maklumat Unit Kuarters...
-                </p>
-              </div>
-            </div>
+            <SearchingDetailDataOverlay
+              mode="loading"
+              loadingMessage="Mendapatkan Maklumat Unit Kuarters..."
+            />
           ) : errorMessage ? (
-            <div className="flex min-h-108 items-center justify-center">
-              <div className="w-full max-w-md rounded-xl border border-red/20 bg-white p-6 text-center">
-                <h4 className="text-lg font-extrabold text-dark-grey">
-                  Maklumat Tidak Dapat Dipaparkan
-                </h4>
-                <p className="mt-2 text-sm leading-6 text-grey">{errorMessage}</p>
-                <button
-                  type="button"
-                  className="mt-5 inline-flex min-h-10 items-center rounded-xl bg-dark-blue px-4 py-2 text-sm font-extrabold text-white transition-opacity hover:opacity-90"
-                  onClick={() => setReloadToken((currentValue) => currentValue + 1)}
-                >
-                  Cuba Lagi
-                </button>
-              </div>
-            </div>
+            <SearchingDetailDataOverlay
+              mode="warning"
+              title="Maklumat Tidak Dapat Dipaparkan"
+              message={errorMessage}
+              onRetry={() => setReloadToken((currentValue) => currentValue + 1)}
+              retryLabel="Cuba Lagi"
+            />
           ) : activeTab === "unit" && unitDetails ? (
             <KuartersUnitDetailsUnitTab
               unitDetails={unitDetails}

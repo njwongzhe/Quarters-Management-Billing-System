@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "../../../../../lib/prisma";
 
 // Error response helper
@@ -35,6 +40,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     const { id } = await params;
 
     // Check if resident exists
@@ -50,8 +56,25 @@ export async function DELETE(
       );
     }
 
-    await prisma.resident.delete({
-      where: { id },
+    await prisma.$transaction(async (tx) => {
+      await tx.resident.delete({
+        where: { id },
+      });
+
+      await recordDataAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Penghuni",
+        actionType: "DELETE",
+        target: formatAuditTarget([resident.fullName, `No. KP ${resident.icNumber}`]),
+        entityType: "RESIDENT",
+        entityId: resident.id,
+        summary: "Memadam rekod penghuni daripada sistem.",
+        details: [
+          resident.phone ? `No. telefon terakhir: ${resident.phone}.` : null,
+          resident.email ? `Emel terakhir: ${resident.email}.` : null,
+          resident.status ? `Status terakhir: ${resident.status}.` : null,
+        ],
+      });
     });
 
     return NextResponse.json(

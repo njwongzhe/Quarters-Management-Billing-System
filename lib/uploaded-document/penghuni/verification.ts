@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 
 import type { ExtractedPenghuniRecord } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import { parseFlexibleDateOnlyInAppTimeZone } from "@/lib/date-time";
 import {
   getTodayStartInMalaysia,
   resolveQuarterUnitOccupancyState,
@@ -1061,7 +1062,7 @@ async function findResidentIdsByNormalizedIc(
 function parsePenghuniMoveInDate(value: string) {
   const date = parsePenghuniDateValue(value);
 
-  if (Number.isNaN(date.getTime())) {
+  if (!date || Number.isNaN(date.getTime())) {
     return null;
   }
 
@@ -1075,16 +1076,9 @@ function parseNullablePenghuniDate(value: string) {
 
   const date = parsePenghuniDateValue(value);
 
-  return Number.isNaN(date.getTime()) ? null : date;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
 function parsePenghuniDateValue(value: string) {
-  const normalizedValue = value.trim();
-  const dayFirstMatch = normalizedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-
-  return dayFirstMatch
-    ? new Date(
-        `${dayFirstMatch[3]}-${dayFirstMatch[2]}-${dayFirstMatch[1]}T00:00:00.000Z`,
-      )
-    : new Date(value);
+  return parseFlexibleDateOnlyInAppTimeZone(value);
 }

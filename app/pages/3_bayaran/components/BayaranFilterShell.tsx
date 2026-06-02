@@ -121,13 +121,16 @@ export default function BayaranFilterShell({
 
             {isFilterMenuOpen ? (
               <FilterOption
-                title="Status Bayaran"
-                description="Pilih rekod yang ingin dipaparkan."
                 ariaLabel="Tapisan status bayaran"
                 defaultLabel="Semua Status"
-                options={statusFilterOptions}
-                selectedValues={statusFilter}
-                onSelect={onStatusFilterChange}
+                optionSets={[
+                  {
+                    title: "Status Bayaran",
+                    options: statusFilterOptions,
+                    selectedValues: statusFilter,
+                  },
+                ]}
+                onChange={(sets) => onStatusFilterChange(sets[0]?.selectedValues ?? [])}
               />
             ) : null}
           </div>

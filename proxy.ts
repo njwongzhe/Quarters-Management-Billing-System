@@ -72,7 +72,7 @@ function unauthorizedApiResponse() {
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith(ROUTES.auth); // Matches /auth, /auth/login, /auth/register, etc.
   const isAuthApiRoute = pathname.startsWith(ROUTES.authApi); // Matches /api/auth/login, /api/auth/register, etc.

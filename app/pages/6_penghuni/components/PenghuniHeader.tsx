@@ -34,7 +34,7 @@ export function PenghuniHeader({ residents }: PenghuniHeaderProps) {
 
             {/* Dashboard Cards */}
             <div className="flex flex-row gap-3">
-                {headerCard("JUMLAH PENGHUNI", String(totalCount), "Rekod Dalam Sistem", "list")}
+                {headerCard("JUMLAH PENGHUNI", String(totalCount), "Rekod Dalam Sistem", "list", "text-dark-blue")}
                 {headerCard("AKTIF", String(aktifCount), "Masih Layak", "check", "text-aktif")}
                 {headerCard("HILANG KELAYAKAN", String(tidakLayakCount), "Tidak Layak", "close", "text-x-layak")}
                 {headerCard("PENCEN MENDATANG", String(pencenMendatangCount), "Tindakan Diperlukan", "warning", "text-pencen-datang")}

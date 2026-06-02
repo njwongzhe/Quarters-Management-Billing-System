@@ -8,20 +8,17 @@ import TransaksiViewRelated from "./TransaksiViewRelated";
 interface TransaksiViewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transaction: any;
 }
 
 export default function TransaksiViewModal({ isOpen, onClose, transaction }: TransaksiViewModalProps) {
   const [activeTab, setActiveTab] = useState<"maklumat" | "berkaitan">("maklumat");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [residentDetails, setResidentDetails] = useState<any>(null);
   const [loadingResident, setLoadingResident] = useState(false);
 
   useEffect(() => {
     const residentId = transaction?.residentId || transaction?.resident?.id;
     if (isOpen && residentId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingResident(true);
       fetch(`/api/residents/${residentId}/read`)
         .then((res) => res.json())
@@ -83,7 +80,6 @@ export default function TransaksiViewModal({ isOpen, onClose, transaction }: Tra
     parentTx = transaction.relatedTransaction;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const relatedRecords: any[] = [];
   if (parentTx) {
     relatedRecords.push({
@@ -96,7 +92,6 @@ export default function TransaksiViewModal({ isOpen, onClose, transaction }: Tra
       creditAmount: parentTx.creditAmount,
     });
     if (parentTx.childTransactions && parentTx.childTransactions.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       parentTx.childTransactions.forEach((child: any) => {
         relatedRecords.push({
           id: child.id,

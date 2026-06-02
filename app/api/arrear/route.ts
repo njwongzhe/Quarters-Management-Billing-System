@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears/arrears";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import {
+  getMonthStartInAppTimeZone,
+  parseDateOnlyInAppTimeZone,
+} from "@/lib/date-time";
 import { generateTransactionNo } from "@/lib/transactions/transactions"; 
 
 export const dynamic = "force-dynamic";
@@ -16,12 +24,14 @@ function getChargeMonthFromMonthValue(monthValue: unknown) {
   const monthParam = typeof monthValue === "string" ? monthValue : null;
 
   if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
-    const [year, month] = monthParam.split("-").map(Number);
-    return new Date(Date.UTC(year, month - 1, 1));
+    const parsedMonth = parseDateOnlyInAppTimeZone(`${monthParam}-01`);
+
+    if (parsedMonth) {
+      return parsedMonth;
+    }
   }
 
-  const today = new Date();
-  return new Date(Date.UTC(today.getFullYear(), today.getMonth(), 1));
+  return getMonthStartInAppTimeZone();
 }
 
 export async function GET(request: Request) {
@@ -182,7 +192,7 @@ export async function POST(request: Request) {
             await tx.additionalCharge.create({
                 data: {
                     monthlyChargeId: monthlyCharge.id,
-                    chargeDate: new Date(item.tarikh),
+                    chargeDate: item.tarikh,
                     description: item.catatan,
                     amount: item.amaun,
                 }
@@ -211,7 +221,7 @@ export async function POST(request: Request) {
             await tx.rebate.create({
                 data: {
                     monthlyChargeId: monthlyCharge.id,
-                    rebateDate: new Date(item.tarikh),
+                    rebateDate: item.tarikh,
                     description: item.catatan,
                     amount: item.amaun,
                 }
@@ -260,12 +270,24 @@ export async function POST(request: Request) {
         });
       }
 
-      await createAuditLog(tx, {
+      const totalTambahan = cajTambahan.reduce((sum, item) => sum + item.amaun, 0);
+      const totalRebat = rebat.reduce((sum, item) => sum + item.amaun, 0);
+
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Tunggakan",
-        targetData: `${residentIds.length} penghuni`,
         actionType: "UPDATE",
-        description: `Mengemaskini caj tunggakan secara pukal untuk ${residentIds.length} penghuni.`,
+        target: formatAuditTarget([`${residentIds.length} penghuni`, formatAuditValue(chargeMonth)]),
+        entityType: "ARREARS_SUMMARY",
+        entityId: null,
+        summary: `Mengemaskini caj tunggakan secara pukal untuk ${residentIds.length} penghuni.`,
+        details: [
+          `Bulan caj: ${formatAuditValue(chargeMonth)}.`,
+          `Caj penyelenggaraan: ${cajSenggaraEnabled ? "diaktifkan" : "tidak diaktifkan"}.`,
+          `Bilangan caj tambahan: ${cajTambahan.length}, jumlah RM ${totalTambahan.toFixed(2)}.`,
+          `Bilangan rebat: ${rebat.length}, jumlah RM ${totalRebat.toFixed(2)}.`,
+          `Senarai penghuni terlibat: ${residentsInfo.map((resident) => `${resident.fullName} (${resident.icNumber})`).join(", ")}.`,
+        ],
       });
     },
       {

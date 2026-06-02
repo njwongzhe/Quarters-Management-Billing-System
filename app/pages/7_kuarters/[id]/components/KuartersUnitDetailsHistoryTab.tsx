@@ -1,56 +1,55 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
+import { InputField as SharedInputField } from "@/app/components/InputField";
 import {
   PaginationControls,
   usePaginationLogic,
 } from "@/app/components/Pagination/Pagination";
 import { Topic } from "@/app/components/InputField";
-import { downloadQuarterUnitOccupancyHistory } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
+import HistoryDownload from "./KuartersUnitHistoryTabComponents/HistoryDownload";
+import { useHistoryFilterDate } from "./KuartersUnitHistoryTabComponents/HistoryFilterDate";
+import { useHistoryFilter } from "./KuartersUnitHistoryTabComponents/HistoryFilter";
+import { useHistorySearch } from "./KuartersUnitHistoryTabComponents/HistorySearch";
 
 import type {
   QuarterUnitDetails,
-  QuarterUnitOccupancyDetails,
 } from "@/lib/quarters/quarter-units";
 
 type KuartersUnitDetailsHistoryTabProps = {
   unitDetails: QuarterUnitDetails;
 };
-type HistoryFilter = "ALL" | QuarterUnitOccupancyDetails["status"];
 
 const HISTORY_PAGE_SIZE = 10;
-
-function getFilterLabel(filter: HistoryFilter) {
-  if (filter === "CURRENT") {
-    return "Aktif";
-  }
-
-  if (filter === "PAST") {
-    return "Keluar";
-  }
-
-  return "Semua Rekod";
-}
 
 export default function KuartersUnitDetailsHistoryTab({
   unitDetails,
 }: KuartersUnitDetailsHistoryTabProps) {
-  const filterMenuRef = useRef<HTMLDivElement | null>(null);
-  const [statusFilter, setStatusFilter] = useState<HistoryFilter>("ALL");
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-
-  const historyRecords = useMemo(() => {
-    if (statusFilter === "ALL") {
-      return unitDetails.occupancyHistory;
-    }
-
-    return unitDetails.occupancyHistory.filter(
-      (occupancy) => occupancy.status === statusFilter,
-    );
-  }, [statusFilter, unitDetails.occupancyHistory]);
+  const {
+    filteredRecords: statusFilteredRecords,
+    statusFilterKey,
+    FilterControl,
+  } = useHistoryFilter(
+    unitDetails.occupancyHistory,
+  );
+  const {
+    filteredRecords: dateFilteredRecords,
+    dateFilterKey,
+    DateFilterControl,
+  } = useHistoryFilterDate(statusFilteredRecords);
+  const {
+    filteredRecords: historyRecords,
+    searchKey,
+    searchInputRef,
+    searchQuery,
+    isSearchOpen,
+    isSearchActive,
+    setSearchQuery,
+    handleClearSearch,
+    SearchButton,
+  } = useHistorySearch(dateFilteredRecords);
 
   const {
     currentPage,
@@ -65,33 +64,7 @@ export default function KuartersUnitDetailsHistoryTab({
 
   useEffect(() => {
     handlePageChange("goto", 1);
-  }, [statusFilter, unitDetails.id]);
-
-  useEffect(() => {
-    if (!isFilterMenuOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target;
-
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      if (filterMenuRef.current?.contains(target)) {
-        return;
-      }
-
-      setIsFilterMenuOpen(false);
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [isFilterMenuOpen]);
+  }, [dateFilterKey, searchKey, statusFilterKey, unitDetails.id]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -99,59 +72,55 @@ export default function KuartersUnitDetailsHistoryTab({
         <Topic content="SEJARAH PENGHUNIAN" />
 
         <div className="flex flex-row gap-4 items-center">
-          <ToolbarButton
-            icon={commonIcons.download}
-            label="Muat turun sejarah penghunian"
-            onClick={() =>
-              downloadQuarterUnitOccupancyHistory(
-                unitDetails.unitCode,
-                historyRecords,
-              )
-            }
-          />
-          <div ref={filterMenuRef} className="relative">
-            <ToolbarButton
-              icon={commonIcons.filter}
-              label={`Tapis sejarah penghunian: ${getFilterLabel(statusFilter)}`}
-              isActive={isFilterMenuOpen || statusFilter !== "ALL"}
-              onClick={() => setIsFilterMenuOpen((currentState) => !currentState)}
-            />
-
-            {isFilterMenuOpen ? (
-              <div
-                className="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-light-grey/20 bg-white p-2 shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
-                role="listbox"
-                aria-label="Tapisan sejarah penghunian"
-              >
-                {(["ALL", "CURRENT", "PAST"] as const).map((option) => {
-                  const isSelected = statusFilter === option;
-
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      className={`flex min-h-10 w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors ${
-                        isSelected
-                          ? "bg-dark-blue text-white"
-                          : "text-dark-grey hover:bg-light-blue"
-                      }`}
-                      onClick={() => {
-                        setStatusFilter(option);
-                        setIsFilterMenuOpen(false);
-                      }}
-                    >
-                      <span className="truncate">{getFilterLabel(option)}</span>
-                      {isSelected ? <Icon icon="done" size={16} /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
+          {SearchButton}
+          {DateFilterControl}
+          {FilterControl}
+          <HistoryDownload unitCode={unitDetails.unitCode} records={historyRecords} />
         </div>
       </div>
+
+      {isSearchOpen ? (
+        <div className="w-full px-3">
+          <div className="rounded-lg bg-white p-4 shadow">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div ref={searchInputRef} className="flex-1">
+                <SharedInputField
+                  label="CARIAN MENGIKUT NAMA ATAU NO. KP"
+                  value={searchQuery}
+                  state="active"
+                  onChange={(value) => {
+                    setSearchQuery(value);
+                  }}
+                  placeholder="Contoh: Ahmad atau 880101-14-5678"
+                  showLabel
+                  leadingIcon={(
+                    <Icon
+                      icon={commonIcons.search}
+                      size={18}
+                      className="text-light-grey"
+                    />
+                  )}
+                  className="w-full"
+                  activeBackgroundClass="bg-light-blue"
+                  inputFontSize={12}
+                  inputMinHeight={40}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 self-start lg:self-end">
+                <button
+                  type="button"
+                  className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!isSearchActive}
+                  onClick={handleClearSearch}
+                >
+                  Kosongkan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-lg overflow-hidden border border-light-grey/20">
         <table className="w-full overflow-x-auto">
@@ -175,7 +144,7 @@ export default function KuartersUnitDetailsHistoryTab({
               currentHistory.map((occupancy) => (
                 <tr
                   key={occupancy.id}
-                  className="text-sm border-b border-b-light-grey/20 hover:bg-light-blue/50 transition-colors"
+                  className="text-sm border-b border-b-light-grey/20 transition-colors"
                 >
                   <td className="px-4 py-3 text-left font-medium">
                     {formatHistoryDate(occupancy.moveInDate)}
@@ -189,10 +158,10 @@ export default function KuartersUnitDetailsHistoryTab({
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
-                      className={`inline-flex min-h-8 items-center rounded-full border px-3 text-[11px] font-semibold ${
+                      className={`inline-flex items-center text-[11px] font-semibold ${
                         occupancy.status === "CURRENT"
-                          ? "border-aktif/20 bg-aktif/10 text-aktif"
-                          : "border-x-layak/20 bg-x-layak/10 text-x-layak"
+                          ? "text-aktif"
+                          : "text-x-layak"
                       }`}
                     >
                       {occupancy.status === "CURRENT" ? "Aktif" : "Keluar"}

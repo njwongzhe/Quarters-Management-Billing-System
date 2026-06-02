@@ -17,7 +17,11 @@ import {
   quarterUnitDetailsInclude,
   resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -48,6 +52,16 @@ function isPrismaForeignKeyError(error: unknown) {
     error.code === "P2003"
   );
 }
+
+const changedFieldLabels: Record<
+  "unitCode" | "occupant" | "moveInDate" | "moveOutDate",
+  string
+> = {
+  unitCode: "Kod unit",
+  occupant: "Penghuni",
+  moveInDate: "Tarikh masuk",
+  moveOutDate: "Tarikh keluar",
+};
 
 // Used to fetch the details of a specific quarter unit, including its current occupancy and occupancy history, for display in the unit details overlay.
 export async function GET(_request: Request, context: RouteContext) {
@@ -136,6 +150,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         quarterCategory: {
           select: {
             id: true,
+            categoryName: true,
           },
         },
       },
@@ -476,14 +491,53 @@ export async function PATCH(request: Request, context: RouteContext) {
         include: buildQuarterUnitCurrentOccupancyInclude(),
       });
 
-      await createAuditLog(tx, {
+      const updatedOccupancy = unit.occupancies[0];
+
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `Unit ${unit.unitCode}`,
         actionType: "UPDATE",
+        target: formatAuditTarget([
+          existingUnit.quarterCategory.categoryName,
+          `Unit ${unit.unitCode}`,
+        ]),
         entityType: "UNIT",
         entityId: unit.id,
-        description: `Mengemaskini unit ${unit.unitCode}. Medan berubah: ${changedFields.join(", ")}.`,
+        summary: "Mengemaskini maklumat unit kuarters.",
+        changes: [
+          {
+            label: "Kod unit",
+            before: existingUnit.unitCode,
+            after: unit.unitCode,
+          },
+          {
+            label: "Status unit",
+            before: existingUnit.status,
+            after: unit.status,
+          },
+          {
+            label: "Penghuni",
+            before: currentOccupancy
+              ? `${currentOccupancy.resident.fullName} (No. KP ${currentOccupancy.resident.icNumber})`
+              : null,
+            after: updatedOccupancy
+              ? `${updatedOccupancy.resident.fullName} (No. KP ${updatedOccupancy.resident.icNumber})`
+              : null,
+          },
+          {
+            label: "Tarikh masuk",
+            before: currentOccupancy?.moveInDate ?? null,
+            after: updatedOccupancy?.moveInDate ?? null,
+          },
+          {
+            label: "Tarikh keluar",
+            before: currentOccupancy?.moveOutDate ?? null,
+            after: updatedOccupancy?.moveOutDate ?? null,
+          },
+        ],
+        details: [
+          `Medan dikemaskini: ${changedFields.map((field) => changedFieldLabels[field]).join(", ")}.`,
+        ],
       });
 
       return unit;
@@ -638,6 +692,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
         quarterCategory: {
           select: {
             id: true,
+            categoryName: true,
           },
         },
         _count: {
@@ -690,14 +745,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
         },
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `Unit ${existingUnit.unitCode}`,
         actionType: "DELETE",
+        target: formatAuditTarget([
+          existingUnit.quarterCategory.categoryName,
+          `Unit ${existingUnit.unitCode}`,
+        ]),
         entityType: "UNIT",
         entityId: existingUnit.id,
-        description: `Memadam unit kuarters ${existingUnit.unitCode}.`,
+        summary: "Memadam unit kuarters.",
+        details: [
+          `Jumlah rekod penghunian sebelum dipadam: ${formatAuditValue(existingUnit._count.occupancies)}.`,
+          `Jumlah caj bulanan berkaitan sebelum dipadam: ${formatAuditValue(existingUnit._count.monthlyCharges)}.`,
+        ],
       });
     });
 
