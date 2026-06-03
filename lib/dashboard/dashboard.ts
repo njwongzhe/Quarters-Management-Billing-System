@@ -127,14 +127,14 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
   const totalCollected = Number(billingSummary._sum.paymentReceived || 0);
   const monthlyPercentage = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
 
-  // All-time target completion rate (All-time Collected vs All-time Billed in MonthlyCharge table)
-  const overallBillingSummary = await prisma.monthlyCharge.aggregate({
-    _sum: { totalMonthlyCharge: true, paymentReceived: true },
+  // All-time/Yearly target completion rate (All-time Collected vs Total Expected [Collected + Outstanding Arrears])
+  const arrearsSummaryAllTime = await prisma.arrearsSummary.aggregate({
+    where: { totalArrearsAmount: { gt: 0 } },
+    _sum: { totalArrearsAmount: true },
   });
-
-  const totalBilledAllTime = Number(overallBillingSummary._sum.totalMonthlyCharge || 0);
-  const totalCollectedAllTime = Number(overallBillingSummary._sum.paymentReceived || 0);
-  const totalPercentage = totalBilledAllTime > 0 ? Math.round((totalCollectedAllTime / totalBilledAllTime) * 100) : 0;
+  const totalArrearsVal = Number(arrearsSummaryAllTime._sum.totalArrearsAmount || 0);
+  const totalExpectedAllTime = totalKutipanVal + totalArrearsVal;
+  const totalPercentage = totalExpectedAllTime > 0 ? Math.round((totalKutipanVal / totalExpectedAllTime) * 100) : 0;
 
   // 5. Calculate Occupancy Status
   const totalUnits = await prisma.unit.count();
@@ -188,15 +188,11 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
               resident: {
                 include: {
                   arrearsSummary: true,
+                  payments: {
+                    select: { amount: true },
+                  },
                 },
               },
-            },
-          },
-          monthlyCharges: {
-            where: { chargeMonth: targetMonth },
-            select: {
-              totalMonthlyCharge: true,
-              paymentReceived: true,
             },
           },
         },
@@ -206,27 +202,30 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
 
   const analysis = categories.map((cat) => {
     let totalOutstanding = 0;
-    let catBilled = 0;
-    let catPaid = 0;
+    let totalPaid = 0;
 
     cat.units.forEach((unit) => {
-      // 1. Accumulate total positive arrears from the current occupant
       const currentOccupancy = unit.occupancies[0];
-      if (currentOccupancy?.resident?.arrearsSummary) {
-        const arrVal = Number(currentOccupancy.resident.arrearsSummary.totalArrearsAmount || 0);
-        if (arrVal > 0) {
-          totalOutstanding += arrVal;
-        }
-      }
+      if (currentOccupancy?.resident) {
+        const resident = currentOccupancy.resident;
 
-      // 2. Accumulate monthly charge statistics for settlement rate calculation
-      unit.monthlyCharges.forEach((charge) => {
-        catBilled += Number(charge.totalMonthlyCharge || 0);
-        catPaid += Number(charge.paymentReceived || 0);
-      });
+        // 1. Accumulate positive arrears from the current occupant
+        if (resident.arrearsSummary) {
+          const arrVal = Number(resident.arrearsSummary.totalArrearsAmount || 0);
+          if (arrVal > 0) {
+            totalOutstanding += arrVal;
+          }
+        }
+
+        // 2. Accumulate all-time payments from the current occupant
+        const occupantPaid = resident.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        totalPaid += occupantPaid;
+      }
     });
 
-    const settlementRate = catBilled > 0 ? Math.round((catPaid / catBilled) * 100) : 0;
+    // 3. Compute settlement rate: Paid / Expected (Paid + Outstanding Arrears)
+    const totalExpected = totalPaid + totalOutstanding;
+    const settlementRate = totalExpected > 0 ? Math.round((totalPaid / totalExpected) * 100) : 0;
 
     return {
       className: cat.categoryName,
