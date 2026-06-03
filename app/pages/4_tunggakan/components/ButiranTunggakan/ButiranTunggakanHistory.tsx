@@ -20,13 +20,17 @@ function getBakiColorClass(baki: number): string {
 
 function calculateRunningBalances(transactions: HistoryData[]): (HistoryData & { baki: number })[] {
     let runningBalance = 0;
-    return transactions.map(transaction => {
+    const result = new Array(transactions.length);
+    // Calculate running balance from oldest (end of array) to newest (start of array)
+    for (let i = transactions.length - 1; i >= 0; i--) {
+        const transaction = transactions[i];
         runningBalance += transaction.debit - transaction.kredit;
-        return {
+        result[i] = {
             ...transaction,
             baki: runningBalance,
         };
-    });
+    }
+    return result;
 }
 
 type ButiranTunggakanHistoryProps = {

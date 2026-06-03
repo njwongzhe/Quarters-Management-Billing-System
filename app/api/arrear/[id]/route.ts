@@ -74,7 +74,7 @@ export async function GET(
     // 3. Format the Historical Ledger Data
     const history = resident.transactions.map(t => ({
       tarikh: new Date(t.transactionDate).toLocaleDateString('en-GB'),
-      id: t.id.substring(0, 8).toUpperCase(), // Create a short transaction ID for the UI
+      id: t.transactionNo || t.id.substring(0, 8).toUpperCase(), // Use transactionNo if available, fallback to short transaction ID
       kategori: t.status === "NORMAL" ? t.category.replace(/_/g, ' ') : `${t.category.replace(/_/g, ' ')} (${t.status})`,
       catatan: t.description || "-",
       debit: Number(t.debitAmount || 0),

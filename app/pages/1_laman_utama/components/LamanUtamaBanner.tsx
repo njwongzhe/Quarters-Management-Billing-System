@@ -28,7 +28,7 @@ export default function LamanUtamaBanner({
 
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % 2);
-    }, 3000); // toggle every 5 seconds
+    }, 4000); // toggle every 5 seconds
 
     return () => clearInterval(timer);
   }, [isHovered]);
