@@ -33,8 +33,9 @@ export function getMonthStartInAppTimeZone(date = new Date()) {
 
 export function getMonthEndInAppTimeZone(date = new Date()) {
   const { year, month } = getAppTimeZoneDateParts(date);
+  const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  return new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+  return datePartsToUtcDate({ year, month, day: lastDayOfMonth });
 }
 
 export function parseDateOnlyInAppTimeZone(value: string) {

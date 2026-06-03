@@ -191,8 +191,7 @@ export default function KuartersResidentPickerModal({
                     ? paginatedResidents.map((resident) => {
                         const isSelected =
                           resident.icNumber === selectedResidentIcNumber;
-                        const hasCurrentUnit = resident.hasCurrentUnit;
-                        const isActionDisabled = isSelected || hasCurrentUnit;
+                        const isActionDisabled = isSelected;
 
                         return (
                           <tr
@@ -230,9 +229,7 @@ export default function KuartersResidentPickerModal({
                               >
                                 {isSelected
                                   ? "Dipilih"
-                                  : hasCurrentUnit
-                                    ? "Didiami"
-                                    : "Pilih"}
+                                  : "Pilih"}
                               </button>
                             </td>
                           </tr>

@@ -197,7 +197,10 @@ export default function KuartersUnitDetailsOverlay({
               onAssignOccupant={() => onAssignOccupant(unitDetails.id)}
             />
           ) : unitDetails ? (
-            <KuartersUnitDetailsHistoryTab unitDetails={unitDetails} />
+            <KuartersUnitDetailsHistoryTab
+              unitDetails={unitDetails}
+              onUnitUpdated={setUnitDetails}
+            />
           ) : null}
         </div>
       </section>

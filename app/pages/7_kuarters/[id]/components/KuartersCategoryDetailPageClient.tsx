@@ -27,7 +27,6 @@ import {
   sortQuarterUnits,
   validateQuarterUnitDraft,
   type KuartersCategoryDetailInitialData,
-  type AvailableResidentOccupancyRecord,
   type KuartersUnitEditorState,
   type QuarterUnitDraft,
   type QuarterUnitMutationResponse,
@@ -115,8 +114,6 @@ export default function KuartersCategoryDetailPageClient({
     searchQuery: "",
     residents: [],
   });
-  const [selectedResidentOccupancyRanges, setSelectedResidentOccupancyRanges] =
-    useState<AvailableResidentOccupancyRecord[]>([]);
   const deferredResidentPickerSearchQuery = useDeferredValue(
     residentPicker.searchQuery,
   );
@@ -309,7 +306,6 @@ export default function KuartersCategoryDetailPageClient({
       rowId: EMPTY_QUARTER_UNIT_ID,
       draft: createEmptyQuarterUnitDraft(),
     });
-    setSelectedResidentOccupancyRanges([]);
     setNotice(null);
   }
 
@@ -324,7 +320,6 @@ export default function KuartersCategoryDetailPageClient({
       rowId: unit.id,
       draft: createDraftFromQuarterUnit(unit),
     });
-    setSelectedResidentOccupancyRanges([]);
     setNotice(null);
   }
 
@@ -351,7 +346,6 @@ export default function KuartersCategoryDetailPageClient({
 
     closeResidentPicker();
     setEditor(null);
-    setSelectedResidentOccupancyRanges([]);
   }
 
   function handleOpenResidentPicker() {
@@ -418,12 +412,11 @@ export default function KuartersCategoryDetailPageClient({
           ...currentEditor.draft,
           occupantIcNumber: resident.icNumber,
           occupantName: resident.fullName,
-          moveInDate: currentEditor.draft.moveInDate || getTodayDateInputValue(),
+          moveInDate: "",
           moveOutDate: "",
         },
       };
     });
-    setSelectedResidentOccupancyRanges(resident.occupancyRanges ?? []);
     closeResidentPicker();
   }
 
@@ -659,7 +652,6 @@ export default function KuartersCategoryDetailPageClient({
         filterQuery={filters.query}
         targetUnitId={targetUnitId}
         statusFilter={filters.status}
-        selectedResidentOccupancyRanges={selectedResidentOccupancyRanges}
         hasActiveFilters={hasActiveFilters}
         isResidentPickerOpen={residentPicker.isOpen}
         onAddUnit={handleAddUnit}
@@ -699,11 +691,3 @@ export default function KuartersCategoryDetailPageClient({
   );
 }
 
-function getTodayDateInputValue() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}

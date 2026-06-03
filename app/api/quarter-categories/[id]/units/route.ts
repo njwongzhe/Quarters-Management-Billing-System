@@ -6,7 +6,6 @@ import {
   buildQuarterUnitCurrentOccupancyInclude,
   buildQuarterUnitCreatedMessage,
   buildQuarterUnitDuplicateMessage,
-  buildQuarterUnitOccupancyConflictMessage,
   buildQuarterUnitResidentNotFoundMessage,
   getTodayStartInMalaysia,
   mapQuarterCategoryUnitsDetailForApi,
@@ -219,31 +218,6 @@ export async function POST(request: Request, context: RouteContext) {
         );
       }
 
-      const conflictingOccupancy = await findOverlappingResidentOccupancy({
-        residentId: resident.id,
-        moveInDate,
-        moveOutDate,
-      });
-
-      if (conflictingOccupancy) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: buildQuarterUnitOccupancyConflictMessage(
-              resident.fullName,
-              resident.icNumber,
-              conflictingOccupancy.unit.unitCode,
-              conflictingOccupancy.unit.quarterCategory.categoryName,
-            ),
-            data: {
-              unitCode: conflictingOccupancy.unit.unitCode,
-            },
-          },
-          {
-            status: 409,
-          },
-        );
-      }
     }
 
     const createdUnit = await prisma.$transaction(async (tx) => {
@@ -338,45 +312,4 @@ export async function POST(request: Request, context: RouteContext) {
       },
     );
   }
-}
-
-async function findOverlappingResidentOccupancy({
-  residentId,
-  moveInDate,
-  moveOutDate,
-}: {
-  residentId: string;
-  moveInDate: Date;
-  moveOutDate: Date | null;
-}) {
-  return prisma.unitOccupancy.findFirst({
-    where: {
-      residentId,
-      moveInDate: {
-        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
-      },
-      OR: [
-        {
-          moveOutDate: null,
-        },
-        {
-          moveOutDate: {
-            gte: moveInDate,
-          },
-        },
-      ],
-    },
-    include: {
-      unit: {
-        select: {
-          unitCode: true,
-          quarterCategory: {
-            select: {
-              categoryName: true,
-            },
-          },
-        },
-      },
-    },
-  });
 }

@@ -19,7 +19,6 @@ import KuartersUnitDatePicker from "./KuartersUnitDatePicker";
 import type { QuarterUnitOccupancyDetails } from "@/lib/quarters/quarter-units";
 
 import type {
-  AvailableResidentOccupancyRecord,
   KuartersUnitEditorState,
   QuarterUnitDraft,
   QuarterUnitRecord,
@@ -48,7 +47,6 @@ type KuartersUnitsPanelProps = {
   filterQuery: string;
   targetUnitId?: string;
   statusFilter: QuarterUnitStatusFilter[];
-  selectedResidentOccupancyRanges: AvailableResidentOccupancyRecord[];
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
   paginationItems: (number | "ellipsis")[];
@@ -147,7 +145,6 @@ export default function KuartersUnitsPanel({
   filterQuery,
   targetUnitId = "",
   statusFilter,
-  selectedResidentOccupancyRanges,
   hasActiveFilters,
   isResidentPickerOpen,
   onAddUnit,
@@ -189,10 +186,6 @@ export default function KuartersUnitsPanel({
     statusFilter,
   );
   const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
-  const filteredResidentOccupancyRanges = selectedResidentOccupancyRanges.filter(
-    (range) => range.unitId !== editor?.rowId,
-  );
-
   useEffect(() => {
     if (editor?.mode !== "edit") {
       return;
@@ -622,7 +615,6 @@ export default function KuartersUnitsPanel({
                         disabled={pendingUnitId === EMPTY_QUARTER_UNIT_ID}
                         required
                         occupancyHistory={[]}
-                        residentOccupancyHistory={filteredResidentOccupancyRanges}
                         onChange={(value) => onDraftChange("moveInDate", value)}
                       />
                     ) : (
@@ -637,7 +629,6 @@ export default function KuartersUnitsPanel({
                         moveInDate={editor.draft.moveInDate}
                         disabled={pendingUnitId === EMPTY_QUARTER_UNIT_ID}
                         occupancyHistory={[]}
-                        residentOccupancyHistory={filteredResidentOccupancyRanges}
                         onChange={(value) => onDraftChange("moveOutDate", value)}
                       />
                     ) : (
@@ -687,6 +678,12 @@ export default function KuartersUnitsPanel({
                   unitOccupancyHistory?.unitId === unit.id
                     ? unitOccupancyHistory.records
                     : [];
+                const editableOccupancyId =
+                  activeUnitOccupancyHistory.find(
+                    (record) =>
+                      record.status === "CURRENT" &&
+                      record.occupantIcNumber === unit.occupantIcNumber,
+                  )?.id ?? null;
 
                 return (
                   <tr
@@ -772,7 +769,7 @@ export default function KuartersUnitsPanel({
                           disabled={isCurrentRowPending}
                           required
                           occupancyHistory={activeUnitOccupancyHistory}
-                          residentOccupancyHistory={filteredResidentOccupancyRanges}
+                          excludedOccupancyId={editableOccupancyId}
                           onChange={(value) => onDraftChange("moveInDate", value)}
                         />
                       ) : (
@@ -793,7 +790,7 @@ export default function KuartersUnitsPanel({
                           moveInDate={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
                           occupancyHistory={activeUnitOccupancyHistory}
-                          residentOccupancyHistory={filteredResidentOccupancyRanges}
+                          excludedOccupancyId={editableOccupancyId}
                           onChange={(value) => onDraftChange("moveOutDate", value)}
                         />
                       ) : (

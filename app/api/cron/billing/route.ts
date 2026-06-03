@@ -2,15 +2,14 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   getBillingDateKey,
-  getBillingDayOfMonth,
   getPreviousBillingPeriod,
-  isSameBillingMonth
 } from "@/lib/billing/billing-period";
 import {
   formatAuditTarget,
   recordDataAuditLog,
 } from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import { calculateOccupancyProrationForMonth } from "@/lib/quarters/unit-occupancy-rules";
 import { generateTransactionNos } from "@/lib/transactions/transactions"; // Ensure this path is correct
 
 // Vercel Cron Jobs send a GET request with Authorization: Bearer <CRON_SECRET>.
@@ -59,7 +58,6 @@ async function runBillingGeneration(
       billingMonthEnd,
       startDateKey,
       endDateKey,
-      totalDaysInMonth,
       label: billingMonthLabel,
     } = getPreviousBillingPeriod(today);
 
@@ -116,53 +114,56 @@ async function runBillingGeneration(
       currentCharges.map((charge) => [charge.residentId, charge])
     );
 
-    const billableItems = residentsInfo.flatMap((resident) => {
-      const occupancy = resident.occupancies.find((item) => {
-        const moveInKey = getBillingDateKey(item.moveInDate);
-        const moveOutKey = item.moveOutDate ? getBillingDateKey(item.moveOutDate) : null;
+    const billableItems = residentsInfo.flatMap((resident) =>
+      resident.occupancies.flatMap((occupancy) => {
+        const moveInKey = getBillingDateKey(occupancy.moveInDate);
+        const moveOutKey = occupancy.moveOutDate
+          ? getBillingDateKey(occupancy.moveOutDate)
+          : null;
+        const overlapsBillingMonth =
+          moveInKey <= endDateKey && (!moveOutKey || moveOutKey >= startDateKey);
 
-        return moveInKey <= endDateKey && (!moveOutKey || moveOutKey >= startDateKey);
-      }); // Pick the unit occupied during the target billing month.
-      if (!occupancy || !occupancy.unit.quarterCategory) return [];
-
-      const categoryPrices = occupancy.unit.quarterCategory;
-      const standardRental = Number(categoryPrices.rentalPrice);
-      const penaltyAmount = Number(categoryPrices.penaltyPrice);
-      const currentCharge = chargeByResidentId.get(resident.id);
-
-      // --- MATH: CALCULATE PRORATED RENT (FOR MOVE-OUTS) ---
-      let finalRentalToCharge = standardRental;
-      
-      // If they have a moveOutDate AND it falls within this billing month
-      if (occupancy.moveOutDate) {
-        const moveOutDate = new Date(occupancy.moveOutDate);
-        if (isSameBillingMonth(moveOutDate, billingMonth)) {
-          
-          // They only pay for the days they stayed
-          const daysStayed = getBillingDayOfMonth(moveOutDate);
-          finalRentalToCharge = (standardRental / totalDaysInMonth) * daysStayed;
+        if (!overlapsBillingMonth || !occupancy.unit.quarterCategory) {
+          return [];
         }
-      }
 
-      const rentalToAdd = !currentCharge || Number(currentCharge.rentalAmount) === 0
-        ? Number(finalRentalToCharge.toFixed(2))
-        : 0;
-      const penaltyToAdd = resident.status === "TIDAK_LAYAK" && (!currentCharge || Number(currentCharge.penaltyAmount) === 0)
-        ? penaltyAmount
-        : 0;
-      const totalNewCharges = rentalToAdd + penaltyToAdd;
+        const categoryPrices = occupancy.unit.quarterCategory;
+        const standardRental = Number(categoryPrices.rentalPrice);
+        const penaltyAmount = Number(categoryPrices.penaltyPrice);
+        const currentCharge = chargeByResidentId.get(resident.id);
+        const proration = calculateOccupancyProrationForMonth(billingMonth, {
+          moveInDate: occupancy.moveInDate,
+          moveOutDate: occupancy.moveOutDate,
+        });
+        const finalRentalToCharge =
+          (standardRental / proration.totalDaysInMonth) * proration.daysStayed;
+        const finalPenaltyToCharge =
+          (penaltyAmount / proration.totalDaysInMonth) * proration.daysStayed;
+        const rentalToAdd =
+          !currentCharge || Number(currentCharge.rentalAmount) === 0
+            ? Number(finalRentalToCharge.toFixed(2))
+            : 0;
+        const penaltyToAdd =
+          resident.status === "TIDAK_LAYAK" &&
+          (!currentCharge || Number(currentCharge.penaltyAmount) === 0)
+            ? Number(finalPenaltyToCharge.toFixed(2))
+            : 0;
+        const totalNewCharges = rentalToAdd + penaltyToAdd;
 
-      if (totalNewCharges <= 0) return [];
+        if (totalNewCharges <= 0) return [];
 
-      return [{
-        residentId: resident.id,
-        unitId: occupancy.unitId,
-        moveOutDate: occupancy.moveOutDate,
-        rentalToAdd,
-        penaltyToAdd,
-        totalNewCharges,
-      }];
-    });
+        return [
+          {
+            residentId: resident.id,
+            unitId: occupancy.unitId,
+            moveOutDate: occupancy.moveOutDate,
+            rentalToAdd,
+            penaltyToAdd,
+            totalNewCharges,
+          },
+        ];
+      }),
+    );
 
     const transactionCount = billableItems.reduce((count, item) => {
       return count + (item.rentalToAdd > 0 ? 1 : 0) + (item.penaltyToAdd > 0 ? 1 : 0);

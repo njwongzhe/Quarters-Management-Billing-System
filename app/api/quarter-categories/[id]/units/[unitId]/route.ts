@@ -7,7 +7,6 @@ import {
   buildQuarterUnitDeleteBlockedMessage,
   buildQuarterUnitDeletedMessage,
   buildQuarterUnitDuplicateMessage,
-  buildQuarterUnitOccupancyConflictMessage,
   buildQuarterUnitResidentNotFoundMessage,
   buildQuarterUnitUpdatedMessage,
   getTodayStartInMalaysia,
@@ -24,6 +23,11 @@ import {
 } from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
+import {
+  createOccupancyBillingAdjustments,
+  syncQuarterUnitStatuses,
+  validateUnitOccupancyPeriod,
+} from "@/lib/quarters/unit-occupancy-rules";
 
 type RouteContext = {
   params: Promise<{
@@ -349,32 +353,23 @@ export async function PATCH(request: Request, context: RouteContext) {
         parsedBody.data.providedFields.moveOutDate ||
         nextResident)
     ) {
-      const overlappingResidentOccupancy =
-        await findOverlappingResidentOccupancy({
-          residentId: nextOccupancyResidentId,
-          excludedOccupancyId: nextResident
-            ? null
-            : (currentOccupancy?.id ?? null),
+      const periodValidation = await prisma.$transaction((tx) =>
+        validateUnitOccupancyPeriod(tx, {
+          unitId,
+          excludedOccupancyId: nextResident ? null : (currentOccupancy?.id ?? null),
           moveInDate: nextOccupancyMoveInDate,
           moveOutDate: nextOccupancyMoveOutDate,
-        });
+        }),
+      );
 
-      if (overlappingResidentOccupancy) {
+      if (!periodValidation.ok) {
         return NextResponse.json(
           {
             success: false,
-            message: buildQuarterUnitOccupancyConflictMessage(
-              overlappingResidentOccupancy.resident.fullName,
-              overlappingResidentOccupancy.resident.icNumber,
-              overlappingResidentOccupancy.unit.unitCode,
-              overlappingResidentOccupancy.unit.quarterCategory.categoryName,
-            ),
-            data: {
-              unitCode: overlappingResidentOccupancy.unit.unitCode,
-            },
+            message: periodValidation.message,
           },
           {
-            status: 409,
+            status: periodValidation.status,
           },
         );
       }
@@ -382,26 +377,27 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       nextOccupancyMoveInDate &&
+      !nextOccupancyResidentId &&
       (parsedBody.data.providedFields.moveInDate ||
-        parsedBody.data.providedFields.moveOutDate ||
-        nextResident)
+        parsedBody.data.providedFields.moveOutDate)
     ) {
-      const hasOverlappingOccupancy = await hasOverlappingUnitOccupancy({
-        unitId,
-        excludedOccupancyId: nextResident ? null : (currentOccupancy?.id ?? null),
-        moveInDate: nextOccupancyMoveInDate,
-        moveOutDate: nextOccupancyMoveOutDate,
-      });
+      const periodValidation = await prisma.$transaction((tx) =>
+        validateUnitOccupancyPeriod(tx, {
+          unitId,
+          excludedOccupancyId: currentOccupancy?.id ?? null,
+          moveInDate: nextOccupancyMoveInDate,
+          moveOutDate: nextOccupancyMoveOutDate,
+        }),
+      );
 
-      if (hasOverlappingOccupancy) {
+      if (!periodValidation.ok) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Julat tarikh penghunian bertindih dengan rekod penghunian sedia ada untuk unit ini.",
+            message: periodValidation.message,
           },
           {
-            status: 409,
+            status: periodValidation.status,
           },
         );
       }
@@ -434,6 +430,35 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const updatedUnit = await prisma.$transaction(async (tx) => {
+      const oldOccupancySnapshot = currentOccupancy
+        ? await tx.unitOccupancy.findUnique({
+            where: {
+              id: currentOccupancy.id,
+            },
+            include: {
+              resident: {
+                select: {
+                  fullName: true,
+                  icNumber: true,
+                  status: true,
+                },
+              },
+              unit: {
+                select: {
+                  unitCode: true,
+                  quarterCategory: {
+                    select: {
+                      categoryName: true,
+                      rentalPrice: true,
+                      penaltyPrice: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : null;
+
       if (
         parsedBody.data.providedFields.occupantIcNumber &&
         shouldReplaceOccupancy &&
@@ -483,6 +508,33 @@ export async function PATCH(request: Request, context: RouteContext) {
           data: unitUpdateData,
         });
       }
+
+      if (oldOccupancySnapshot && (shouldReplaceOccupancy || Object.keys(occupancyUpdateData).length > 0)) {
+        const nextAdjustmentPeriod =
+          shouldReplaceOccupancy || !nextOccupancyMoveInDate || !nextOccupancyResidentId
+            ? null
+            : {
+                residentId: nextOccupancyResidentId,
+                unitId,
+                moveInDate: nextOccupancyMoveInDate,
+                moveOutDate: nextOccupancyMoveOutDate,
+                residentStatus: oldOccupancySnapshot.resident.status,
+                rentalPrice: Number(
+                  oldOccupancySnapshot.unit.quarterCategory.rentalPrice,
+                ),
+                penaltyPrice: Number(
+                  oldOccupancySnapshot.unit.quarterCategory.penaltyPrice,
+                ),
+              };
+
+        await createOccupancyBillingAdjustments(
+          tx,
+          oldOccupancySnapshot,
+          nextAdjustmentPeriod,
+        );
+      }
+
+      await syncQuarterUnitStatuses(tx, [unitId]);
 
       const unit = await tx.unit.findUniqueOrThrow({
         where: {
@@ -579,105 +631,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     );
   }
-}
-
-async function hasOverlappingUnitOccupancy({
-  unitId,
-  excludedOccupancyId,
-  moveInDate,
-  moveOutDate,
-}: {
-  unitId: string;
-  excludedOccupancyId: string | null;
-  moveInDate: Date;
-  moveOutDate: Date | null;
-}) {
-  const overlappingOccupancy = await prisma.unitOccupancy.findFirst({
-    where: {
-      unitId,
-      ...(excludedOccupancyId
-        ? {
-            NOT: {
-              id: excludedOccupancyId,
-            },
-          }
-        : {}),
-      moveInDate: {
-        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
-      },
-      OR: [
-        {
-          moveOutDate: null,
-        },
-        {
-          moveOutDate: {
-            gte: moveInDate,
-          },
-        },
-      ],
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  return Boolean(overlappingOccupancy);
-}
-
-async function findOverlappingResidentOccupancy({
-  residentId,
-  excludedOccupancyId,
-  moveInDate,
-  moveOutDate,
-}: {
-  residentId: string;
-  excludedOccupancyId: string | null;
-  moveInDate: Date;
-  moveOutDate: Date | null;
-}) {
-  return prisma.unitOccupancy.findFirst({
-    where: {
-      residentId,
-      ...(excludedOccupancyId
-        ? {
-            NOT: {
-              id: excludedOccupancyId,
-            },
-          }
-        : {}),
-      moveInDate: {
-        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
-      },
-      OR: [
-        {
-          moveOutDate: null,
-        },
-        {
-          moveOutDate: {
-            gte: moveInDate,
-          },
-        },
-      ],
-    },
-    include: {
-      resident: {
-        select: {
-          fullName: true,
-          icNumber: true,
-        },
-      },
-      unit: {
-        select: {
-          unitCode: true,
-          quarterCategory: {
-            select: {
-              categoryName: true,
-            },
-          },
-        },
-      },
-    },
-  });
 }
 
 // Used to delete a quarter unit, with validations to prevent deletion if the unit has current occupancies or associated monthly charges, and handling of related business logic such as revalidating relevant pages after deletion.

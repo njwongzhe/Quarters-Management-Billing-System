@@ -8,6 +8,7 @@ import {
   getTodayStartInMalaysia,
   resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
+import { createOccupancyBillingAdjustments } from "@/lib/quarters/unit-occupancy-rules";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 import {
   findQuarterCategoryByNameAddress,
@@ -160,9 +161,17 @@ export async function verifyPenghuniDrafts(
     candidates,
     failedMessages,
   );
+  const occupancyRowsAfterInternalConflictCheck = getPenghuniOccupancyRows(
+    rowsAfterInternalConflictCheck,
+  );
+  const occupancyIdByDraftId = await findPenghuniOccupancyIdsToUpdate(
+    tx,
+    occupancyRowsAfterInternalConflictCheck,
+  );
   const conflictingDraftIds = await findConflictingPenghuniDraftIds(
     tx,
     rowsAfterInternalConflictCheck,
+    occupancyIdByDraftId,
   );
   const rowsToVerify = rowsAfterInternalConflictCheck.filter((row) => {
     if (conflictingDraftIds.has(row.draft.id)) {
@@ -189,7 +198,11 @@ export async function verifyPenghuniDrafts(
     rowsToVerify,
     unitResolutionCache,
   );
-  const additionalAffectedUnitIds = await writePenghuniOccupancies(tx, rowsToVerify);
+  const additionalAffectedUnitIds = await writePenghuniOccupancies(
+    tx,
+    rowsToVerify,
+    occupancyIdByDraftId,
+  );
 
   await tx.residentDraft.deleteMany({
     where: { id: { in: rowsToVerify.map((row) => row.draft.id) } },
@@ -237,6 +250,11 @@ type PreparedPenghuniDraft = {
   moveOutDate: Date | null;
 };
 
+type PreparedPenghuniOccupancyRow = PreparedPenghuniDraft & {
+  unitId: string;
+  moveInDate: Date;
+};
+
 function filterPenghuniInternalConflicts(
   candidates: PreparedPenghuniDraft[],
   failedMessages: string[],
@@ -278,10 +296,9 @@ function filterPenghuniInternalConflicts(
 async function findConflictingPenghuniDraftIds(
   tx: Prisma.TransactionClient,
   candidates: PreparedPenghuniDraft[],
+  occupancyIdByDraftId: Map<string, string>,
 ) {
-  const occupancyCandidates = candidates.filter(
-    (candidate) => candidate.unitId && candidate.moveInDate,
-  );
+  const occupancyCandidates = getPenghuniOccupancyRows(candidates);
 
   if (occupancyCandidates.length === 0) {
     return new Set<string>();
@@ -293,6 +310,7 @@ async function findConflictingPenghuniDraftIds(
     unitId: candidate.unitId,
     moveInDate: candidate.moveInDate?.toISOString(),
     moveOutDate: candidate.moveOutDate?.toISOString() ?? null,
+    excludedOccupancyId: occupancyIdByDraftId.get(candidate.draft.id) ?? null,
   }));
 
   const conflicts = await tx.$queryRaw<{ draftId: string }[]>`
@@ -303,14 +321,18 @@ async function findConflictingPenghuniDraftIds(
         "residentId" uuid,
         "unitId" uuid,
         "moveInDate" timestamp,
-        "moveOutDate" timestamp
+        "moveOutDate" timestamp,
+        "excludedOccupancyId" uuid
       )
     )
     SELECT DISTINCT input."draftId"
     FROM input
     INNER JOIN "UnitOccupancy" occupancy
       ON occupancy."unitId" = input."unitId"
-      AND occupancy."residentId" <> input."residentId"
+      AND (
+        input."excludedOccupancyId" IS NULL
+        OR occupancy."id" <> input."excludedOccupancyId"
+      )
       AND occupancy."moveInDate" <= COALESCE(input."moveOutDate", 'infinity'::timestamp)
       AND COALESCE(occupancy."moveOutDate", 'infinity'::timestamp) >= input."moveInDate"
   `;
@@ -405,24 +427,14 @@ async function writePenghuniResidents(
 async function writePenghuniOccupancies(
   tx: Prisma.TransactionClient,
   rowsToVerify: PreparedPenghuniDraft[],
+  occupancyIdByDraftId: Map<string, string>,
 ) {
-  const occupancyRows = rowsToVerify.filter(
-    (row): row is PreparedPenghuniDraft & { unitId: string; moveInDate: Date } =>
-      Boolean(row.unitId && row.moveInDate),
-  );
+  const occupancyRows = getPenghuniOccupancyRows(rowsToVerify);
 
   if (occupancyRows.length === 0) {
     return [];
   }
 
-  const additionalAffectedUnitIds = await markOtherCurrentPenghuniOccupanciesPast(
-    tx,
-    occupancyRows,
-  );
-  const occupancyIdByDraftId = await findPenghuniOccupancyIdsToUpdate(
-    tx,
-    occupancyRows,
-  );
   const rowsToUpdate = occupancyRows.filter((row) =>
     occupancyIdByDraftId.has(row.draft.id),
   );
@@ -431,6 +443,42 @@ async function writePenghuniOccupancies(
   );
 
   if (rowsToUpdate.length > 0) {
+    const occupancyIdsToUpdate = rowsToUpdate
+      .map((row) => occupancyIdByDraftId.get(row.draft.id))
+      .filter((id): id is string => Boolean(id));
+    const existingOccupancyById = new Map(
+      (
+        await tx.unitOccupancy.findMany({
+          where: {
+            id: {
+              in: occupancyIdsToUpdate,
+            },
+          },
+          include: {
+            resident: {
+              select: {
+                fullName: true,
+                icNumber: true,
+                status: true,
+              },
+            },
+            unit: {
+              select: {
+                unitCode: true,
+                quarterCategory: {
+                  select: {
+                    categoryName: true,
+                    rentalPrice: true,
+                    penaltyPrice: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+      ).map((occupancy) => [occupancy.id, occupancy]),
+    );
+
     await tx.$executeRaw`
       UPDATE "UnitOccupancy" AS occupancy
       SET
@@ -459,6 +507,31 @@ async function writePenghuniOccupancies(
       ) AS updates("id", "moveInDate", "moveOutDate", "status")
       WHERE occupancy."id" = updates."id"
     `;
+
+    for (const row of rowsToUpdate) {
+      const occupancyId = occupancyIdByDraftId.get(row.draft.id);
+      const existingOccupancy = occupancyId
+        ? existingOccupancyById.get(occupancyId)
+        : null;
+
+      if (!existingOccupancy) {
+        continue;
+      }
+
+      await createOccupancyBillingAdjustments(tx, existingOccupancy, {
+        residentId: existingOccupancy.residentId,
+        unitId: existingOccupancy.unitId,
+        moveInDate: row.moveInDate,
+        moveOutDate: row.moveOutDate,
+        residentStatus: existingOccupancy.resident.status,
+        rentalPrice: Number(
+          existingOccupancy.unit.quarterCategory.rentalPrice,
+        ),
+        penaltyPrice: Number(
+          existingOccupancy.unit.quarterCategory.penaltyPrice,
+        ),
+      });
+    }
   }
 
   if (rowsToCreate.length > 0) {
@@ -481,47 +554,17 @@ async function writePenghuniOccupancies(
     });
   }
 
-  return additionalAffectedUnitIds;
-}
-
-async function markOtherCurrentPenghuniOccupanciesPast(
-  tx: Prisma.TransactionClient,
-  occupancyRows: (PreparedPenghuniDraft & { unitId: string; moveInDate: Date })[],
-) {
-  const referenceDate = getTodayStartInMalaysia();
-
-  const affectedRows = await tx.$queryRaw<{ unitId: string }[]>`
-    UPDATE "UnitOccupancy" AS occupancy
-    SET
-      "moveOutDate" = COALESCE(occupancy."moveOutDate", updates."moveInDate"),
-      "status" = CASE
-        WHEN updates."moveInDate" < ${referenceDate}::timestamp
-        THEN 'PAST'::"OccupancyStatus"
-        ELSE 'CURRENT'::"OccupancyStatus"
-      END,
-      "updatedAt" = NOW()
-    FROM (
-      VALUES ${Prisma.join(
-        occupancyRows.map(
-          (row) =>
-            Prisma.sql`(${row.residentId}::uuid, ${row.unitId}::uuid, ${row.moveInDate}::timestamp)`,
-        ),
-      )}
-    ) AS updates("residentId", "unitId", "moveInDate")
-    WHERE occupancy."residentId" = updates."residentId"
-      AND occupancy."status" = 'CURRENT'::"OccupancyStatus"
-      AND occupancy."unitId" <> updates."unitId"
-      AND occupancy."moveInDate" <= updates."moveInDate"
-    RETURNING occupancy."unitId" AS "unitId"
-  `;
-
-  return [...new Set(affectedRows.map((row) => row.unitId))];
+  return [];
 }
 
 async function findPenghuniOccupancyIdsToUpdate(
   tx: Prisma.TransactionClient,
-  occupancyRows: (PreparedPenghuniDraft & { unitId: string; moveInDate: Date })[],
+  occupancyRows: PreparedPenghuniOccupancyRow[],
 ) {
+  if (occupancyRows.length === 0) {
+    return new Map<string, string>();
+  }
+
   const rows = await tx.$queryRaw<{ draftId: string; occupancyId: string }[]>`
     WITH input AS (
       SELECT *
@@ -548,6 +591,15 @@ async function findPenghuniOccupancyIdsToUpdate(
   `;
 
   return new Map(rows.map((row) => [row.draftId, row.occupancyId]));
+}
+
+function getPenghuniOccupancyRows(
+  rows: PreparedPenghuniDraft[],
+): PreparedPenghuniOccupancyRow[] {
+  return rows.filter(
+    (row): row is PreparedPenghuniOccupancyRow =>
+      Boolean(row.unitId && row.moveInDate),
+  );
 }
 
 function buildRecordFromDraft(

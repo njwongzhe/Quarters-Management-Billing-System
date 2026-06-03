@@ -243,16 +243,14 @@ function normalizePenghuniLookupAddress(value: unknown) {
 export async function hasOccupancyConflict(
   tx: Prisma.TransactionClient,
   unitId: string,
-  residentId: string | null,
+  _residentId: string | null,
   moveInDate: Date,
   moveOutDate: Date | null,
 ) {
-  const residentUuid = residentId || null;
   const conflicts = await tx.$queryRaw<{ id: string }[]>`
     SELECT "id"
     FROM "UnitOccupancy"
     WHERE "unitId" = ${unitId}::uuid
-      AND (${residentUuid}::uuid IS NULL OR "residentId" <> ${residentUuid}::uuid)
       AND "moveInDate" <= COALESCE(${moveOutDate}, 'infinity'::timestamp)
       AND COALESCE("moveOutDate", 'infinity'::timestamp) >= ${moveInDate}
     LIMIT 1
