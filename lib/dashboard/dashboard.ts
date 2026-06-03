@@ -18,6 +18,7 @@ export interface DashboardSummaryData {
   arrearsCount: number;
   pendingCount: number;
   pendingUploadsToday: number;
+  pendingCategory?: string;
   
   analysis: Array<{
     className: string;
@@ -158,7 +159,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
   const totalArrears = Number(arrearsSummary._sum.totalArrearsAmount || 0);
 
   // 7. Calculate Semakan (Pending documents queue size)
-  const pendingCount = await prisma.uploadedDocument.count({
+  const pendingDocs = await prisma.uploadedDocument.findMany({
     where: {
       OR: [
         { residentDrafts: { some: {} } },
@@ -168,7 +169,24 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
         { quarterCategoryDrafts: { some: {} } },
       ],
     },
+    select: {
+      category: true,
+    },
   });
+
+  const pendingCount = pendingDocs.length;
+
+  const pendingCategories = new Set(pendingDocs.map((doc) => doc.category));
+  let pendingCategory = "bayaran"; // Default fallback
+  if (pendingCategories.has("BAYARAN")) {
+    pendingCategory = "bayaran";
+  } else if (pendingCategories.has("TUNGGAKAN")) {
+    pendingCategory = "tunggakan";
+  } else if (pendingCategories.has("PENGHUNI")) {
+    pendingCategory = "penghuni";
+  } else if (pendingCategories.has("KUARTERS")) {
+    pendingCategory = "kuarters";
+  }
 
   const startOfToday = getTodayDateInAppTimeZone();
   const pendingUploadsToday = await prisma.uploadedDocument.count({
@@ -267,6 +285,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     arrearsCount: arrearsCount || 0,
     pendingCount: pendingCount || 0,
     pendingUploadsToday: pendingUploadsToday || 0,
+    pendingCategory,
     
     analysis: formattedAnalysis.length > 0 ? formattedAnalysis : [
       { className: "Jalan Ariffin", amount: "RM 0.00", settlementRate: 0, opacity: 1.0 },

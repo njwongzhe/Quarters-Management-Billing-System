@@ -9,6 +9,7 @@ interface LamanUtamaAlertsProps {
   arrearsCount?: number;
   pendingCount?: number;
   pendingUploadsToday?: number;
+  pendingCategory?: string;
 }
 
 export default function LamanUtamaAlerts({
@@ -16,6 +17,7 @@ export default function LamanUtamaAlerts({
   arrearsCount = 0,
   pendingCount = 0,
   pendingUploadsToday = 0,
+  pendingCategory = "bayaran",
 }: LamanUtamaAlertsProps) {
   return (
     <div className="flex flex-col gap-6 w-full h-[332px]">
@@ -80,7 +82,7 @@ export default function LamanUtamaAlerts({
         {/* Action Link Row */}
         <div className="flex justify-end items-center mt-3">
           <Link
-            href={ROUTES.bayaran}
+            href={`${ROUTES.muatNaik}?kategori=${pendingCategory}`}
             className="flex flex-row items-center gap-1.5 text-sm font-bold text-[#0B1C30] hover:underline hover:scale-[0.98] active:scale-[0.96] transition-all cursor-pointer"
           >
             <span>Proses Sekarang</span>

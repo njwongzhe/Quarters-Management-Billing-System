@@ -22,6 +22,7 @@ interface DashboardData {
   arrearsCount: number;
   pendingCount: number;
   pendingUploadsToday: number;
+  pendingCategory?: string;
   analysis: Array<{
     className: string;
     amount: string;
@@ -135,6 +136,7 @@ export default function LamanUtamaPage() {
           arrearsCount={data.arrearsCount}
           pendingCount={data.pendingCount}
           pendingUploadsToday={data.pendingUploadsToday}
+          pendingCategory={data.pendingCategory}
         />
       </div>
 
