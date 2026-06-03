@@ -42,11 +42,35 @@ export default function LamanUtamaAnalysis({
     (currentPage + 1) * itemsPerPage
   );
 
+  // Compute dynamic height based on the number of items displayed on the current page.
+  // This ensures the card fits the items beautifully for 1-4 items instead of leaving huge empty space,
+  // while transitioning height smoothly between page changes.
+  let minHeight = 580;
+  if (items.length === 0) {
+    minHeight = 280;
+  } else {
+    const count = displayedItems.length;
+    const hasPagination = totalPages > 1;
+    
+    if (count === 1) {
+      minHeight = hasPagination ? 240 : 200;
+    } else if (count === 2) {
+      minHeight = hasPagination ? 330 : 290;
+    } else if (count === 3) {
+      minHeight = hasPagination ? 420 : 380;
+    } else if (count === 4) {
+      minHeight = hasPagination ? 510 : 470;
+    } else {
+      minHeight = 580; // 5 items
+    }
+  }
+
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="relative flex flex-col items-start p-8 w-full min-h-[580px] bg-light-blue rounded-xl shadow-sm hover:shadow-md hover:scale-[1.01] select-none transition-all duration-300"
+      style={{ minHeight: `${minHeight}px` }}
+      className="relative flex flex-col items-start p-8 w-full bg-light-blue rounded-xl shadow-sm hover:shadow-md hover:scale-[1.01] select-none transition-all duration-500 ease-in-out"
     >
       {/* Title & Page Indicators */}
       <div className="flex flex-row justify-between items-center w-full mb-6">
