@@ -12,7 +12,7 @@ interface LamanUtamaAlertsProps {
 }
 
 export default function LamanUtamaAlerts({
-  arrearsAmount = "RM 0",
+  arrearsAmount = "RM 0.00",
   arrearsCount = 0,
   pendingCount = 0,
   pendingUploadsToday = 0,

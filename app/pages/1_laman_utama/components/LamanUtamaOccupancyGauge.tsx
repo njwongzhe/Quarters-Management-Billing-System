@@ -9,8 +9,8 @@ interface LamanUtamaOccupancyGaugeProps {
 }
 
 export default function LamanUtamaOccupancyGauge({
-  initialTotal = 1450,
-  initialOccupied = 1087,
+  initialTotal = 0,
+  initialOccupied = 0,
 }: LamanUtamaOccupancyGaugeProps) {
   const [total, setTotal] = useState(initialTotal);
   const [occupied, setOccupied] = useState(initialOccupied);

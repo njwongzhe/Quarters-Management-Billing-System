@@ -13,12 +13,12 @@ interface LamanUtamaBannerProps {
 }
 
 export default function LamanUtamaBanner({
-  monthlyAmount = "RM 452,890.00",
-  monthlyChange = "+4.5%",
-  monthlyPercentage = 75,
-  totalAmount = "RM 5,120,450.00",
-  totalChange = "+12.8% YTD",
-  totalPercentage = 85,
+  monthlyAmount = "RM 0.00",
+  monthlyChange = "+0.0%",
+  monthlyPercentage = 0,
+  totalAmount = "RM 0.00",
+  totalChange = "+0.0% YTD",
+  totalPercentage = 0,
 }: LamanUtamaBannerProps) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -54,7 +54,7 @@ export default function LamanUtamaBanner({
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="relative w-full h-[223px] overflow-hidden bg-gradient-to-r from-[#151E66] to-[#2D367D] rounded-xl p-8 shadow-xl text-white select-none transition-all duration-300"
+      className="relative w-full h-[223px] overflow-hidden bg-gradient-to-r from-[#151E66] to-[#2D367D] rounded-xl p-8 shadow-xl hover:shadow-2xl hover:scale-[1.01] text-white select-none transition-all duration-300"
     >
       {/* Background shadow overlay */}
       <div className="absolute inset-0 bg-white/[0.002] shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] rounded-xl pointer-events-none" />

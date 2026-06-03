@@ -125,7 +125,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
 
   const totalBilled = Number(billingSummary._sum.totalMonthlyCharge || 0);
   const totalCollected = Number(billingSummary._sum.paymentReceived || 0);
-  const monthlyPercentage = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 75;
+  const monthlyPercentage = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
 
   // All-time target completion rate (All-time Collected vs All-time Billed in MonthlyCharge table)
   const overallBillingSummary = await prisma.monthlyCharge.aggregate({
@@ -134,7 +134,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
 
   const totalBilledAllTime = Number(overallBillingSummary._sum.totalMonthlyCharge || 0);
   const totalCollectedAllTime = Number(overallBillingSummary._sum.paymentReceived || 0);
-  const totalPercentage = totalBilledAllTime > 0 ? Math.round((totalCollectedAllTime / totalBilledAllTime) * 100) : 85;
+  const totalPercentage = totalBilledAllTime > 0 ? Math.round((totalCollectedAllTime / totalBilledAllTime) * 100) : 0;
 
   // 5. Calculate Occupancy Status
   const totalUnits = await prisma.unit.count();
@@ -236,8 +236,14 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     };
   });
 
-  // Sort by outstanding amount descending, and map visual opacities
-  analysis.sort((a, b) => b.amountVal - a.amountVal);
+  // Sort by outstanding amount descending (high to low), then alphabetically by category name
+  analysis.sort((a, b) => {
+    if (b.amountVal !== a.amountVal) {
+      return b.amountVal - a.amountVal;
+    }
+    return a.className.localeCompare(b.className);
+  });
+
   const formattedAnalysis = analysis.map((item, idx) => ({
     className: item.className,
     amount: item.amount,
