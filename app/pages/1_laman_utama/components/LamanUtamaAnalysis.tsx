@@ -27,7 +27,7 @@ export default function LamanUtamaAnalysis({
 
     const timer = setInterval(() => {
       setCurrentPage((prev) => (prev + 1) % totalPages);
-    }, 5000); // toggle every 5 seconds
+    }, 4000); // toggle every 5 seconds
 
     return () => clearInterval(timer);
   }, [isHovered, totalPages]);
@@ -37,23 +37,28 @@ export default function LamanUtamaAnalysis({
     setCurrentPage(0);
   }, [items.length]);
 
-  // Compute a constant height based on the total number of items (capped at itemsPerPage)
-  // to ensure that the card is appropriately sized for the total content,
-  // but doesn't jump in height when navigating pages of the carousel (making horizontal transition 100% smooth).
+  const displayedItems = items.slice(
+    currentPage * itemsPerPage,
+    (currentPage + 1) * itemsPerPage
+  );
+
+  // Compute dynamic height based on the number of items displayed on the current page.
+  // This ensures the card fits the items beautifully for 1-4 items instead of leaving huge empty space,
+  // transitioning height smoothly between page changes.
   let minHeight = 580;
   if (items.length === 0) {
     minHeight = 280; // Empty state height
   } else {
-    const maxItemsOnAnyPage = Math.min(items.length, itemsPerPage);
+    const count = displayedItems.length;
     const hasPagination = totalPages > 1;
 
-    if (maxItemsOnAnyPage === 1) {
+    if (count === 1) {
       minHeight = hasPagination ? 240 : 200;
-    } else if (maxItemsOnAnyPage === 2) {
+    } else if (count === 2) {
       minHeight = hasPagination ? 330 : 290;
-    } else if (maxItemsOnAnyPage === 3) {
+    } else if (count === 3) {
       minHeight = hasPagination ? 420 : 380;
-    } else if (maxItemsOnAnyPage === 4) {
+    } else if (count === 4) {
       minHeight = hasPagination ? 510 : 470;
     } else {
       minHeight = 580; // 5 items
@@ -91,7 +96,7 @@ export default function LamanUtamaAnalysis({
           </div>
         ) : (
           <div
-            className="flex flex-row w-full transition-transform duration-500 ease-in-out"
+            className="flex flex-row items-start w-full transition-transform duration-500 ease-in-out"
             style={{
               transform: `translateX(-${currentPage * 100}%)`,
             }}
