@@ -54,22 +54,22 @@ export default function LamanUtamaBanner({
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="relative w-full h-[223px] overflow-hidden bg-gradient-to-r from-[#151E66] to-[#2D367D] rounded-xl p-8 shadow-xl hover:shadow-2xl hover:scale-[1.01] text-white select-none transition-all duration-300"
+      className="relative w-full h-[223px] overflow-hidden bg-gradient-to-r from-[#151E66] to-[#2D367D] rounded-xl shadow-xl hover:shadow-2xl hover:scale-[1.01] text-white select-none transition-all duration-300"
     >
       {/* Background shadow overlay */}
       <div className="absolute inset-0 bg-white/[0.002] shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] rounded-xl pointer-events-none" />
 
-      {/* Slide Container (Absolute overlays for cross-fade) */}
-      {slides.map((slide, idx) => {
-        const isActive = activeSlide === idx;
-        return (
+      {/* Slide Container (Flex row for horizontal sliding) */}
+      <div
+        className="flex flex-row w-full h-full transition-transform duration-500 ease-in-out"
+        style={{
+          transform: `translateX(-${activeSlide * 100}%)`,
+        }}
+      >
+        {slides.map((slide, idx) => (
           <div
             key={idx}
-            className={`absolute inset-0 p-8 flex flex-col justify-between transition-all duration-700 ease-in-out ${
-              isActive
-                ? "opacity-100 translate-x-0 scale-100 pointer-events-auto"
-                : "opacity-0 translate-x-4 scale-[0.98] pointer-events-none"
-            }`}
+            className="w-full h-full p-8 flex flex-col justify-between flex-shrink-0"
           >
             {/* Top row */}
             <div className="flex flex-row justify-between items-center w-full">
@@ -112,8 +112,8 @@ export default function LamanUtamaBanner({
               </span>
             </div>
           </div>
-        );
-      })}
+        ))}
+      </div>
 
       {/* Pagination Dots (Bottom Right) */}
       <div className="absolute bottom-6 right-8 flex flex-row items-center gap-2 z-20">

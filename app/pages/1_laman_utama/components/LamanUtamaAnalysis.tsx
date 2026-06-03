@@ -37,28 +37,23 @@ export default function LamanUtamaAnalysis({
     setCurrentPage(0);
   }, [items.length]);
 
-  const displayedItems = items.slice(
-    currentPage * itemsPerPage,
-    (currentPage + 1) * itemsPerPage
-  );
-
-  // Compute dynamic height based on the number of items displayed on the current page.
-  // This ensures the card fits the items beautifully for 1-4 items instead of leaving huge empty space,
-  // while transitioning height smoothly between page changes.
+  // Compute a constant height based on the total number of items (capped at itemsPerPage)
+  // to ensure that the card is appropriately sized for the total content,
+  // but doesn't jump in height when navigating pages of the carousel (making horizontal transition 100% smooth).
   let minHeight = 580;
   if (items.length === 0) {
-    minHeight = 280;
+    minHeight = 280; // Empty state height
   } else {
-    const count = displayedItems.length;
+    const maxItemsOnAnyPage = Math.min(items.length, itemsPerPage);
     const hasPagination = totalPages > 1;
-    
-    if (count === 1) {
+
+    if (maxItemsOnAnyPage === 1) {
       minHeight = hasPagination ? 240 : 200;
-    } else if (count === 2) {
+    } else if (maxItemsOnAnyPage === 2) {
       minHeight = hasPagination ? 330 : 290;
-    } else if (count === 3) {
+    } else if (maxItemsOnAnyPage === 3) {
       minHeight = hasPagination ? 420 : 380;
-    } else if (count === 4) {
+    } else if (maxItemsOnAnyPage === 4) {
       minHeight = hasPagination ? 510 : 470;
     } else {
       minHeight = 580; // 5 items
@@ -87,7 +82,7 @@ export default function LamanUtamaAnalysis({
       </div>
 
       {/* List Container */}
-      <div className="flex flex-col gap-6 w-full flex-grow">
+      <div className="relative w-full flex-grow overflow-hidden">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 w-full text-grey/60">
             <span className="text-sm font-semibold">
@@ -95,41 +90,62 @@ export default function LamanUtamaAnalysis({
             </span>
           </div>
         ) : (
-          displayedItems.map((item, index) => {
-            // Progress bar represents outstanding arrears = 100% - settlementRate
-            const outstandingRate = 100 - item.settlementRate;
+          <div
+            className="flex flex-row w-full transition-transform duration-500 ease-in-out"
+            style={{
+              transform: `translateX(-${currentPage * 100}%)`,
+            }}
+          >
+            {Array.from({ length: totalPages }).map((_, pageIdx) => {
+              const pageItems = items.slice(
+                pageIdx * itemsPerPage,
+                (pageIdx + 1) * itemsPerPage
+              );
 
-            // Key includes currentPage to force rerender and trigger fade-in animation on page switch
-            return (
-              <div key={`${currentPage}-${index}`} className="flex flex-col gap-2 w-full animate-fadeIn">
-                {/* Top row: Class Name and Amount */}
-                <div className="flex flex-row justify-between items-center w-full">
-                  <span className="text-sm font-bold text-[#0B1C30]">
-                    {item.className}
-                  </span>
-                  <span className="text-base font-bold text-red">
-                    {item.amount}
-                  </span>
-                </div>
+              return (
+                <div
+                  key={pageIdx}
+                  className="w-full flex-shrink-0 flex flex-col gap-6"
+                >
+                  {pageItems.map((item, index) => {
+                    // Progress bar represents outstanding arrears = 100% - settlementRate
+                    // If the outstanding amount is 0, the progress bar width is 0%
+                    const outstandingRate = item.amount.includes(" 0.00") ? 0 : (100 - item.settlementRate);
 
-                {/* Progress bar container */}
-                <div className="relative w-full h-3.5 bg-white rounded-full overflow-hidden">
-                  <div
-                    className="absolute top-0 bottom-0 left-0 rounded-full transition-all duration-500 ease-out"
-                    style={{
-                      width: `${outstandingRate}%`,
-                      backgroundColor: `rgba(186, 26, 26, ${item.opacity})`,
-                    }}
-                  />
-                </div>
+                    return (
+                      <div key={index} className="flex flex-col gap-2 w-full">
+                        {/* Top row: Class Name and Amount */}
+                        <div className="flex flex-row justify-between items-center w-full">
+                          <span className="text-sm font-bold text-[#0B1C30]">
+                            {item.className}
+                          </span>
+                          <span className="text-base font-bold text-red">
+                            {item.amount}
+                          </span>
+                        </div>
 
-                {/* Label row */}
-                <div className="w-full text-[11px] text-grey font-medium leading-3">
-                  Kadar Penyelesaian: {item.settlementRate}%
+                        {/* Progress bar container */}
+                        <div className="relative w-full h-3.5 bg-white rounded-full overflow-hidden">
+                          <div
+                            className="absolute top-0 bottom-0 left-0 rounded-full transition-all duration-500 ease-out"
+                            style={{
+                              width: `${outstandingRate}%`,
+                              backgroundColor: `rgba(186, 26, 26, ${item.opacity})`,
+                            }}
+                          />
+                        </div>
+
+                        {/* Label row */}
+                        <div className="w-full text-[11px] text-grey font-medium leading-3">
+                          Kadar Penyelesaian: {item.settlementRate}%
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
