@@ -47,7 +47,7 @@ export default function LamanUtamaAlerts({
         {/* Action Link Row */}
         <div className="flex justify-end items-center mt-3">
           <Link
-            href={ROUTES.tunggakan}
+            href={`${ROUTES.tunggakan}?autoSelect=true`}
             className="flex flex-row items-center gap-1.5 text-sm font-bold text-red hover:underline hover:scale-[0.98] active:scale-[0.96] transition-all cursor-pointer"
           >
             <span>Lihat Senarai</span>

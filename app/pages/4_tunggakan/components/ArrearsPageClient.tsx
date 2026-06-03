@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+
 import TunggakanFilterPanel from "./TunggakanFilterPanel";
 import { defaultFilter, type TunggakanFilter } from "@/lib/arrears/arrears";
 import Icon from "@/app/components/Icon/Icon";
@@ -42,7 +44,12 @@ export default function TunggakanPageClient() {
   const [targetBillingMonthLabel, setTargetBillingMonthLabel] = useState<string | null>(null);
   const [isBillingRunning, setIsBillingRunning] = useState(false);
   
+  const searchParams = useSearchParams();
+  const autoSelect = searchParams.get("autoSelect") === "true";
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const [isKemasKiniModalOpen, setIsKemasKiniModalOpen] = useState(false);
   const [viewResidentId, setViewResidentId] = useState<string | null>(null);
   const [filters, setFilters] = useState<TunggakanFilter>(defaultFilter);
@@ -82,6 +89,14 @@ export default function TunggakanPageClient() {
       if (result.ok) {
         setData(result.data);
         setSummary(result.summary);
+        
+        if (autoSelect && !hasAutoSelected) {
+          const idsWithArrears = (result.data as TunggakanListItem[])
+            .filter((item) => item.jumlahTunggakan > 0)
+            .map((item) => item.id);
+          setSelectedIds(idsWithArrears);
+          setHasAutoSelected(true);
+        }
       } else {
         console.error("API Error:", result.message);
       }
