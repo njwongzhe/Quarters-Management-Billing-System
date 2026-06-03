@@ -1,7 +1,9 @@
 "use client";
 
-import { PaginationControls } from "@/app/components/Pagination/Pagination";
-import type { BayaranPaginationItem } from "@/lib/payments/bayaran-types";
+import {
+  buildPaginationItems,
+  PaginationControls,
+} from "@/app/components/Pagination/Pagination";
 
 export default function BayaranPagination({
   currentPage,
@@ -10,7 +12,6 @@ export default function BayaranPagination({
   onPageChange,
   totalPages,
   totalRecordCount,
-  visiblePages,
 }: {
   currentPage: number;
   firstVisibleRecord: number;
@@ -18,17 +19,16 @@ export default function BayaranPagination({
   onPageChange: (page: number) => void;
   totalPages: number;
   totalRecordCount: number;
-  visiblePages: BayaranPaginationItem[];
 }) {
   return (
-    <div className="border-t border-[#EEF1F7] px-6 py-4">
+    <div className="border-t border-light-grey/20 bg-white px-4 py-4 sm:px-5">
       <PaginationControls
         currentPage={currentPage}
         totalPages={totalPages}
         startIndex={Math.max(0, firstVisibleRecord - 1)}
         endIndex={lastVisibleRecord}
         totalRecords={totalRecordCount}
-        paginationItems={visiblePages}
+        paginationItems={buildPaginationItems(currentPage, totalPages)}
         onPageChange={(action, pageNum) => {
           const nextPage =
             action === "prev"

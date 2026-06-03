@@ -1,24 +1,27 @@
 "use client";
 
+import Calender from "@/app/components/Calender/Calender";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { createPortal } from "react-dom";
 import { PatternFormat } from 'react-number-format';
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 type FieldState = "active" | "inactive";
 
 type BaseFieldStyleProps = {
+    showLabel?: boolean;
+    placeholder?: string;
+    leadingIcon?: ReactNode;
+    trailingIcon?: ReactNode;
+    error?: boolean;
+    errorMessage?: string;
     className?: string;
+    textAlign?: "left" | "center" | "right";
     labelFontSize?: number | string;
     inputFontSize?: number | string;
     inputMinHeight?: number | string;
-    placeholder?: string;
     activeBackgroundClass?: string;
     inactiveBackgroundClass?: string;
-    error?: boolean;
-    errorMessage?: string;
-    showLabel?: boolean;
-    leadingIcon?: ReactNode;
-    trailingIcon?: ReactNode;
 };
 
 type TableInputFieldAlign = "start" | "center" | "end";
@@ -151,6 +154,7 @@ export function InputField({
     state,
     onChange,
     className,
+    textAlign = "left",
     labelFontSize = 10,
     inputFontSize,
     inputMinHeight,
@@ -188,10 +192,7 @@ export function InputField({
                         ${leadingIcon ? 'pl-9' : 'pl-3'} ${trailingIcon ? 'pr-9' : 'pr-3'} py-3
                         ${error ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
                         ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass}`}
-                    style={{
-                        fontSize: inputFontSize,
-                        minHeight: inputMinHeight,
-                    }}
+                    style={{ textAlign: textAlign, fontSize: inputFontSize, minHeight: inputMinHeight }}
                 />
                 {trailingIcon && (
                     <div className="absolute right-3 flex items-center text-gray-400 pointer-events-none">
@@ -202,6 +203,147 @@ export function InputField({
             {error && errorMessage && (
                 <p className="text-red text-xs pl-1">{errorMessage}</p>
             )}
+        </div>
+    );
+}
+
+// Reusable date input field.
+export function DateField({
+    label,
+    showLabel = true,
+    value,
+    placeholder = "Pilih Tarikh",
+    required = false,
+    error = false,
+    errorMessage = "",
+    state,
+    className,
+    textAlign = "left",
+    labelFontSize = 10,
+    inputFontSize,
+    inputMinHeight,
+    activeBackgroundClass = "bg-white",
+    inactiveBackgroundClass = "bg-transparent",
+    onChange,
+}: {
+    label: string;
+    value: string;
+    state: FieldState;
+    required?: boolean;
+    onChange: (value: string) => void;
+} & Omit<BaseFieldStyleProps, "leadingIcon" | "trailingIcon">) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [isOpen, setIsOpen] = useState(false);
+    const [pickerPosition, setPickerPosition] = useState({ left: 0, top: 0 });
+    const isDisabled = state === "inactive";
+
+    useEffect(() => {
+        if (!isOpen || !containerRef.current) {
+            return;
+        }
+
+        function updatePosition() {
+            if (!containerRef.current) {
+                return;
+            }
+
+            const fieldRect = containerRef.current.getBoundingClientRect();
+            const verticalGap = 8;
+
+            setPickerPosition({
+                left: fieldRect.left,
+                top: fieldRect.bottom + verticalGap,
+            });
+        }
+
+        updatePosition();
+        window.addEventListener("resize", updatePosition);
+        window.addEventListener("scroll", updatePosition, true);
+
+        return () => {
+            window.removeEventListener("resize", updatePosition);
+            window.removeEventListener("scroll", updatePosition, true);
+        };
+    }, [isOpen]);
+
+    function formatTimeFieldDisplay(value: string) {
+        if (!value) {
+            return "";
+        }
+
+        const date = new Date(`${value}T00:00:00`);
+
+        if (Number.isNaN(date.getTime())) {
+            return "";
+        }
+
+        return new Intl.DateTimeFormat("ms-MY", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        }).format(date);
+    }
+
+    return (
+        <div ref={containerRef} className="relative">
+            <InputField
+                label={label}
+                showLabel={showLabel}
+                value={formatTimeFieldDisplay(value)}
+                placeholder={placeholder}
+                required={required}
+                error={error}
+                errorMessage={errorMessage}
+                state={state}
+                className={className}
+                textAlign={textAlign}
+                labelFontSize={labelFontSize}
+                inputFontSize={inputFontSize}
+                inputMinHeight={inputMinHeight}
+                activeBackgroundClass={activeBackgroundClass}
+                inactiveBackgroundClass={inactiveBackgroundClass}
+                trailingIcon={<Icon icon={commonIcons.calendar} size={18} className="text-grey" />}
+                onChange={() => {}}
+            />
+
+            <button
+                type="button"
+                className="absolute inset-0 z-10 rounded-md disabled:cursor-not-allowed"
+                disabled={isDisabled}
+                aria-label={label}
+                onClick={() => setIsOpen((current) => !current)}
+            />
+
+            {isOpen && typeof document !== "undefined"
+                ? createPortal(
+                    <div
+                        className="fixed z-50 rounded-3xl border border-light-grey/20 bg-white shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+                        style={{
+                            left: `${pickerPosition.left}px`,
+                            top: `${pickerPosition.top}px`,
+                            width: "320px",
+                        }}
+                        role="dialog"
+                        aria-label={label}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <Calender
+                            containerRef={containerRef}
+                            isOpen={true}
+                            value={value}
+                            disableAbsolutePositioning={true}
+                            onChange={(nextValue) => {
+                                onChange(nextValue);
+                                setIsOpen(false);
+                            }}
+                            onClose={() => setIsOpen(false)}
+                            scale={1}
+                        />
+                    </div>,
+                    document.body,
+                )
+                : null}
         </div>
     );
 }
@@ -219,6 +361,7 @@ export function InputFieldPassword({
     state,
     onChange,
     className,
+    textAlign = "left",
     labelFontSize = 10,
     inputFontSize,
     inputMinHeight,
@@ -258,10 +401,7 @@ export function InputFieldPassword({
                         ${leadingIcon ? 'pl-9' : 'pl-3'} pr-10 py-3
                         ${error ? 'border-red focus-within:border-red' : 'border border-light-grey/40'}
                         ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass}`}
-                    style={{
-                        fontSize: inputFontSize,
-                        minHeight: inputMinHeight,
-                    }}
+                    style={{textAlign: textAlign, fontSize: inputFontSize, minHeight: inputMinHeight}}
                 />
                 <button
                     type="button"
@@ -294,6 +434,7 @@ export function InputFieldFormat({
     state,
     onChange,
     className,
+    textAlign = "left",
     labelFontSize = 10,
     inputFontSize,
     inputMinHeight,
@@ -338,10 +479,7 @@ export function InputFieldFormat({
                         onValueChange={(values) => onChange && onChange(values.value)}
                         placeholder={placeholder}
                         className={`${inputClass} ${state === "active" ? activeBackgroundClass : inactiveBackgroundClass}`}
-                        style={{
-                            fontSize: inputFontSize,
-                            minHeight: inputMinHeight,
-                        }}
+                        style={{textAlign: textAlign, fontSize: inputFontSize, minHeight: inputMinHeight}}
                     />
                 )}
                 {trailingIcon && (

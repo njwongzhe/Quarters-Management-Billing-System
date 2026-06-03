@@ -388,7 +388,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                                 Batal
                                             </button>
                                             <button 
-                                                className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 type="button"
                                                 onClick={validateAndSave}
                                                 disabled={isSaving || !isFormValid}

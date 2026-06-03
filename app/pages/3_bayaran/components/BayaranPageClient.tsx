@@ -10,17 +10,18 @@ import BayaranPageHeader from "./BayaranPageHeader";
 import BayaranPagination from "./BayaranPagination";
 import BayaranRecordsTable from "./BayaranRecordsTable";
 import BayaranStatsCards from "./BayaranStatsCards";
-import { bayaranStatusFilters } from "@/lib/payments/bayaran-constants";
+import {
+  bayaranStatTemplates,
+  bayaranStatusFilters,
+} from "@/lib/payments/bayaran-constants";
 import {
   createDefaultBayaranFilters,
   filterBayaranRecords,
-  getVisiblePages,
 } from "@/lib/payments/bayaran-helpers";
 import type {
   BayaranExportRow,
   BayaranDetail,
   BayaranFilters,
-  BayaranPaginationItem,
   BayaranRow,
   BayaranStatCard,
   BayaranStatusFilter,
@@ -47,58 +48,16 @@ type BayaranPageState = {
 
 const BAYARAN_ROWS_PER_PAGE = 10;
 const CURRENT_PAYMENT_MONTH_KEY = getMonthKey(new Date());
+const EMPTY_BAYARAN_STATS: BayaranStatCard[] = bayaranStatTemplates.map((stat) => ({
+  ...stat,
+  value: "0",
+}));
 
 const EMPTY_BAYARAN_DATA: BayaranPageData = {
   rows: [],
   exportRows: [],
   detailsByPaymentId: {},
-  stats: [
-    {
-      label: "Jumlah Rekod",
-      helper: "Terkini",
-      icon: "fact_check",
-      accent: "border-l-dark-blue",
-      dot: "bg-dark-blue",
-      helperColor: "text-dark-blue",
-      value: "0",
-    },
-    {
-      label: "Cukup Bayaran",
-      helper: "Bayaran Lengkap",
-      icon: "check_circle",
-      accent: "border-l-cukup",
-      dot: "bg-cukup",
-      helperColor: "text-cukup",
-      value: "0",
-    },
-    {
-      label: "Kurang Bayaran",
-      helper: "Perlu Semakan",
-      icon: "error",
-      accent: "border-l-kurang",
-      dot: "bg-kurang",
-      helperColor: "text-kurang",
-      value: "0",
-    },
-    {
-      label: "Lebihan Bayaran",
-      helper: "Kredit Tersimpan",
-      icon: "add_circle",
-      accent: "border-l-lebih",
-      dot: "bg-lebih",
-      helperColor: "text-lebih",
-      value: "0",
-    },
-    {
-      label: "Data Tidak Lengkap",
-      helper: "Tindakan Segera",
-      icon: "warning",
-      accent: "border-l-x-lengkap",
-      dot: "bg-x-lengkap",
-      helperColor: "text-x-lengkap",
-      value: "0",
-    },
-  ],
+  stats: EMPTY_BAYARAN_STATS,
 };
 
 export default function BayaranPageClient() {
@@ -145,10 +104,6 @@ export default function BayaranPageClient() {
   const lastVisibleRecord = Math.min(
     startIndex + visibleRows.length,
     totalRecordCount,
-  );
-  const visiblePages: BayaranPaginationItem[] = getVisiblePages(
-    safeCurrentPage,
-    totalPages,
   );
   const paymentMonthLabel = formatPaymentMonthLabel(paymentMonthKey);
   const canGoNextPaymentMonth = paymentMonthKey < CURRENT_PAYMENT_MONTH_KEY;
@@ -219,7 +174,10 @@ export default function BayaranPageClient() {
     }
 
     setPageState((currentState) => ({
-      ...currentState,
+      data: {
+        ...currentState.data,
+        stats: EMPTY_BAYARAN_STATS,
+      },
       errorMessage: "",
       isLoaded: false,
     }));
@@ -233,7 +191,10 @@ export default function BayaranPageClient() {
 
     setCurrentPage(1);
     setPageState((currentState) => ({
-      ...currentState,
+      data: {
+        ...currentState.data,
+        stats: EMPTY_BAYARAN_STATS,
+      },
       errorMessage: "",
       isLoaded: false,
     }));
@@ -242,7 +203,10 @@ export default function BayaranPageClient() {
 
   function handleReloadBayaranData() {
     setPageState((currentState) => ({
-      ...currentState,
+      data: {
+        ...currentState.data,
+        stats: EMPTY_BAYARAN_STATS,
+      },
       errorMessage: "",
       isLoaded: false,
     }));
@@ -250,27 +214,31 @@ export default function BayaranPageClient() {
   }
 
   return (
-    <section className="min-h-full bg-background pb-4 pt-2 text-[#111827]">
-      <div className="flex w-full flex-col gap-7">
+    <main className="relative flex flex-col gap-4 pb-4 text-[#0B1C30]">
+      <div className="flex w-full flex-col gap-4">
         <BayaranPageHeader />
         <BayaranStatsCards stats={data.stats} />
 
         <BayaranFilterShell
-          downloadButton={<BayaranDownload exportRows={filteredExportRows} />}
+          downloadButton={(
+            <BayaranDownload
+              disabled={isLoading}
+              exportRows={filteredExportRows}
+            />
+          )}
           filterQuery={filters.query}
+          isLoading={isLoading}
           statusFilter={filters.statuses}
           onFilterQueryChange={handleFilterQueryChange}
           onStatusFilterChange={handleStatusFilterChange}
         >
-          {errorMessage ? (
-            <div className="border-b border-light-grey/20 bg-[#FFF4F4] px-6 py-3 text-sm font-semibold text-[#B42318]">
-              {errorMessage}
-            </div>
-          ) : null}
           <BayaranRecordsTable
             rows={visibleRows}
             canGoNextPaymentMonth={canGoNextPaymentMonth}
+            errorMessage={errorMessage}
             isLoading={isLoading}
+            loadingColumnCount={5}
+            loadingRowCount={10}
             onAddPayment={setSelectedAddPaymentId}
             onNextPaymentMonth={() => handlePaymentMonthChange(1)}
             onPaymentMonthSelect={handlePaymentMonthSelect}
@@ -286,7 +254,6 @@ export default function BayaranPageClient() {
             onPageChange={setCurrentPage}
             totalPages={totalPages}
             totalRecordCount={totalRecordCount}
-            visiblePages={visiblePages}
           />
         </BayaranFilterShell>
       </div>
@@ -308,7 +275,7 @@ export default function BayaranPageClient() {
           onSaved={handleReloadBayaranData}
         />
       ) : null}
-    </section>
+    </main>
   );
 }
 

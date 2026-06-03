@@ -9,11 +9,14 @@ import {
 } from "@/app/components/InputField";
 import { ROUTES } from "@/app/constants/routes";
 
-type PenghuniOccupancy = {
+type KuartersOccupancyDetail = {
   occupantId: string;
   occupantName: string;
   occupantIcNumber: string;
   occupantAge: number | null;
+  quarterClass: string | null;
+  quarterUnit: string | null;
+  quarterAddress: string | null;
   moveInDate: string | null;
   moveOutDate: string | null;
   occupantStatus: string;
@@ -37,8 +40,8 @@ type CustomButtonProps = EmptyButtonProps & {
   type: "custom";
 };
 
-type PenghuniCompleteProps = {
-  currentOccupancy: PenghuniOccupancy | null;
+type PenghuniCompleteWithKuartersDetailProps = {
+  currentOccupancy: KuartersOccupancyDetail | null;
   actionButton?: ProfileButtonProps | CustomButtonProps;
 };
 
@@ -89,10 +92,10 @@ function getOccupantStatusClass(value: string): string {
   }
 }
 
-export default function PenghuniComplete({
+export default function PenghuniCompleteWithKuartersDetail({
   currentOccupancy,
   actionButton,
-}: PenghuniCompleteProps) {
+}: PenghuniCompleteWithKuartersDetailProps) {
   const router = useRouter();
   const statusClass = getOccupantStatusClass(
     currentOccupancy?.occupantStatus ?? "",
@@ -160,6 +163,33 @@ export default function PenghuniComplete({
           state="inactive"
           inactiveBackgroundClass="bg-[#EEF4FF]"
           className="md:col-span-2"
+        />
+      </div>
+
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <InputField
+          label="KELAS"
+          value={currentOccupancy?.quarterClass ?? "N/A"}
+          state="inactive"
+          inactiveBackgroundClass="bg-[#EEF4FF]"
+          className="md:col-span-1"
+        />
+        <InputField
+          label="UNIT KUARTERS"
+          value={currentOccupancy?.quarterUnit ?? "N/A"}
+          state="inactive"
+          inactiveBackgroundClass="bg-[#EEF4FF]"
+          className="md:col-span-1"
+        />
+      </div>
+
+      <div className="grid items-start gap-4 md:grid-cols-1">
+        <InputField
+          label="ALAMAT"
+          value={currentOccupancy?.quarterAddress ?? "N/A"}
+          state="inactive"
+          inactiveBackgroundClass="bg-[#EEF4FF]"
+          className="md:col-span-1"
         />
       </div>
 

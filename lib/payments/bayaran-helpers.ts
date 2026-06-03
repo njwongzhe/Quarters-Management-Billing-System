@@ -139,10 +139,10 @@ export function filterBayaranRecords<
 }
 
 export function rowBorder(tone: string) {
-  if (tone === "green") return "border-l-cukup";
-  if (tone === "red") return "border-l-kurang";
-  if (tone === "blue") return "border-l-lebih";
-  return "border-l-x-lengkap";
+  if (tone === "green") return "border-l-4 border-l-cukup";
+  if (tone === "red") return "border-l-4 border-l-kurang";
+  if (tone === "blue") return "border-l-4 border-l-lebih";
+  return "border-l-4 border-l-x-lengkap";
 }
 
 export function rowText(tone: string) {

@@ -9,10 +9,14 @@ import {
 import type { BayaranExportRow } from "@/lib/payments/bayaran-types";
 
 type BayaranDownloadProps = {
+  disabled?: boolean;
   exportRows: BayaranExportRow[];
 };
 
-export default function BayaranDownload({ exportRows }: BayaranDownloadProps) {
+export default function BayaranDownload({
+  disabled = false,
+  exportRows,
+}: BayaranDownloadProps) {
   function handleDownload() {
     const headers: XlsxCell[] = [
       { value: "Nama Penghuni", style: "header" },
@@ -59,7 +63,7 @@ export default function BayaranDownload({ exportRows }: BayaranDownloadProps) {
     <ToolbarButton
       icon="download"
       label="Muat turun rekod bayaran"
-      disabled={exportRows.length === 0}
+      disabled={disabled || exportRows.length === 0}
       onClick={handleDownload}
     />
   );

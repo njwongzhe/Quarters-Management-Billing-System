@@ -4,43 +4,38 @@ export const BAYARAN_ROWS_PER_PAGE = 10;
 
 export const bayaranStatTemplates = [
   {
-    label: "Jumlah Rekod",
+    label: "JUMLAH REKOD",
     helper: "Terkini",
     icon: "fact_check",
     accent: "border-l-dark-blue",
-    dot: "bg-dark-blue",
     helperColor: "text-dark-blue",
   },
   {
-    label: "Cukup Bayaran",
+    label: "CUKUP BAYARAN",
     helper: "Bayaran Lengkap",
     icon: "check_circle",
     accent: "border-l-cukup",
-    dot: "bg-cukup",
     helperColor: "text-cukup",
   },
   {
-    label: "Kurang Bayaran",
+    label: "KURANG BAYARAN",
     helper: "Perlu Semakan",
     icon: "error",
     accent: "border-l-kurang",
-    dot: "bg-kurang",
     helperColor: "text-kurang",
   },
   {
-    label: "Lebihan Bayaran",
+    label: "LEBIHAN BAYARAN",
     helper: "Kredit Tersimpan",
     icon: "add_circle",
     accent: "border-l-lebih",
-    dot: "bg-lebih",
     helperColor: "text-lebih",
   },
   {
-    label: "Data Tidak Lengkap",
+    label: "DATA TIDAK LENGKAP",
     helper: "Tindakan Segera",
     icon: "warning",
     accent: "border-l-x-lengkap",
-    dot: "bg-x-lengkap",
     helperColor: "text-x-lengkap",
   },
 ] as const;

@@ -5,15 +5,20 @@ import { PatternFormat } from "react-number-format";
 
 import Calender from "@/app/components/Calender/Calender";
 import Icon from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { rowBorder, rowText } from "@/lib/payments/bayaran-helpers";
 import type { BayaranRow } from "@/lib/payments/bayaran-types";
 import BayaranRowActions from "./BayaranRowActions";
 
-const mainTextSize = "text-sm";
-const subTextSize = "text-xs";
+// Text size constants for table display.
+const mainTextSize = "text-[12px]";
+const subTextSize = "text-[11px]";
 
 export default function BayaranRecordsTable({
+  errorMessage = "",
   isLoading = false,
+  loadingColumnCount = 5,
+  loadingRowCount = 1,
   onAddPayment,
   onNextPaymentMonth,
   onPaymentMonthSelect,
@@ -25,7 +30,10 @@ export default function BayaranRecordsTable({
   rows,
 }: {
   canGoNextPaymentMonth?: boolean;
+  errorMessage?: string;
   isLoading?: boolean;
+  loadingColumnCount?: number;
+  loadingRowCount?: number;
   onAddPayment: (paymentId: string) => void;
   onNextPaymentMonth: () => void;
   onPaymentMonthSelect: (monthKey: string) => void;
@@ -35,25 +43,33 @@ export default function BayaranRecordsTable({
   paymentMonthLabel: string;
   rows: BayaranRow[];
 }) {
+  // Month picker state for selecting payment month directly from the table header row.
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const monthPickerRef = useRef<HTMLDivElement | null>(null);
+  const normalizedLoadingRowCount = Math.max(1, Math.floor(loadingRowCount));
+  const normalizedLoadingColumnCount = Math.max(
+    1,
+    Math.floor(loadingColumnCount),
+  );
 
   return (
-    <table className="w-full">
-      <thead>
+    <div className="overflow-x-auto overflow-y-auto">
+      <table className="w-full min-w-220 text-left">
+      {/* Table Header */}
+      <thead className="bg-background">
         <tr className="bg-background text-xs font-bold text-grey">
-          <th className="w-min whitespace-nowrap p-3 text-left">Penghuni</th>
-          <th className="w-min whitespace-nowrap p-3 text-left">Kuarters</th>
-          <th className="w-min whitespace-nowrap p-3 text-right">
-            Tunggakan (RM)
-          </th>
-          <th className="w-min whitespace-nowrap p-3 text-right">
-            <div className="flex flex-col items-end leading-tight">
-              <span>Amaun Bayar (RM)</span>
-              <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold uppercase text-grey/80">
+          <th className="w-min whitespace-nowrap p-3  text-left">Penghuni</th>
+          <th className="w-min whitespace-nowrap p-3  text-left">Kuarters</th>
+          <th className="w-min whitespace-nowrap p-3 text-right">Tunggakan (RM)</th>
+
+          {/* Amaun Bayar & Time Picker */}
+          <th className="w-min whitespace-nowrap py-3 pl-3 text-right">
+            <span className="pr-3">Amaun Bayar (RM)</span>
+            <div className="mt-1">
+              <div className="flex items-center justify-end gap-1 text-[10px] font-semibold uppercase text-grey/80">
                 <button
                   type="button"
-                  className="grid h-5 w-5 place-items-center rounded text-dark-blue transition hover:bg-light-blue"
+                  className="grid w-5 place-items-center rounded text-dark-blue transition hover:bg-light-blue"
                   aria-label="Pilih bulan bayaran sebelumnya"
                   title="Bulan sebelumnya"
                   onClick={onPreviousPaymentMonth}
@@ -63,14 +79,14 @@ export default function BayaranRecordsTable({
                 <div ref={monthPickerRef} className="relative min-w-20">
                   <button
                     type="button"
-                    className="min-w-20 rounded px-1.5 py-1 text-center uppercase text-dark-blue transition hover:bg-light-blue"
+                    className="min-w-20 rounded px-1.5 text-center uppercase text-dark-blue transition hover:bg-light-blue"
                     aria-label={`Pilih bulan bayaran. Bulan semasa ${paymentMonthLabel}`}
                     title="Pilih bulan"
                     onClick={() => setIsMonthPickerOpen((isOpen) => !isOpen)}
                   >
                     {paymentMonthLabel}
                   </button>
-                  <div className="absolute left-1/2 top-full z-50 mt-1 w-64 -translate-x-1/2 normal-case">
+                  <div className="absolute left-1/2 top-full z-50 w-64 -translate-x-1/2 normal-case">
                     <Calender
                       containerRef={monthPickerRef}
                       disableAbsolutePositioning
@@ -88,7 +104,7 @@ export default function BayaranRecordsTable({
                 </div>
                 <button
                   type="button"
-                  className="grid h-5 w-5 place-items-center rounded text-dark-blue transition hover:bg-light-blue disabled:cursor-not-allowed disabled:text-light-grey"
+                  className="grid w-5 place-items-center rounded text-dark-blue transition hover:bg-light-blue disabled:cursor-not-allowed disabled:text-light-grey"
                   aria-label="Pilih bulan bayaran seterusnya"
                   title="Bulan seterusnya"
                   disabled={!canGoNextPaymentMonth}
@@ -99,48 +115,56 @@ export default function BayaranRecordsTable({
               </div>
             </div>
           </th>
-          <th className="w-[0%] whitespace-nowrap p-3 text-center">
-            Tindakan
-          </th>
+
+          <th className="w-[0%] whitespace-nowrap p-3 text-center">Tindakan</th>
         </tr>
       </thead>
+
+      {/* Table Body */}
       <tbody className="bg-white">
+        {/* Loading State / Error */}
         {isLoading ? (
-          <LoadingRows />
+          loadingTableRows({ // During Loading
+            mode: "loading",
+            rowCount: normalizedLoadingRowCount,
+            columnCount: normalizedLoadingColumnCount,
+          })
+        ) : errorMessage ? (
+          loadingTableRows({ // Error
+            mode: "message",
+            rowCount: normalizedLoadingRowCount,
+            columnCount: normalizedLoadingColumnCount,
+            message: errorMessage,
+          })
         ) : rows.length === 0 ? (
-          <tr>
-            <td
-              colSpan={5}
-              className="px-8 py-12 text-center text-sm font-semibold text-[#667085]"
-            >
-              Tiada rekod bayaran lengkap ditemui.
-            </td>
-          </tr>
+          loadingTableRows({ // Not Exist
+            mode: "message",
+            rowCount: normalizedLoadingRowCount,
+            columnCount: normalizedLoadingColumnCount,
+            message: "Tiada rekod bayaran lengkap ditemui.",
+          })
         ) : (
           rows.map((row) => (
             <tr
               key={row.id}
               className={[
-                "border-b border-b-light-grey/20 text-sm",
+                "border-t border-light-grey/20 text-sm transition-colors hover:bg-background/60",
                 rowBorder(row.tone),
               ].join(" ")}
             >
+              {/* Penghuni Data */}
               <td className="w-min whitespace-nowrap px-3 py-2 text-left">
-                <div className={`font-bold ${mainTextSize}`}>
-                  {row.name}
-                </div>
-                <div className={`font-extralight ${subTextSize} text-grey`}>
-                  {formatIcNumber(row.ic)}
-                </div>
+                <div className={`font-bold ${mainTextSize}`}>{row.name}</div>
+                <div className={`font-extralight ${subTextSize} text-grey`}>{formatIcNumber(row.ic)}</div>
               </td>
+
+              {/* Kuarters Data */}
               <td className="w-min whitespace-nowrap px-3 py-2 text-left">
-                <div className={`font-bold ${mainTextSize}`}>
-                  {row.quarters}
-                </div>
-                <div className={`font-extralight ${subTextSize} text-grey`}>
-                  {row.unit}
-                </div>
+                <div className={`font-bold ${mainTextSize}`}>{row.quarters}</div>
+                <div className={`font-extralight ${subTextSize} text-grey`}>{row.unit}</div>
               </td>
+
+              {/* Arrears Data */}
               <td
                 className={[
                   `w-min whitespace-nowrap px-3 py-2 text-right font-bold ${mainTextSize}`,
@@ -149,11 +173,15 @@ export default function BayaranRecordsTable({
               >
                 {row.arrears}
               </td>
+
+              {/* Amount Data */}
               <td
-                className={`w-min whitespace-nowrap px-3 py-2 text-right font-bold ${mainTextSize}`}
+                className={`w-min whitespace-nowrap px-3 py-2 text-right font-bold text-dark-grey ${mainTextSize}`}
               >
                 {row.amount}
               </td>
+
+              {/* Tindakan */}
               <td className="w-min whitespace-nowrap px-3 py-2 text-center align-middle">
                 <BayaranRowActions
                   paymentId={row.id}
@@ -166,8 +194,11 @@ export default function BayaranRecordsTable({
         )}
       </tbody>
     </table>
+    </div>
   );
 }
+
+// Format IC number with standard Malaysian separator pattern.
 function formatIcNumber(value: string) {
   const digits = value.replace(/\D/g, "");
 
@@ -185,27 +216,9 @@ function formatIcNumber(value: string) {
   );
 }
 
+// Return current month key in YYYY-MM format for calendar maxDate.
 function getCurrentMonthKey() {
   const today = new Date();
 
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function LoadingRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }, (_, rowIndex) => (
-        <tr
-          key={rowIndex}
-          className="border-b border-b-light-grey/20 border-l-4 border-l-light-grey/30 text-sm"
-        >
-          {Array.from({ length: 5 }, (_, cellIndex) => (
-            <td key={cellIndex} className="px-3 py-3">
-              <div className="h-4 w-full max-w-36 animate-pulse rounded bg-light-blue" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
-  );
 }

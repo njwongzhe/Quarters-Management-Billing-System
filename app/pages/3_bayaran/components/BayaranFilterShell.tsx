@@ -13,6 +13,7 @@ type BayaranFilterShellProps = {
   children: ReactNode;
   downloadButton: ReactNode;
   filterQuery: string;
+  isLoading?: boolean;
   statusFilter: BayaranStatusFilter[];
   onFilterQueryChange: (value: string) => void;
   onStatusFilterChange: (values: BayaranStatusFilter[]) => void;
@@ -28,6 +29,7 @@ export default function BayaranFilterShell({
   children,
   downloadButton,
   filterQuery,
+  isLoading = false,
   statusFilter,
   onFilterQueryChange,
   onStatusFilterChange,
@@ -92,20 +94,21 @@ export default function BayaranFilterShell({
   }
 
   return (
-    <div className="rounded-xl bg-light-blue p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-      <div className="mb-5 flex items-start justify-between">
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
+      <div className="flex items-start justify-between gap-4 px-3 pt-3">
         <div>
-          <h2 className="text-lg font-extrabold leading-tight text-[#07162F]">
+          <h2 className="text-lg font-bold text-dark-grey">
             Senarai Rekod Bayaran
           </h2>
-          <p className="text-xs font-medium text-[#344054]">
+          <p className="text-xs text-grey">
             Rekod bayaran terkini.
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 text-[#607083]">
           <ToolbarIconButton
             icon={commonIcons.search}
             label="Cari rekod bayaran"
+            disabled={isLoading}
             isActive={isSearchPanelOpen}
             onClick={handleToggleSearch}
           />
@@ -113,10 +116,17 @@ export default function BayaranFilterShell({
             <ToolbarIconButton
               icon={commonIcons.filter}
               label={`Tapis status bayaran: ${getStatusFilterLabel(statusFilter)}`}
+              disabled={isLoading}
               isActive={isFilterButtonActive}
               hasPopup="menu"
               isExpanded={isFilterMenuOpen}
-              onClick={() => setIsFilterMenuOpen((value) => !value)}
+              onClick={() => {
+                if (isLoading) {
+                  return;
+                }
+
+                setIsFilterMenuOpen((value) => !value);
+              }}
             />
 
             {isFilterMenuOpen ? (
@@ -139,44 +149,46 @@ export default function BayaranFilterShell({
       </div>
 
       {isSearchPanelOpen ? (
-        <div className="mb-5 rounded-lg bg-white p-4 shadow">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div ref={searchInputRef} className="flex-1">
-              <SharedInputField
-                label="CARIAN REKOD BAYARAN"
-                value={filterQuery}
-                state="active"
-                onChange={onFilterQueryChange}
-                placeholder="Contoh: Ahmad, 850212-01-1234, Kelas A atau A-01-05"
-                showLabel
-                leadingIcon={(
-                  <Icon
-                    icon={commonIcons.search}
-                    size={18}
-                    className="text-light-grey"
-                  />
-                )}
-                className="w-full"
-                activeBackgroundClass="bg-light-blue"
-                inputFontSize={12}
-                inputMinHeight={40}
-              />
-            </div>
+        <div className="mt-3 px-3">
+          <div className="rounded-lg bg-white p-4 shadow">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div ref={searchInputRef} className="flex-1">
+                <SharedInputField
+                  label="CARIAN REKOD BAYARAN"
+                  value={filterQuery}
+                  state="active"
+                  onChange={onFilterQueryChange}
+                  placeholder="Contoh: Ahmad, 850212-01-1234, Kelas A atau A-01-05"
+                  showLabel
+                  leadingIcon={(
+                    <Icon
+                      icon={commonIcons.search}
+                      size={18}
+                      className="text-light-grey"
+                    />
+                  )}
+                  className="w-full"
+                  activeBackgroundClass="bg-light-blue"
+                  inputFontSize={12}
+                  inputMinHeight={40}
+                />
+              </div>
 
-            <button
-              type="button"
-              className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!isSearchFilterActive}
-              onClick={handleClearSearch}
-            >
-              Kosongkan
-            </button>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!isSearchFilterActive}
+                onClick={handleClearSearch}
+              >
+                Kosongkan
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      <div className="overflow-visible rounded-lg bg-white shadow-sm">{children}</div>
-    </div>
+      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">{children}</div>
+    </section>
   );
 }
 
