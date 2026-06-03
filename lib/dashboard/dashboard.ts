@@ -31,7 +31,7 @@ export interface DashboardSummaryData {
 export async function getDashboardSummary(): Promise<DashboardSummaryData> {
   const today = new Date();
 
-  // 1. Determine Target Billing Month (Latest successfully billed period)
+  // 1. Determine Target Billing Month (Latest successfully billed period) - Run this quickly first
   const latestCycle = await prisma.billingCycle.findFirst({
     where: { success: true },
     orderBy: { billingMonth: "desc" },
@@ -40,34 +40,144 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
   const { year: curYear, month: curMonth } = getAppTimeZoneDateParts(today);
   const targetMonth = latestCycle?.billingMonth || new Date(Date.UTC(curYear, curMonth - 2, 1));
 
-  // 2. Calculate Current Month's Collections (Jumlah Kutipan Bulan Ini) using the Payment table
+  // Pre-calculate date ranges
   const startOfCalendarMonth = getMonthStartInAppTimeZone(today);
   
   const prevMonthDate = new Date(today);
   prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
   const startOfPrevCalendarMonth = getMonthStartInAppTimeZone(prevMonthDate);
 
-  const currentMonthCollections = await prisma.payment.aggregate({
-    where: {
-      paymentDate: { gte: startOfCalendarMonth },
-    },
-    _sum: { amount: true },
-  });
+  const startOfThisYear = new Date(Date.UTC(curYear, 0, 1, 0, 0, 0, 0));
+  const startOfLastYear = new Date(Date.UTC(curYear - 1, 0, 1, 0, 0, 0, 0));
+  const samePeriodLastYear = new Date(today);
+  samePeriodLastYear.setFullYear(samePeriodLastYear.getFullYear() - 1);
 
-  const prevMonthCollections = await prisma.payment.aggregate({
-    where: {
-      paymentDate: {
-        gte: startOfPrevCalendarMonth,
-        lt: startOfCalendarMonth,
+  const startOfToday = getTodayDateInAppTimeZone();
+
+  // 2. Parallelize all remaining database operations (concurrency optimization)
+  const [
+    currentMonthCollections,
+    prevMonthCollections,
+    allTimeCollections,
+    thisYearCollections,
+    lastYearCollections,
+    billingSummary,
+    totalUnits,
+    occupiedUnits,
+    vacantUnits,
+    arrearsSummary,
+    arrearsCount,
+    pendingDocs,
+    pendingUploadsToday,
+    activeOccupancies,
+    paymentSums,
+    categories
+  ] = await Promise.all([
+    // Current Month's Collections
+    prisma.payment.aggregate({
+      where: { paymentDate: { gte: startOfCalendarMonth } },
+      _sum: { amount: true },
+    }),
+    // Previous Month's Collections
+    prisma.payment.aggregate({
+      where: {
+        paymentDate: {
+          gte: startOfPrevCalendarMonth,
+          lt: startOfCalendarMonth,
+        },
       },
-    },
-    _sum: { amount: true },
-  });
+      _sum: { amount: true },
+    }),
+    // All-Time Collections
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+    }),
+    // This Year's YTD Collections
+    prisma.payment.aggregate({
+      where: { paymentDate: { gte: startOfThisYear } },
+      _sum: { amount: true },
+    }),
+    // Last Year's Collections (Same Period)
+    prisma.payment.aggregate({
+      where: {
+        paymentDate: {
+          gte: startOfLastYear,
+          lt: samePeriodLastYear,
+        },
+      },
+      _sum: { amount: true },
+    }),
+    // Target Month Billing Details
+    prisma.monthlyCharge.aggregate({
+      where: { chargeMonth: targetMonth },
+      _sum: { totalMonthlyCharge: true, paymentReceived: true },
+    }),
+    // Total Units Count
+    prisma.unit.count(),
+    // Occupied Units Count
+    prisma.unit.count({
+      where: { status: "OCCUPIED" },
+    }),
+    // Vacant Units Count
+    prisma.unit.count({
+      where: { status: "VACANT" },
+    }),
+    // Master Arrears aggregate
+    prisma.arrearsSummary.aggregate({
+      where: { totalArrearsAmount: { gt: 0 } },
+      _sum: { totalArrearsAmount: true },
+    }),
+    // Residents count with arrears
+    prisma.arrearsSummary.count({
+      where: { totalArrearsAmount: { gt: 0 } },
+    }),
+    // Pending documents drafts
+    prisma.uploadedDocument.findMany({
+      where: {
+        OR: [
+          { residentDrafts: { some: {} } },
+          { paymentDrafts: { some: {} } },
+          { arrearsSummaryDrafts: { some: {} } },
+          { unitDrafts: { some: {} } },
+          { quarterCategoryDrafts: { some: {} } },
+        ],
+      },
+      select: {
+        category: true,
+      },
+    }),
+    // Daily Uploads count today
+    prisma.uploadedDocument.count({
+      where: { uploadedAt: { gte: startOfToday } },
+    }),
+    // Category Analysis: fetch current occupants and their arrears in a flat query
+    prisma.unitOccupancy.findMany({
+      where: { status: "CURRENT" },
+      select: {
+        residentId: true,
+        unit: { select: { categoryId: true } },
+        resident: {
+          select: {
+            arrearsSummary: { select: { totalArrearsAmount: true } },
+          },
+        },
+      },
+    }),
+    // Category Analysis: sum payments grouped by resident ID in the DB
+    prisma.payment.groupBy({
+      by: ["residentId"],
+      _sum: { amount: true },
+    }),
+    // Categories List
+    prisma.quarterCategory.findMany({
+      select: { id: true, categoryName: true },
+    }),
+  ]);
 
+  // --- Calculate Collections Metrics ---
   const curKutipan = Number(currentMonthCollections._sum.amount || 0);
   const prevKutipan = Number(prevMonthCollections._sum.amount || 0);
 
-  // Calculate percentage change compared to last month
   let percentChangeStr = "+0.0%";
   if (prevKutipan > 0) {
     const change = ((curKutipan - prevKutipan) / prevKutipan) * 100;
@@ -76,35 +186,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     percentChangeStr = "+100.0%";
   }
 
-  // 3. Calculate All-Time Collections (Jumlah Keseluruhan Kutipan) and YTD Growth using the Payment table
-  const allTimeCollections = await prisma.payment.aggregate({
-    _sum: { amount: true },
-  });
-
   const totalKutipanVal = Number(allTimeCollections._sum.amount || 0);
-
-  const startOfThisYear = new Date(Date.UTC(curYear, 0, 1, 0, 0, 0, 0));
-  const startOfLastYear = new Date(Date.UTC(curYear - 1, 0, 1, 0, 0, 0, 0));
-  const samePeriodLastYear = new Date(today);
-  samePeriodLastYear.setFullYear(samePeriodLastYear.getFullYear() - 1);
-
-  const thisYearCollections = await prisma.payment.aggregate({
-    where: {
-      paymentDate: { gte: startOfThisYear },
-    },
-    _sum: { amount: true },
-  });
-
-  const lastYearCollections = await prisma.payment.aggregate({
-    where: {
-      paymentDate: {
-        gte: startOfLastYear,
-        lt: samePeriodLastYear,
-      },
-    },
-    _sum: { amount: true },
-  });
-
   const thisYearVal = Number(thisYearCollections._sum.amount || 0);
   const lastYearVal = Number(lastYearCollections._sum.amount || 0);
 
@@ -116,66 +198,17 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     ytdChangeStr = "+100.0% YTD";
   }
 
-  // 4. Calculate target completion rates dynamically
-  
-  // Monthly target completion rate (Monthly Collected vs Monthly Billed for target billing month)
-  const billingSummary = await prisma.monthlyCharge.aggregate({
-    where: { chargeMonth: targetMonth },
-    _sum: { totalMonthlyCharge: true, paymentReceived: true },
-  });
-
+  // --- Calculate Targets Completion ---
   const totalBilled = Number(billingSummary._sum.totalMonthlyCharge || 0);
   const totalCollected = Number(billingSummary._sum.paymentReceived || 0);
   const monthlyPercentage = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
 
-  // All-time/Yearly target completion rate (All-time Collected vs Total Expected [Collected + Outstanding Arrears])
-  const arrearsSummaryAllTime = await prisma.arrearsSummary.aggregate({
-    where: { totalArrearsAmount: { gt: 0 } },
-    _sum: { totalArrearsAmount: true },
-  });
-  const totalArrearsVal = Number(arrearsSummaryAllTime._sum.totalArrearsAmount || 0);
+  const totalArrearsVal = Number(arrearsSummary._sum.totalArrearsAmount || 0);
   const totalExpectedAllTime = totalKutipanVal + totalArrearsVal;
   const totalPercentage = totalExpectedAllTime > 0 ? Math.round((totalKutipanVal / totalExpectedAllTime) * 100) : 0;
 
-  // 5. Calculate Occupancy Status
-  const totalUnits = await prisma.unit.count();
-  const occupiedUnits = await prisma.unit.count({
-    where: { status: "OCCUPIED" },
-  });
-  const vacantUnits = await prisma.unit.count({
-    where: { status: "VACANT" },
-  });
-
-  // 6. Calculate Arrears Summary
-  const arrearsSummary = await prisma.arrearsSummary.aggregate({
-    where: { totalArrearsAmount: { gt: 0 } },
-    _sum: { totalArrearsAmount: true },
-  });
-
-  const arrearsCount = await prisma.arrearsSummary.count({
-    where: { totalArrearsAmount: { gt: 0 } },
-  });
-
-  const totalArrears = Number(arrearsSummary._sum.totalArrearsAmount || 0);
-
-  // 7. Calculate Semakan (Pending documents queue size)
-  const pendingDocs = await prisma.uploadedDocument.findMany({
-    where: {
-      OR: [
-        { residentDrafts: { some: {} } },
-        { paymentDrafts: { some: {} } },
-        { arrearsSummaryDrafts: { some: {} } },
-        { unitDrafts: { some: {} } },
-        { quarterCategoryDrafts: { some: {} } },
-      ],
-    },
-    select: {
-      category: true,
-    },
-  });
-
+  // --- Calculate Semakan / Pending Redirection ---
   const pendingCount = pendingDocs.length;
-
   const pendingCategories = new Set(pendingDocs.map((doc) => doc.category));
   let pendingCategory = "bayaran"; // Default fallback
   if (pendingCategories.has("BAYARAN")) {
@@ -188,60 +221,37 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     pendingCategory = "kuarters";
   }
 
-  const startOfToday = getTodayDateInAppTimeZone();
-  const pendingUploadsToday = await prisma.uploadedDocument.count({
-    where: {
-      uploadedAt: { gte: startOfToday },
-    },
+  // --- Calculate Category Arrears analysis ---
+  // Create a map of payment sums by residentId
+  const paymentMap = new Map<string, number>();
+  paymentSums.forEach((item) => {
+    paymentMap.set(item.residentId, Number(item._sum.amount || 0));
   });
 
-  // 8. Calculate Analisis Kelas (Arrears by quarters category)
-  const categories = await prisma.quarterCategory.findMany({
-    include: {
-      units: {
-        include: {
-          occupancies: {
-            where: { status: "CURRENT" },
-            include: {
-              resident: {
-                include: {
-                  arrearsSummary: true,
-                  payments: {
-                    select: { amount: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
+  // Aggregate outstanding arrears and payment totals per category
+  const categoryOutstandingMap = new Map<string, number>();
+  const categoryPaidMap = new Map<string, number>();
+
+  activeOccupancies.forEach((occ) => {
+    const categoryId = occ.unit.categoryId;
+    const outstanding = Number(occ.resident.arrearsSummary?.totalArrearsAmount || 0);
+    const paid = paymentMap.get(occ.residentId) || 0;
+
+    categoryOutstandingMap.set(
+      categoryId,
+      (categoryOutstandingMap.get(categoryId) || 0) + (outstanding > 0 ? outstanding : 0)
+    );
+    categoryPaidMap.set(
+      categoryId,
+      (categoryPaidMap.get(categoryId) || 0) + paid
+    );
   });
 
+  // Map to final format
   const analysis = categories.map((cat) => {
-    let totalOutstanding = 0;
-    let totalPaid = 0;
+    const totalOutstanding = categoryOutstandingMap.get(cat.id) || 0;
+    const totalPaid = categoryPaidMap.get(cat.id) || 0;
 
-    cat.units.forEach((unit) => {
-      const currentOccupancy = unit.occupancies[0];
-      if (currentOccupancy?.resident) {
-        const resident = currentOccupancy.resident;
-
-        // 1. Accumulate positive arrears from the current occupant
-        if (resident.arrearsSummary) {
-          const arrVal = Number(resident.arrearsSummary.totalArrearsAmount || 0);
-          if (arrVal > 0) {
-            totalOutstanding += arrVal;
-          }
-        }
-
-        // 2. Accumulate all-time payments from the current occupant
-        const occupantPaid = resident.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-        totalPaid += occupantPaid;
-      }
-    });
-
-    // 3. Compute settlement rate: Paid / Expected (Paid + Outstanding Arrears)
     const totalExpected = totalPaid + totalOutstanding;
     const settlementRate = totalExpected > 0 ? Math.round((totalPaid / totalExpected) * 100) : 0;
 
@@ -281,7 +291,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     occupancyOccupied: occupiedUnits || 1087,
     occupancyVacant: vacantUnits || 363,
     
-    arrearsAmount: `RM ${totalArrears.toLocaleString("ms-MY", { minimumFractionDigits: 2 })}`,
+    arrearsAmount: `RM ${totalArrearsVal.toLocaleString("ms-MY", { minimumFractionDigits: 2 })}`,
     arrearsCount: arrearsCount || 0,
     pendingCount: pendingCount || 0,
     pendingUploadsToday: pendingUploadsToday || 0,
