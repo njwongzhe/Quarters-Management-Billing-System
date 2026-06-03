@@ -114,7 +114,7 @@ export default function PenghuniPage() {
     const onCreateSuccess = handleCreateSuccess.bind(null, setResidents);
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
             {/* Page Header */}
             <PenghuniHeader residents={residents} />
 
