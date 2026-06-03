@@ -389,7 +389,7 @@ export default function KuartersCategoryRatesPanel({
                   <tr
                     key={rate.id}
                     ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 ${isEditing ? "bg-dark-blue/3" : ""}`}
+                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60"}`}
                   >
                     <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (

@@ -103,7 +103,7 @@ export function TableInputField({
     );
 }
 
-// Compact picker-like field used in editable table cells.
+// Compact picker-like field used in editable table cells. (Will open a dialog or popover on click, but that logic is handled by the parent component.)
 export function TablePickerField({
     value,
     placeholder = "",

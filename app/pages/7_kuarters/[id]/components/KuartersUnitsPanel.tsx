@@ -703,8 +703,8 @@ export default function KuartersUnitsPanel({
                         ? "bg-dark-blue/8 ring-2 ring-inset ring-dark-blue/20"
                         : isEditing
                           ? "bg-dark-blue/3"
-                          : ""
-                    }`}
+                          : "hover:bg-background/60"
+                    } transition-colors`}
                   >
                     <td
                       className={`overflow-hidden text-sm font-semibold text-dark-grey align-middle w-min whitespace-nowrap

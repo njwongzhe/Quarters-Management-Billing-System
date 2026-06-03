@@ -193,7 +193,7 @@ export default function KuartersResidentPickerModal({
                         return (
                           <tr
                             key={resident.id}
-                            className="border-b border-b-light-grey/20 text-sm transition-colors"
+                            className="border-b border-b-light-grey/20 text-sm transition-colors hover:bg-background/60"
                           >
                             <td
                               className="px-4 py-3 text-left font-bold text-dark-grey w-min whitespace-nowrap"

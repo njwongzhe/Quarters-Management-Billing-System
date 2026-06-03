@@ -513,18 +513,18 @@ export default function KuartersUnitDetailsHistoryTab({
         <table className="w-full overflow-x-auto">
           <thead>
             <tr className="font-bold text-xs text-grey bg-background">
-              <th className="text-center px-4 py-3">No. Kad Pengenalan</th>
-              <th className="text-left px-4 py-3">Nama Penghuni</th>
-              <th className="text-center px-4 py-3">Tarikh Masuk</th>
-              <th className="text-center px-4 py-3">Tarikh Keluar</th>
-              <th className="text-center px-4 py-3">Status</th>
-              <th className="text-center px-4 py-3">Tindakan</th>
+              <th className="text-left p-3 w-min whitespace-nowrap">No. Kad Pengenalan</th>
+              <th className="text-left p-3 w-min whitespace-nowrap">Nama Penghuni</th>
+              <th className="text-center p-3 w-min whitespace-nowrap">Tarikh Masuk</th>
+              <th className="text-center p-3 w-min whitespace-nowrap">Tarikh Keluar</th>
+              <th className="text-center p-3 w-min whitespace-nowrap">Status</th>
+              <th className="w-[0%] text-center p-3 whitespace-nowrap">Tindakan</th>
             </tr>
           </thead>
           <tbody className="bg-white">
             {currentHistory.length === 0 ? (
               <tr className="text-sm">
-                <td className="px-4 py-4 text-center text-grey" colSpan={6}>
+                <td className="px-3 py-4 text-center text-grey" colSpan={6}>
                   Tiada rekod penghunian yang sepadan untuk unit ini.
                 </td>
               </tr>
@@ -536,9 +536,9 @@ export default function KuartersUnitDetailsHistoryTab({
                   <tr
                     key={occupancy.id}
                     ref={isEditing ? editingRowRef : null}
-                    className="text-sm border-b border-b-light-grey/20 transition-colors"
+                    className="text-sm border-b border-b-light-grey/20 transition-colors hover:bg-background/60"
                   >
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-left">
                       {isEditing ? (
                         <button
                           type="button"
@@ -553,10 +553,10 @@ export default function KuartersUnitDetailsHistoryTab({
                         formatIcNumber(occupancy.occupantIcNumber)
                       )}
                     </td>
-                    <td className="px-4 py-3 text-left">
+                    <td className="px-3 py-2 text-left">
                       {isEditing ? editingDraft.occupantName || "N/A" : occupancy.occupantName}
                     </td>
-                    <td className="px-4 py-3 text-center font-medium">
+                    <td className="px-3 py-2 text-center font-medium">
                       {isEditing ? (
                         <KuartersUnitDatePicker
                           fieldType="moveInDate"
@@ -571,7 +571,7 @@ export default function KuartersUnitDetailsHistoryTab({
                         formatHistoryDate(occupancy.moveInDate)
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-center">
                       {isEditing ? (
                         <KuartersUnitDatePicker
                           fieldType="moveOutDate"
@@ -586,7 +586,7 @@ export default function KuartersUnitDetailsHistoryTab({
                         formatHistoryDate(occupancy.moveOutDate)
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-center">
                       {isEditing ? (
                         <span className="text-xs font-semibold text-grey">N/A</span>
                       ) : (
@@ -601,7 +601,7 @@ export default function KuartersUnitDetailsHistoryTab({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-center">
                       {isEditing ? (
                         <div className="flex justify-center gap-1">
                           <HistoryActionButton

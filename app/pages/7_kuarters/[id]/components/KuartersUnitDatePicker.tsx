@@ -342,6 +342,7 @@ export default function KuartersUnitDatePicker({
               {/* Calendar Component */}
               <Calender
                 containerRef={containerRef}
+                scale={0.85}
                 isOpen={true}
                 value={value}
                 required={required}

@@ -240,7 +240,7 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                             })
                         ) : (
                             currentResidents.map((resident) => (
-                                <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20`}>
+                                <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60`}>
                                     {/* Penghuni */}
                                     <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>{resident.fullName}</div>
