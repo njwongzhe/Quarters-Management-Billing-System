@@ -300,14 +300,12 @@ def _payment_from_pdf_tokens(row: list[str]) -> tuple[str, str, str, str, str | 
     if amount is None:
         return None
 
-    ic_index = next(
-        (
-            index
-            for index, cell in enumerate(row[1:-1], start=1)
-            if re.fullmatch(r"\d{12}", _normalize_ic(cell))
-        ),
-        None,
-    )
+    ic_candidates = [
+        index
+        for index, cell in enumerate(row[1:-1], start=1)
+        if re.fullmatch(r"\d{12}", _normalize_ic(cell))
+    ]
+    ic_index = ic_candidates[-1] if ic_candidates else None
 
     if ic_index is None:
         return None
