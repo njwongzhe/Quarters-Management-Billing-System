@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Icon from "@/app/components/Icon/Icon";
-import type { TunggakanListItem } from "@/lib/arrears/arrears";
+import type { TunggakanListItem, TunggakanFilter } from "@/lib/arrears/arrears";
 
 type TunggakanTableProps = {
   isLoading: boolean;
@@ -14,6 +14,7 @@ type TunggakanTableProps = {
   onViewResident: (id: string) => void;
   selectedChargeMonthLabel: string;
   activeFilterCount: number;
+  filters: TunggakanFilter;
 };
 
 export default function TunggakanTable({
@@ -26,15 +27,16 @@ export default function TunggakanTable({
   onViewResident,
   selectedChargeMonthLabel,
   activeFilterCount,
+  filters,
 }: TunggakanTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState("");
   const ITEMS_PER_PAGE = 5;
 
-  // Reset page when filter changes
+  // Reset page when filter options change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filteredData]);
+  }, [filters, selectedChargeMonthLabel]);
 
   const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
   const paginatedData = useMemo(() => {

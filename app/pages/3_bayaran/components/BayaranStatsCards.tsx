@@ -22,23 +22,20 @@ export default function BayaranStatsCards({
           <p className="text-3xl font-bold text-dark-grey">
             {stat.value}
           </p>
-          <p
+          <div
             className={[
-              "text-xs font-bold",
+              "text-xs font-bold flex items-center gap-1",
               stat.helperColor,
             ].join(" ")}
           >
-            <div className="flex items-center gap-1">
-              <Icon
-                icon={stat.icon}
-                size={12}
-                weight={600}
-                className={stat.helperColor}
-              />
-              {stat.helper}
-            </div>
-            
-          </p>
+            <Icon
+              icon={stat.icon}
+              size={12}
+              weight={600}
+              className={stat.helperColor}
+            />
+            {stat.helper}
+          </div>
         </article>
       ))}
     </section>

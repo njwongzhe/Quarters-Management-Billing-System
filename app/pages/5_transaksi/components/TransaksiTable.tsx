@@ -25,12 +25,13 @@ type TransactionRow = {
 interface TransaksiTableProps {
   transactions: TransactionRow[];
   isLoading: boolean;
+  isFetching?: boolean;
   onView: (tx: TransactionRow) => void;
   onReverse: (tx: TransactionRow) => void;
   onAdjust: (tx: TransactionRow) => void;
 }
 
-export default function TransaksiTable({ transactions, isLoading, onView, onReverse, onAdjust }: TransaksiTableProps) {
+export default function TransaksiTable({ transactions, isLoading, isFetching, onView, onReverse, onAdjust }: TransaksiTableProps) {
   
   const formatRM = (amount: number | string) => {
     return Number(amount).toLocaleString("ms-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -87,24 +88,14 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
     }
   });
 
-  const displayTransactions = sortedTransactions.filter((tx) => {
-    const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
-    if (!isRelatedChild) return true;
-
-    const relatedChildren = getRelatedChildren(tx);
-    if (relatedChildren.length > 0) {
-      return relatedChildren[0].id === tx.id;
-    }
-
-    return !!tx.relatedTransactionId && newestRelatedChildByParentId.get(tx.relatedTransactionId) === tx.id;
-  });
+  const displayTransactions = sortedTransactions;
 
   if (displayTransactions.length === 0) {
     return <div className="p-12 text-center text-gray-500 font-medium">Tiada rekod transaksi dijumpai.</div>;
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className={`overflow-x-auto transition-opacity duration-200 ${isFetching ? "opacity-50 pointer-events-none" : ""}`}>
       <table className="w-full text-sm text-left">
         <thead className="text-[10px] text-gray-500 uppercase bg-gray-50 border-y border-gray-100">
           <tr>
@@ -152,11 +143,12 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
                 
                 if (fixes.length > 0) {
                     displayRelatedId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
-                    extraRelatedCount = fixes.length - 1;
+                    extraRelatedCount = fixes.length;
                 }
             } else if (tx.relatedTransaction) {
                 // Child rows point to their parent transaction, but do not show the hidden-related count.
                 displayRelatedId = tx.relatedTransaction.transactionNo || tx.relatedTransaction.id.split('-')[0] + '...';
+                extraRelatedCount = 0;
             }
 
             return (

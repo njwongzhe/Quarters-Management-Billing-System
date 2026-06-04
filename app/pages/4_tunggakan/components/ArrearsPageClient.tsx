@@ -76,7 +76,9 @@ export default function TunggakanPageClient() {
   // --- DATA FETCHING ---
   const fetchTunggakanData = async () => {
     try {
-      setIsLoading(true);
+      if (data.length === 0) {
+        setIsLoading(true);
+      }
       const params = new URLSearchParams({
         t: String(Date.now()),
         chargeMonth: selectedChargeMonth,
@@ -109,6 +111,7 @@ export default function TunggakanPageClient() {
 
   // Fetch on page load
   useEffect(() => {
+    setData([]);
     fetchTunggakanData();
     fetchBillingStatus();
   }, [selectedChargeMonth]);
@@ -314,6 +317,7 @@ export default function TunggakanPageClient() {
           onViewResident={setViewResidentId}
           selectedChargeMonthLabel={selectedChargeMonthLabel}
           activeFilterCount={activeFilterCount}
+          filters={filters}
         />
       </div>
 

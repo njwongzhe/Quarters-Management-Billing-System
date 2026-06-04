@@ -29,6 +29,8 @@ export default function TransaksiPageClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [summary, setSummary] = useState<SummaryData>({ totalCount: 0, totalDebit: 0, totalCredit: 0 });
+  const [totalItems, setTotalItems] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
   const [selectedReverseTx, setSelectedReverseTx] = useState<any>(null);
   const [selectedAdjustTx, setSelectedAdjustTx] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState<FilterState>(defaultFilters);
@@ -96,17 +98,7 @@ export default function TransaksiPageClient() {
         }
       });
 
-      const displayTxs = sorted.filter((tx: any) => {
-        const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
-        if (!isRelatedChild) return true;
-
-        const relatedChildren = getRelatedChildren(tx);
-        if (relatedChildren.length > 0) {
-          return relatedChildren[0].id === tx.id;
-        }
-
-        return !!tx.relatedTransactionId && newestRelatedChildByParentId.get(tx.relatedTransactionId) === tx.id;
-      });
+      const displayTxs = sorted;
 
       // Prepare Excel rows
       const headers = [
@@ -143,7 +135,8 @@ export default function TransaksiPageClient() {
           if (isDilaraskan || tx.status === "DIBALIKAN") {
             const fixes = getRelatedChildren(tx);
             if (fixes.length > 0) {
-              displayRelatedId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
+              const primaryId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
+              displayRelatedId = `${primaryId} (${fixes.length} Id Lagi Berkaitan)`;
             }
           } else if (tx.relatedTransaction) {
             displayRelatedId = tx.relatedTransaction.transactionNo || tx.relatedTransaction.id.split('-')[0] + '...';
@@ -205,7 +198,11 @@ export default function TransaksiPageClient() {
 
   // We now pass "page" to the API!
   const fetchTransactions = useCallback(async (filtersToApply: FilterState, page: number = 1) => {
-    setIsLoading(true);
+    if (transactions.length === 0) {
+      setIsLoading(true);
+    } else {
+      setIsFetching(true);
+    }
     try {
       const queryParams = new URLSearchParams();
       
@@ -232,6 +229,7 @@ export default function TransaksiPageClient() {
       if (result.ok) {
         setTransactions(result.data);
         setSummary(result.meta.summary);
+        setTotalItems(result.meta.total);
       } else {
         alert(result.message); 
       }
@@ -239,8 +237,9 @@ export default function TransaksiPageClient() {
       console.error("Failed to fetch transactions:", error);
     } finally {
       setIsLoading(false);
+      setIsFetching(false);
     }
-  }, []);
+  }, [transactions]);
 
   // Fetch whenever the page number OR the active filters change
   useEffect(() => {
@@ -254,11 +253,15 @@ export default function TransaksiPageClient() {
     fetchTransactions(filters, 1);
   };
 
+  const handleSuccess = useCallback(() => {
+    setCurrentPage(1);
+    fetchTransactions(activeFilters, 1);
+  }, [activeFilters, fetchTransactions]);
+
   // ==========================================
   // PAGINATION LOGIC (SERVER-SIDE)
   // ==========================================
   // Use the REAL total from the database summary, not the 10 items in the array!
-  const totalItems = summary.totalCount || 0; 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + transactions.length; // Actual items received
@@ -308,6 +311,7 @@ export default function TransaksiPageClient() {
         <TransaksiTable 
           transactions={currentTransactions}
           isLoading={isLoading}
+          isFetching={isFetching}
           onView={handleViewDetails}
           onReverse={(tx) => setSelectedReverseTx(tx)}
           onAdjust={(tx) => setSelectedAdjustTx(tx)}
@@ -366,14 +370,14 @@ export default function TransaksiPageClient() {
         isOpen={!!selectedReverseTx} 
         onClose={() => setSelectedReverseTx(null)} 
         transaction={selectedReverseTx}
-        onSuccess={() => fetchTransactions(activeFilters)} 
+        onSuccess={handleSuccess} 
       />
 
       <TransaksiAdjustModal 
         isOpen={!!selectedAdjustTx} 
         onClose={() => setSelectedAdjustTx(null)} 
         transaction={selectedAdjustTx}
-        onSuccess={() => fetchTransactions(activeFilters)} 
+        onSuccess={handleSuccess} 
       />
 
       <TransaksiViewModal 
