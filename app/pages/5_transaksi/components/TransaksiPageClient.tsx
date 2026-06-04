@@ -197,7 +197,9 @@ export default function TransaksiPageClient() {
 
   // We now pass "page" to the API!
   const fetchTransactions = useCallback(async (filtersToApply: FilterState, page: number = 1) => {
-    setIsLoading(true);
+    if (transactions.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const queryParams = new URLSearchParams();
       
@@ -233,7 +235,7 @@ export default function TransaksiPageClient() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [transactions]);
 
   // Fetch whenever the page number OR the active filters change
   useEffect(() => {
@@ -246,6 +248,11 @@ export default function TransaksiPageClient() {
     setCurrentPage(1);
     fetchTransactions(filters, 1);
   };
+
+  const handleSuccess = useCallback(() => {
+    setCurrentPage(1);
+    fetchTransactions(activeFilters, 1);
+  }, [activeFilters, fetchTransactions]);
 
   // ==========================================
   // PAGINATION LOGIC (SERVER-SIDE)
@@ -358,14 +365,14 @@ export default function TransaksiPageClient() {
         isOpen={!!selectedReverseTx} 
         onClose={() => setSelectedReverseTx(null)} 
         transaction={selectedReverseTx}
-        onSuccess={() => fetchTransactions(activeFilters)} 
+        onSuccess={handleSuccess} 
       />
 
       <TransaksiAdjustModal 
         isOpen={!!selectedAdjustTx} 
         onClose={() => setSelectedAdjustTx(null)} 
         transaction={selectedAdjustTx}
-        onSuccess={() => fetchTransactions(activeFilters)} 
+        onSuccess={handleSuccess} 
       />
 
       <TransaksiViewModal 
