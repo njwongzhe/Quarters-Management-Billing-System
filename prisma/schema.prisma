@@ -279,6 +279,7 @@ model Transaction {
   paymentId            String?            @unique @db.Uuid
 
   transactionDate DateTime
+  chargeMonth     DateTime?
   category        TransactionCategory
   status          TransactionStatus   @default(NORMAL)
 

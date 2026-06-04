@@ -189,7 +189,8 @@ export async function reverseTransaction(
     }
 
     if (original.residentId) {
-        await applyFinancialDeltaToBilling(tx, original.residentId, original.transactionDate, original.category, -currentNet, remarks);
+        const targetChargeMonth = original.chargeMonth || original.transactionDate;
+        await applyFinancialDeltaToBilling(tx, original.residentId, targetChargeMonth, original.category, -currentNet, remarks);
     }
     // -------------------------------------------------------------
 
@@ -216,6 +217,7 @@ export async function reverseTransaction(
         creditAmount: reverseCredit,
         description: remarks,
         relatedTransactionId: original.id, 
+        chargeMonth: original.chargeMonth,
       },
     });
     return pembalikan;
@@ -267,7 +269,8 @@ export async function adjustTransaction(
 
     // --- NEW LOGIC: SYNC WITH BILLING ENGINE (MONTHLY CHARGE) ---
     if (original.residentId) {
-        await applyFinancialDeltaToBilling(tx, original.residentId, original.transactionDate, original.category, deltaAmount, remarks);
+        const targetChargeMonth = original.chargeMonth || original.transactionDate;
+        await applyFinancialDeltaToBilling(tx, original.residentId, targetChargeMonth, original.category, deltaAmount, remarks);
     }
     // -------------------------------------------------------------
 
@@ -303,6 +306,7 @@ export async function adjustTransaction(
         creditAmount: newCredit,
         description: remarks,
         relatedTransactionId: original.id, 
+        chargeMonth: original.chargeMonth,
       },
     });
 
@@ -380,7 +384,7 @@ export async function generateTransactionNos(
 async function applyFinancialDeltaToBilling(
   tx: Prisma.TransactionClient,
   residentId: string,
-  transactionDate: Date,
+  targetChargeMonth: Date,
   category: TransactionCategory,
   deltaAmount: number,
   remarks: string
@@ -388,7 +392,7 @@ async function applyFinancialDeltaToBilling(
   if (!residentId || deltaAmount === 0) return;
 
   // 1. Force the date to the first day of the app timezone month to find the correct MonthlyCharge.
-  const chargeMonth = getMonthStartInAppTimeZone(transactionDate);
+  const chargeMonth = getMonthStartInAppTimeZone(targetChargeMonth);
 
   let monthlyCharge = await tx.monthlyCharge.findUnique({
     where: { residentId_chargeMonth: { residentId, chargeMonth } }

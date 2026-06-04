@@ -383,6 +383,7 @@ export async function createOccupancyBillingAdjustments(
         transactionNo: transactionNos[transactionNoIndex++],
         residentId: previous.residentId,
         transactionDate: new Date(),
+        chargeMonth: delta.chargeMonth, // Set chargeMonth to align with the monthly charge!
         category: delta.category,
         status: "PELARASAN",
         debitAmount: deltaAmount > 0 ? deltaAmount : 0,
@@ -576,10 +577,16 @@ async function findOriginalChargeTransaction(
   return tx.transaction.findFirst({
     where: {
       residentId: input.residentId,
-      transactionDate: {
-        gte: monthStart,
-        lt: nextMonthStart,
-      },
+      OR: [
+        { chargeMonth: monthStart }, // For new data
+        {
+          chargeMonth: null,         // For legacy data fallback
+          transactionDate: {
+            gte: monthStart,
+            lt: nextMonthStart,
+          },
+        },
+      ],
       category: input.category,
       status: {
         in: ["NORMAL", "DILARASKAN"],

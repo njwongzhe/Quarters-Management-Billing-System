@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 
 import { generateTransactionNos } from "@/lib/transactions/transactions";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
+import { getMonthStartInAppTimeZone } from "@/lib/date-time";
 
 export async function verifyTunggakanDrafts(
   tx: Prisma.TransactionClient,
@@ -93,11 +94,15 @@ export async function verifyTunggakanDrafts(
   await tx.transaction.createMany({
     data: rowsToVerify.map((row, index) => {
       const amount = Number(row.draft.totalArrearsAmount);
+      const chargeMonth = row.draft.lastUpdatedMonth
+        ? getMonthStartInAppTimeZone(row.draft.lastUpdatedMonth)
+        : null;
 
       return {
         transactionNo: transactionNos[index],
         residentId: row.residentId,
-        transactionDate: row.draft.lastUpdatedMonth ?? new Date(),
+        transactionDate: new Date(),
+        chargeMonth,
         category: "BAKI_AWAL",
         description: "Baki awal daripada muat naik tunggakan.",
         debitAmount: amount < 0 ? Math.abs(amount) : 0,

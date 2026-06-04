@@ -174,9 +174,10 @@ export async function POST(request: Request) {
 
                 await tx.transaction.create({
                     data: {
-                        transactionNo: txNoSenggara, // 2. ADD THIS
+                        transactionNo: txNoSenggara,
                         residentId: resident.id,
-                        transactionDate: chargeMonth,
+                        transactionDate: new Date(), // Actual date of creation
+                        chargeMonth: chargeMonth,    // Target billing period
                         category: "CAJ_PENYELENGGARAAN",
                         debitAmount: maintenanceRate,
                     }
@@ -199,13 +200,14 @@ export async function POST(request: Request) {
             });
 
             // 2. Log Transaction (Debit)
-            const txNoTambahan = await generateTransactionNo(tx); // 1. ADD THIS
+            const txNoTambahan = await generateTransactionNo(tx);
 
             await tx.transaction.create({
                 data: {
-                    transactionNo: txNoTambahan, // 2. ADD THIS
+                    transactionNo: txNoTambahan,
                     residentId: resident.id,
-                    transactionDate: chargeMonth,
+                    transactionDate: item.tarikh ? new Date(item.tarikh) : new Date(), // Actual date of charge
+                    chargeMonth: chargeMonth, // Target billing period
                     category: "CAJ_TAMBAHAN",
                     description: item.catatan,
                     debitAmount: item.amaun,
@@ -228,13 +230,14 @@ export async function POST(request: Request) {
             });
 
             // 2. Log Transaction (Credit)
-            const txNoRebat = await generateTransactionNo(tx); // 1. ADD THIS
+            const txNoRebat = await generateTransactionNo(tx);
 
             await tx.transaction.create({
                 data: {
-                    transactionNo: txNoRebat, // 2. ADD THIS
+                    transactionNo: txNoRebat,
                     residentId: resident.id,
-                    transactionDate: chargeMonth,
+                    transactionDate: item.tarikh ? new Date(item.tarikh) : new Date(), // Actual date of rebate
+                    chargeMonth: chargeMonth, // Target billing period
                     category: "REBAT",
                     description: item.catatan,
                     creditAmount: item.amaun,

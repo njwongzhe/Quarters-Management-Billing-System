@@ -172,6 +172,9 @@ async function runBillingGeneration(
     let transactionNoIndex = 0;
     const chunkSize = 10;
 
+    const rawMonthName = new Intl.DateTimeFormat("ms-MY", { month: "long" }).format(billingMonth);
+    const monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
+
     for (let index = 0; index < billableItems.length; index += chunkSize) {
       const chunk = billableItems.slice(index, index + chunkSize);
       const transactionsToCreate = chunk.flatMap((item) => {
@@ -181,10 +184,13 @@ async function runBillingGeneration(
           transactions.push({
             transactionNo: transactionNos[transactionNoIndex++],
             residentId: item.residentId,
-            transactionDate: billingMonth,
+            transactionDate: new Date(), // Actual date of billing generation
+            chargeMonth: billingMonth,   // Billed month
             category: "CAJ_SEWA" as const,
             debitAmount: item.rentalToAdd,
-            description: item.moveOutDate ? "Caj Sewa (Prorata Pindah Keluar)" : "Caj Sewa Bulanan",
+            description: item.moveOutDate 
+              ? `Caj Sewa (Prorata Pindah Keluar) (${monthName})` 
+              : `Caj Sewa Bulanan (${monthName})`,
           });
         }
 
@@ -192,10 +198,11 @@ async function runBillingGeneration(
           transactions.push({
             transactionNo: transactionNos[transactionNoIndex++],
             residentId: item.residentId,
-            transactionDate: billingMonth,
+            transactionDate: new Date(), // Actual date of billing generation
+            chargeMonth: billingMonth,   // Billed month
             category: "CAJ_PENALTI" as const,
             debitAmount: item.penaltyToAdd,
-            description: "Denda / Penalti Hilang Kelayakan",
+            description: `Denda / Penalti Hilang Kelayakan (${monthName})`,
           });
         }
 

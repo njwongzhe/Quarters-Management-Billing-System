@@ -88,6 +88,7 @@ export async function createPaymentRecords(
     const description = isUploadedPaymentEntry(entry)
       ? withUploadedPaymentSource(baseDescription)
       : baseDescription ?? MANUAL_PAYMENT_DESCRIPTION;
+    const chargeMonth = getMonthStartInAppTimeZone(entry.paymentDate);
 
     await insertTransactionRow(
       tx,
@@ -97,6 +98,7 @@ export async function createPaymentRecords(
         residentId: entry.residentId,
         paymentId: paymentRows[index].id,
         transactionDate: entry.paymentDate,
+        chargeMonth,
         creditAmount: normalizePaymentAmount(entry.amount),
         receiptNo: normalizeReceiptNo(entry.receiptNo),
         description,
@@ -173,6 +175,7 @@ async function insertTransactionRow(
     residentId: string;
     paymentId: string;
     transactionDate: Date;
+    chargeMonth: Date;
     creditAmount: number;
     receiptNo: string | null;
     description: string;
@@ -214,6 +217,11 @@ async function insertTransactionRow(
   if (columns.has("createdById")) {
     fields.push(Prisma.sql`"createdById"`);
     values.push(uuidSql(row.createdById));
+  }
+
+  if (columns.has("chargeMonth")) {
+    fields.push(Prisma.sql`"chargeMonth"`);
+    values.push(Prisma.sql`${row.chargeMonth}`);
   }
 
   await tx.$executeRaw(Prisma.sql`
