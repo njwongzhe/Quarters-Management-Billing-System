@@ -108,7 +108,6 @@ export default function BayaranFilterShell({
           <ToolbarIconButton
             icon={commonIcons.search}
             label="Cari rekod bayaran"
-            disabled={isLoading}
             isActive={isSearchPanelOpen}
             onClick={handleToggleSearch}
           />
@@ -116,15 +115,10 @@ export default function BayaranFilterShell({
             <ToolbarIconButton
               icon={commonIcons.filter}
               label={`Tapis status bayaran: ${getStatusFilterLabel(statusFilter)}`}
-              disabled={isLoading}
               isActive={isFilterButtonActive}
               hasPopup="menu"
               isExpanded={isFilterMenuOpen}
               onClick={() => {
-                if (isLoading) {
-                  return;
-                }
-
                 setIsFilterMenuOpen((value) => !value);
               }}
             />

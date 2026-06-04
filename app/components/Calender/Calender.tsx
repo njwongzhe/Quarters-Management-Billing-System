@@ -162,7 +162,7 @@ function CalenderPanel({
 
     return (
         <div
-            className={`${disableAbsolutePositioning ? "relative" : "absolute top-full left-0 right-0"} z-50 w-full rounded-3xl bg-white p-2 shadow-lg flex flex-col gap-2`}
+            className={`${disableAbsolutePositioning ? "relative" : "absolute top-full left-0 right-0"} z-50 w-full rounded-3xl bg-white p-2 shadow-lg flex flex-col gap-0.5`}
             style={scale !== undefined ? { zoom: scale } : undefined}
         >
             {/* Header (Month and Year) */}
@@ -170,18 +170,18 @@ function CalenderPanel({
                 {/* Previous Month Button */}
                 <button
                     type="button"
-                    className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
+                    className="grid h-6 w-6 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
                     aria-label="Bulan Sebelumnya"
                     title="Bulan Sebelumnya"
                     onClick={handlePrevious}
                 >
-                    <Icon icon="chevron_left" size={20} />
+                    <Icon icon="chevron_left" size={15} />
                 </button>
 
                 {/* Month and Year Label */}
                 <button
                     type="button"
-                    className="flex-1 cursor-pointer text-center text-sm font-bold text-dark-grey transition-colors hover:text-dark-blue"
+                    className="flex-1 cursor-pointer text-center text-xs font-bold text-dark-grey transition-colors hover:text-dark-blue"
                     onClick={() => {
                         if (!monthOnly) {
                             setShowMonthYearPicker(!showMonthYearPicker);
@@ -196,19 +196,19 @@ function CalenderPanel({
                 {/* Next Month Button */}
                 <button
                     type="button"
-                    className="grid h-9 w-9 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
+                    className="grid h-6 w-6 place-items-center rounded-xl text-grey transition-colors hover:bg-light-blue hover:text-dark-blue"
                     aria-label="Bulan Seterusnya"
                     title="Bulan Seterusnya"
                     onClick={handleNext}
                 >
-                    <Icon icon="chevron_right" size={20} />
+                    <Icon icon="chevron_right" size={15} />
                 </button>
             </div>
 
             {/* Weekday Labels */}
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold uppercase text-grey">
                 {WEEKDAY_LABELS.map((day, index) => (
-                    <div key={`${day.label}-${index}`} title={day.title}>
+                    <div className="flex h-6 w-6 items-center justify-center mx-auto leading-none" key={`${day.label}-${index}`} title={day.title}>
                         {day.label}
                     </div>
                 ))}
@@ -300,7 +300,7 @@ function CalenderPanel({
                                 aria-disabled={isDisabled}
                                 tabIndex={isDisabled ? -1 : 0}
                                 title={activeDisabledMeta?.note ?? undefined}
-                                className={`grid h-9 place-items-center rounded-full text-sm font-bold transition-colors ${
+                                className={`flex h-6 w-6 items-center justify-center mx-auto leading-none rounded-full text-xs font-bold transition-colors ${
                                     shouldShowDisabledStyle && !hasCustomDisabledVisual
                                         ? "cursor-not-allowed text-red bg-red/20"
                                         : isDisabled
@@ -386,7 +386,7 @@ function formatDateInput(date: Date) {
 // Helper function to format the month label in the calendar header. It formats the date in "MMMM YYYY" format. If the date is invalid, it returns the original value.
 function formatMonthLabel(date: Date) {
     return new Intl.DateTimeFormat("ms-MY", {
-        month: "long",
+        month: "short",
         year: "numeric",
     }).format(date);
 }

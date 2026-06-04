@@ -227,7 +227,6 @@ export default function BayaranPageClient() {
             />
           )}
           filterQuery={filters.query}
-          isLoading={isLoading}
           statusFilter={filters.statuses}
           onFilterQueryChange={handleFilterQueryChange}
           onStatusFilterChange={handleStatusFilterChange}
