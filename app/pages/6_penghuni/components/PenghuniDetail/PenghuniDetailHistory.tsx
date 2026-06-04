@@ -35,15 +35,18 @@ function getBakiColorClass(baki: number): string {
 // Helper function to calculate running balance for each transaction.
 function calculateRunningBalances(transactions: TransactionRecord[]): (TransactionRecord & { baki: number })[] {
     let runningBalance = 0;
+
+    const reversedTransactions = [...transactions].reverse();
     
-    return transactions.map(transaction => {
-        // Calculate net amount: debit increases balance (owed), kredit decreases it.
+    const withBaki = reversedTransactions.map(transaction => {
         runningBalance += transaction.debit - transaction.kredit;
         return {
             ...transaction,
             baki: runningBalance,
         };
     });
+
+    return withBaki.reverse();
 }
 
 export default function PenghuniDetailHistory({ residentId }: { residentId?: string }) {
