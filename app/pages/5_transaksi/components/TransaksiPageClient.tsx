@@ -29,6 +29,7 @@ export default function TransaksiPageClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [summary, setSummary] = useState<SummaryData>({ totalCount: 0, totalDebit: 0, totalCredit: 0 });
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedReverseTx, setSelectedReverseTx] = useState<any>(null);
   const [selectedAdjustTx, setSelectedAdjustTx] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState<FilterState>(defaultFilters);
@@ -223,6 +224,7 @@ export default function TransaksiPageClient() {
       if (result.ok) {
         setTransactions(result.data);
         setSummary(result.meta.summary);
+        setTotalItems(result.meta.total);
       } else {
         alert(result.message); 
       }
@@ -249,7 +251,6 @@ export default function TransaksiPageClient() {
   // PAGINATION LOGIC (SERVER-SIDE)
   // ==========================================
   // Use the REAL total from the database summary, not the 10 items in the array!
-  const totalItems = summary.totalCount || 0; 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + transactions.length; // Actual items received
