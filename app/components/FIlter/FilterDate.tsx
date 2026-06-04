@@ -130,19 +130,19 @@ export default function FilterDate({
           ? {
               top: `${calendarPos.top}px`,
               left: `${calendarPos.left}px`,
-              width: "320px",
+              width: "auto",
               height: "auto",
             }
           : renderInFlow
             ? {
                 marginLeft: `${calendarPos.left}px`,
-                width: "320px",
+                width: "auto",
                 height: "auto",
               }
             : {
                 top: `${calendarPos.top}px`,
                 left: `${calendarPos.left}px`,
-                width: "320px",
+                width: "auto",
                 height: "auto",
               }
       }
@@ -151,7 +151,7 @@ export default function FilterDate({
       onClick={(e) => e.stopPropagation()}
     >
       <Calender
-        scale={0.85}
+        scale={1}
         containerRef={calendarContainerRef}
         isOpen={true}
         value={openField === "start" ? draft.startDate : draft.endDate}

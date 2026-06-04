@@ -13,13 +13,11 @@ import {
 
 type AuditFilterDateProps = {
 	filters: AuditLogFilters;
-	disabled?: boolean;
 	onBeforeOpen?: () => void;
 };
 
 export default function AuditFilterDate({
 	filters,
-	disabled = false,
 	onBeforeOpen,
 }: AuditFilterDateProps) {
 	const router = useRouter();
@@ -37,11 +35,6 @@ export default function AuditFilterDate({
 
 	// Close the panel when the user clicks outside of this component.
 	useEffect(() => {
-		if (disabled) {
-			setIsOpen(false);
-			return;
-		}
-
 		if (!isOpen) {
 			return;
 		}
@@ -71,7 +64,7 @@ export default function AuditFilterDate({
 		return () => {
 			document.removeEventListener("pointerdown", handlePointerDown);
 		};
-	}, [disabled, isOpen]);
+	}, [isOpen]);
 
 	// Persist selected filters into URL params and reset table pagination.
 	function pushFilters(nextFilters: AuditLogFilters) {
@@ -87,13 +80,8 @@ export default function AuditFilterDate({
 			<ToolbarIconButton
 				icon={commonIcons.calendar}
 				label="Tapis tarikh rekod audit"
-				disabled={disabled}
 				isActive={isActive}
 				onClick={() => {
-					if (disabled) {
-						return;
-					}
-
 					const nextIsOpen = !isOpen;
 					if (nextIsOpen) {
 						onBeforeOpen?.();
@@ -102,7 +90,7 @@ export default function AuditFilterDate({
 				}}
 			/>
 
-			{isOpen && !disabled ? (
+			{isOpen ? (
 				<FilterDate
 					title="Tarikh"
 					description="Pilih julat tarikh rekod yang ingin dipaparkan."

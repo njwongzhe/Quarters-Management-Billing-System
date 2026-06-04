@@ -139,12 +139,10 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                 </div>
                 <div className="flex flex-row gap-4 items-center">
                     <PenghuniSearchButton
-                        disabled={isLoading}
                         isOpen={isSearchOpen}
                         onToggle={handleToggleSearch}
                     />
                     <PenghuniFilter
-                        disabled={isLoading}
                         selectedValues={selectedStatuses}
                         onSelect={handleStatusFilterChange}
                     />

@@ -463,7 +463,6 @@ export default function KuartersUnitsPanel({
         <div className="flex items-center gap-4">
           <ToolbarButton
             icon={commonIcons.search}
-            disabled={isLoading}
             label="Cari unit kuarters"
             isActive={isSearchOpen}
             onClick={handleToggleSearch}
@@ -472,8 +471,6 @@ export default function KuartersUnitsPanel({
             <ToolbarButton
               icon={commonIcons.filter}
               label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
-              disabled={isLoading}
-
               isActive={isFilterButtonActive}
               hasPopup="menu"
               isExpanded={isFilterMenuOpen}

@@ -321,7 +321,7 @@ export function DateField({
                         style={{
                             left: `${pickerPosition.left}px`,
                             top: `${pickerPosition.top}px`,
-                            width: "320px",
+                            width: "auto",
                         }}
                         role="dialog"
                         aria-label={label}

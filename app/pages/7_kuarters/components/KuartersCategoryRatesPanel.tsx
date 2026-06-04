@@ -225,7 +225,6 @@ export default function KuartersCategoryRatesPanel({
         <div className="flex items-center gap-4">
           <ToolbarButton
             icon={commonIcons.search}
-            disabled={isLoading}
             label="Cari kategori kuarters"
             isActive={isSearchOpen}
             onClick={handleToggleSearch}
