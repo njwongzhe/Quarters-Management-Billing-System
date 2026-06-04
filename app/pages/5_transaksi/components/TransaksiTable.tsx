@@ -87,17 +87,7 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
     }
   });
 
-  const displayTransactions = sortedTransactions.filter((tx) => {
-    const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
-    if (!isRelatedChild) return true;
-
-    const relatedChildren = getRelatedChildren(tx);
-    if (relatedChildren.length > 0) {
-      return relatedChildren[0].id === tx.id;
-    }
-
-    return !!tx.relatedTransactionId && newestRelatedChildByParentId.get(tx.relatedTransactionId) === tx.id;
-  });
+  const displayTransactions = sortedTransactions;
 
   if (displayTransactions.length === 0) {
     return <div className="p-12 text-center text-gray-500 font-medium">Tiada rekod transaksi dijumpai.</div>;
@@ -152,11 +142,12 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
                 
                 if (fixes.length > 0) {
                     displayRelatedId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
-                    extraRelatedCount = fixes.length - 1;
+                    extraRelatedCount = fixes.length;
                 }
             } else if (tx.relatedTransaction) {
                 // Child rows point to their parent transaction, but do not show the hidden-related count.
                 displayRelatedId = tx.relatedTransaction.transactionNo || tx.relatedTransaction.id.split('-')[0] + '...';
+                extraRelatedCount = 0;
             }
 
             return (

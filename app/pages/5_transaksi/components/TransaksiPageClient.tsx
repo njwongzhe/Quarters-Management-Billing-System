@@ -96,17 +96,7 @@ export default function TransaksiPageClient() {
         }
       });
 
-      const displayTxs = sorted.filter((tx: any) => {
-        const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
-        if (!isRelatedChild) return true;
-
-        const relatedChildren = getRelatedChildren(tx);
-        if (relatedChildren.length > 0) {
-          return relatedChildren[0].id === tx.id;
-        }
-
-        return !!tx.relatedTransactionId && newestRelatedChildByParentId.get(tx.relatedTransactionId) === tx.id;
-      });
+      const displayTxs = sorted;
 
       // Prepare Excel rows
       const headers = [
@@ -143,7 +133,8 @@ export default function TransaksiPageClient() {
           if (isDilaraskan || tx.status === "DIBALIKAN") {
             const fixes = getRelatedChildren(tx);
             if (fixes.length > 0) {
-              displayRelatedId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
+              const primaryId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
+              displayRelatedId = `${primaryId} (${fixes.length} Id Lagi Berkaitan)`;
             }
           } else if (tx.relatedTransaction) {
             displayRelatedId = tx.relatedTransaction.transactionNo || tx.relatedTransaction.id.split('-')[0] + '...';
