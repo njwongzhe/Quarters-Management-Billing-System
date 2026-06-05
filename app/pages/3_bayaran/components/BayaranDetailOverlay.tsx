@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
-import FilterDate from "@/app/components/FIlter/FilterDate";
+import FilterDate from "@/app/components/Filter/FilterDate";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import { Topic } from "@/app/components/InputField";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
@@ -397,7 +397,6 @@ function PaymentHistoryTab({
             <ToolbarButton
               icon={commonIcons.calendar}
               label="Tapis sejarah pembayaran mengikut tarikh"
-              disabled={isLoading}
               isActive={isDateFilterActive || isDateFilterOpen}
               onClick={handleToggleDateFilter}
             />

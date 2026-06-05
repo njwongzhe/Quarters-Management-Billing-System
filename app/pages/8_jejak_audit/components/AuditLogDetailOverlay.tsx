@@ -60,18 +60,22 @@ export default function AuditLogDetailOverlay({
         </header>
 
         {isLoading ? (
-          <SearchingDetailDataOverlay
-            mode="loading"
-            loadingMessage="Mendapatkan Butiran Jejak Audit..."
-          />
+          <div className="h-full">
+            <SearchingDetailDataOverlay
+              mode="loading"
+              loadingMessage="Mendapatkan Butiran Jejak Audit..."
+            />
+          </div>
         ) : errorMessage ? (
-          <SearchingDetailDataOverlay
-            mode="warning"
-            title="Maklumat Tidak Dapat Dipaparkan"
-            message={errorMessage}
-            onRetry={onRetry}
-            retryLabel="Cuba Lagi"
-          />
+          <div className="h-full">
+            <SearchingDetailDataOverlay
+              mode="warning"
+              title="Maklumat Tidak Dapat Dipaparkan"
+              message={errorMessage}
+              onRetry={onRetry}
+              retryLabel="Cuba Lagi"
+            />
+          </div>
         ) : auditLog ? (
           <div className="overflow-y-auto bg-light-blue p-6">
             <div className="flex flex-col gap-8">

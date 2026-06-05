@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
-import FilterDate from "@/app/components/FIlter/FilterDate";
+import FilterDate from "@/app/components/Filter/FilterDate";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import type { HistoryData } from "./ButiranTunggakanModal";
 
@@ -17,6 +17,7 @@ type UseButiranTunggakanHistoryFilterResult = {
 
 export function useButiranTunggakanHistoryFilter(
     records: Array<HistoryData & { baki: number }>,
+    disabled = false,
 ): UseButiranTunggakanHistoryFilterResult {
     const [dateFilter, setDateFilter] = useState<DateFilter>({ startDate: "", endDate: "" });
     const [isOpen, setIsOpen] = useState(false);
@@ -40,6 +41,10 @@ export function useButiranTunggakanHistoryFilter(
     }, []);
 
     function handleToggle() {
+        if (disabled) {
+            return;
+        }
+
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
             setAnchorStyle({
@@ -91,8 +96,9 @@ export function useButiranTunggakanHistoryFilter(
         <>
             <div ref={buttonRef}>
                 <ToolbarIconButton
-                    icon={commonIcons.filter}
+                    icon={commonIcons.calendar}
                     label="Tapis mengikut tarikh"
+                    disabled={disabled}
                     isActive={isActive}
                     onClick={handleToggle}
                 />

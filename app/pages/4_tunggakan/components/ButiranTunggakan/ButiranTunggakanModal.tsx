@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
+
 import Icon from "@/app/components/Icon/Icon";
+import { Topic } from "@/app/components/InputField";
+import SearchingDetailDataOverlay from "@/app/components/Loading/SearchingDetailDataOverlay";
+import PenghuniCompleteWithKuartersDetail from "@/app/components/RecordNavigation/PenghuniCompleteWithKuartersDetail";
+import { InputField } from "@/app/components/InputField";
+
 import ButiranTunggakanHistory from "./ButiranTunggakanHistory";
 
 type ButiranTunggakanModalProps = {
@@ -11,313 +16,348 @@ type ButiranTunggakanModalProps = {
   residentId: string | null;
 };
 
-// Define the shape of the data we expect from the API
 export type ProfileData = {
-  fullName: string; icNumber: string; age: number; kelas: string;
-  unit: string; tarikhMasuk: string; tarikhKeluar: string; status: string;
-  charges: { sewa: number; senggara: number; penalti: number; tambahan: number; rebat: number; total: number; };
+  fullName: string;
+  icNumber: string;
+  age: number;
+  kelas: string | null;
+  unit: string | null;
+  tarikhMasuk: string | null;
+  tarikhKeluar: string | null;
+  status: string;
+  quarterAddress: string | null;
+  charges: {
+    sewa: number;
+    senggara: number;
+    penalti: number;
+    tambahan: number;
+    rebat: number;
+    total: number;
+  };
 };
 
 export type HistoryData = {
-  tarikh: string; id: string; kategori: string; catatan: string; debit: number; kredit: number;
+  tarikh: string;
+  id: string;
+  kategori: string;
+  catatan: string;
+  debit: number;
+  kredit: number;
 };
 
-export default function ButiranTunggakanModal({ isOpen, onClose, residentId }: ButiranTunggakanModalProps) {
-  const [activeTab, setActiveTab] = useState<"maklumat" | "sejarah">("maklumat");
-  
-  // New States for API Data
-  const [data, setData] = useState<{ profile: ProfileData; history: HistoryData[] } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+type ArrearDetailResponse = {
+  ok: boolean;
+  message?: string;
+  data?: {
+    profile: ProfileData;
+    history: HistoryData[];
+  };
+};
 
-  const formatRM = (value: number) => value.toFixed(2);
+type ActiveTab = "maklumat" | "sejarah";
 
-  // Fetch the data whenever the modal opens with a valid residentId
-  useEffect(() => {
-    const fetchResidentDetails = async () => {
-      if (!residentId) return;
-      
-      setIsLoading(true);
-      try {
-        const response = await fetch(`/api/arrear/${residentId}`);
-        if (!response.ok) {
-          console.error(`[HTTP ${response.status}] API Failed.`);
-          return;
-        }
-        
-        const result = await response.json();
-        if (result.ok) {
-          setData(result.data);
-        } else {
-          console.error("API Error:", result.message);
-        }
-      } catch (error) {
-        console.error("Failed to fetch resident details:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+function TabButton({
+  children,
+  isActive,
+  onClick,
+}: {
+  children: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`-mb-px py-4 text-sm font-bold transition-colors ${
+        isActive
+          ? "border-b-4 border-dark-blue text-dark-blue"
+          : "text-gray-500 hover:text-dark-blue"
+      }`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
 
-    if (isOpen && residentId) {
-      fetchResidentDetails();
-    } else {
-      // Reset state when modal closes so old data doesn't flash next time
-      setData(null);
-      setActiveTab("maklumat"); 
-    }
-  }, [isOpen, residentId]);
+function parseDisplayDateToIso(value: string | null) {
+  if (!value || value === "N/A") {
+    return null;
+  }
 
-  if (!isOpen) return null;
+  const dateParts = value.split("/");
+  if (dateParts.length !== 3) {
+    return null;
+  }
+
+  const [day, month, year] = dateParts;
+  return `${year}-${month}-${day}`;
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("ms-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function ButiranInfoTab({
+  profile,
+  residentId,
+}: {
+  profile: ProfileData;
+  residentId: string | null;
+}) {
+  const currentOccupancy = {
+    occupantId: residentId ?? "",
+    occupantName: profile.fullName,
+    occupantIcNumber: profile.icNumber,
+    occupantAge: profile.age,
+    quarterClass: profile.kelas,
+    quarterUnit: profile.unit,
+    quarterAddress: profile.quarterAddress,
+    moveInDate: parseDisplayDateToIso(profile.tarikhMasuk),
+    moveOutDate: parseDisplayDateToIso(profile.tarikhKeluar),
+    occupantStatus: profile.status,
+  };
 
   return (
-    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
-      <div className="bg-light-blue rounded-lg shadow-2xl w-full overflow-hidden flex flex-col max-h-full">
-        
-        {/* Header */}
-        <div className="bg-dark-blue px-8 py-5 flex justify-between items-start text-white">
+    <div className="flex flex-col gap-8">
+      <PenghuniCompleteWithKuartersDetail
+        currentOccupancy={currentOccupancy}
+        actionButton={{
+          type: "profile",
+          residentId,
+          label: "Profil Penuh",
+        }}
+      />
+
+      <section className="flex flex-col gap-4">
+        <Topic content="MAKLUMAT TUNGGAKAN" />
+
+        <div className="grid items-start gap-4 md:grid-cols-5">
+          <InputField
+            label="SEWA (RM)"
+            value={formatMoney(profile.charges.sewa)}
+            state="inactive"
+            inactiveBackgroundClass="bg-[#EEF4FF] text-red"
+          />
+          <InputField
+            label="SENGGARA (RM)"
+            value={formatMoney(profile.charges.senggara)}
+            state="inactive"
+            inactiveBackgroundClass="bg-[#EEF4FF] text-red"
+          />
+          <InputField
+            label="PENALTI (RM)"
+            value={formatMoney(profile.charges.penalti)}
+            state="inactive"
+            inactiveBackgroundClass="bg-[#EEF4FF] text-red"
+          />
+          <InputField
+            label="TAMBAHAN (RM)"
+            value={formatMoney(profile.charges.tambahan)}
+            state="inactive"
+            inactiveBackgroundClass="bg-[#EEF4FF] text-red"
+          />
+          <InputField
+            label="REBAT (RM)"
+            value={formatMoney(profile.charges.rebat)}
+            state="inactive"
+            inactiveBackgroundClass="bg-[#EEF4FF] text-green"
+          />
+        </div>
+
+        <div className="flex flex-col gap-3 overflow-hidden rounded-lg bg-dark-blue p-4 text-white shadow-[0_24px_40px_rgba(23,31,111,0.18)]">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <div className="text-xs font-bold uppercase text-light-grey">TUNGGAKAN</div>
+              <div className={`text-2xl font-bold ${profile.charges.total > 0 ? "text-red" : "text-green"}`}>RM {formatMoney(profile.charges.total)}</div>
+              <span className="text-xs font-extralight text-light-grey">{profile.charges.total > 0 ? "Belum Dikutip" : "Sudah Dikutip"}</span>
+            </div>
+
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10">
+              <Icon
+                icon={profile.charges.total > 0 ? "priority_high" : "check_circle"}
+                size={40}
+                filled
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function ButiranTunggakanModal({
+  isOpen,
+  onClose,
+  residentId,
+}: ButiranTunggakanModalProps) {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("maklumat");
+  const [data, setData] = useState<{ profile: ProfileData; history: HistoryData[] } | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handleEscapeKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleEscapeKey);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !residentId) {
+      setData(null);
+      setErrorMessage(null);
+      setActiveTab("maklumat");
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function fetchResidentDetails() {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetch(`/api/arrear/${residentId}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | ArrearDetailResponse
+          | null;
+
+        if (!response.ok || !payload?.ok || !payload.data) {
+          throw new Error(payload?.message ?? "Gagal mendapatkan butiran tunggakan.");
+        }
+
+        setData(payload.data);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setData(null);
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Gagal mendapatkan butiran tunggakan.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void fetchResidentDetails();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isOpen, residentId, reloadToken]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/45 p-12 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <section
+        className="flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="arrear-details-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center justify-between bg-dark-blue p-6 text-white">
           <div>
-            <h2 className="text-[1.1rem] font-bold uppercase tracking-wide">Butiran Tunggakan</h2>
-            <p className="text-[10px] font-semibold text-blue-200 mt-1 uppercase tracking-widest">
-              Maklumat Terperinci Pembayaran & Baki
+            <h2 id="arrear-details-title" className="text-lg font-bold">
+              BUTIRAN TUNGGAKAN
+            </h2>
+            <p className="text-xs font-extralight text-light-grey">
+              MAKLUMAT TERPERINCI TUNGGAKAN PENGHUNI
             </p>
           </div>
-          <button onClick={onClose} className="hover:bg-white/10 p-1 rounded transition-colors">
+          <button
+            type="button"
+            className="hover:scale-96 active:scale-92 text-white"
+            aria-label="Tutup butiran tunggakan"
+            onClick={onClose}
+          >
             <Icon icon="close" size={20} />
           </button>
-        </div>
+        </header>
 
-        {/* Tabs */}
-        <nav className="flex items-center justify-center gap-8 bg-white border-b border-light-grey/20">
-          <button 
-            onClick={() => setActiveTab("maklumat")} 
-            className={`py-4 text-xs font-bold uppercase tracking-widest border-b-4 transition-colors duration-200 ${activeTab === "maklumat" ? "border-dark-blue text-dark-blue" : "border-transparent text-light-grey hover:text-dark-blue"}`}
+        <nav
+          className="flex items-center justify-center gap-8 border-b border-light-grey/20 bg-white"
+          aria-label="Tab butiran tunggakan"
+        >
+          <TabButton
+            isActive={activeTab === "maklumat"}
+            onClick={() => setActiveTab("maklumat")}
           >
-            Maklumat Tunggakan
-          </button>
-          <button 
-            onClick={() => setActiveTab("sejarah")} 
-            className={`py-4 text-xs font-bold uppercase tracking-widest border-b-4 transition-colors duration-200 ${activeTab === "sejarah" ? "border-dark-blue text-dark-blue" : "border-transparent text-light-grey hover:text-dark-blue"}`}
+            MAKLUMAT TUNGGAKAN
+          </TabButton>
+          <TabButton
+            isActive={activeTab === "sejarah"}
+            onClick={() => setActiveTab("sejarah")}
           >
-            Sejarah Tunggakan
-          </button>
+            SEJARAH TUNGGAKAN
+          </TabButton>
         </nav>
 
-        {/* Body */}
-        <div className="p-8 overflow-y-auto flex-1 bg-light-blue relative min-h-75">
-          
-          {/* LOADING STATE */}
-          {isLoading && (
-            <div className="absolute inset-0 z-10 bg-light-blue/80 backdrop-blur-sm flex flex-col items-center justify-center text-dark-blue">
-              <Icon
-                icon="progress_activity"
-                size={48}
-                className="animate-spin text-dark-blue mb-3"
-              />
-              <p className="text-sm font-bold text-dark-blue uppercase tracking-widest animate-pulse">
-                Menarik Rekod Penghuni...
-              </p>
-              <p className="text-xs text-light-grey mt-1">Sila tunggu sebentar</p>
-            </div>
-          )}
-
-          {/* TAB 1: MAKLUMAT TUNGGAKAN */}
-          {activeTab === "maklumat" && data?.profile && (
-            <div className={`space-y-8 transition-opacity duration-300 ${isLoading ? 'opacity-20' : 'opacity-100'}`}>
-              
-              <section className="flex flex-col gap-4">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest">
-                    MAKLUMAT PENGHUNI
-                  </span>
-                  {residentId && (
-                    <Link
-                      href={`/pages/6_penghuni?targetId=${residentId}`}
-                      className="text-[10px] font-bold text-dark-blue flex items-center gap-1 hover:underline uppercase tracking-wider"
-                    >
-                      PROFIL PENUH <Icon icon="chevronRight" size={16} />
-                    </Link>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-12 gap-5">
-                  <div className="col-span-6 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Nama Penghuni</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.fullName}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                    </div>
-                  </div>
-                  <div className="col-span-4 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">No. Kad Pengenalan</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.icNumber}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                    </div>
-                  </div>
-                  <div className="col-span-2 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Umur</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.age || "-"}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="col-span-6 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Kelas</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.kelas}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-10 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                      <Icon icon="externalLink" size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-light-grey" />
-                    </div>
-                  </div>
-                  <div className="col-span-6 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Unit Kuarters</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.unit}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-10 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                      <Icon icon="externalLink" size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-light-grey" />
-                    </div>
-                  </div>
-
-                  <div className="col-span-3 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Tarikh Masuk</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.tarikhMasuk}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                    </div>
-                  </div>
-                  <div className="col-span-3 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Tarikh Keluar</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.tarikhKeluar}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-light-grey"
-                      />
-                    </div>
-                  </div>
-                  <div className="col-span-6 flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Status Penghuni</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={data.profile.status}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-green"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="flex flex-col gap-4">
-                <span className="border-l-4 border-dark-blue pl-3 py-0.5 text-xs text-dark-blue font-bold tracking-widest">
-                  MAKLUMAT TUNGGAKAN
-                </span>
-
-                <div className="grid grid-cols-5 gap-5">
-                  <div className="flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Sewa (RM)</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={formatRM(data.profile.charges.sewa)}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-red"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Senggara (RM)</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={formatRM(data.profile.charges.senggara)}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-dark-blue"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Penalti (RM)</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={formatRM(data.profile.charges.penalti)}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-red"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Tambahan (RM)</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={formatRM(data.profile.charges.tambahan)}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-red"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 tracking-widest">
-                    <label className="font-bold text-gray-500 pl-1 text-[10px] uppercase">Rebat (RM)</label>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        readOnly
-                        value={formatRM(data.profile.charges.rebat)}
-                        className="w-full rounded-md text-sm min-h-12 border border-light-grey/40 outline-none pl-3 pr-3 py-3 bg-transparent font-bold text-green"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 bg-dark-blue rounded-xl p-6 flex justify-between items-center text-white shadow-lg">
-                  <div>
-                    <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1">Jumlah Tunggakan Terkumpul</p>
-                    <h2 className="text-3xl font-bold">RM {formatRM(data.profile.charges.total)}</h2>
-                  </div>
-                  <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">
-                    <span className="text-2xl font-bold">!</span>
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
-
-          {/* TAB 2: SEJARAH TUNGGAKAN */}
-          {activeTab === "sejarah" && data?.history && (
-            <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-20' : 'opacity-100'}`}>
-              <ButiranTunggakanHistory history={data.history} residentId={residentId} />
-            </div>
-          )}
-        </div>
-      </div>
+        {errorMessage ? (
+          <div className="h-full">
+            <SearchingDetailDataOverlay
+              mode="warning"
+              title="Butiran Tidak Dapat Dipaparkan"
+              message={errorMessage}
+              onRetry={() => setReloadToken((value) => value + 1)}
+              retryLabel="Cuba Lagi"
+            />
+          </div>
+        ) : isLoading ? (
+          <div className="h-full">
+            <SearchingDetailDataOverlay
+              mode="loading"
+              loadingMessage="Sedang mendapatkan butiran tunggakan..."
+            />
+          </div>
+        ) : activeTab === "maklumat" && data?.profile ? (
+          <div className="overflow-y-auto bg-light-blue p-6">
+            <ButiranInfoTab profile={data.profile} residentId={residentId} />
+          </div>
+        ) : activeTab === "sejarah" ? (
+          <div className="overflow-y-auto bg-light-blue p-6">
+            <ButiranTunggakanHistory
+              history={data?.history ?? []}
+              residentId={residentId}
+              isLoading={isLoading}
+            />
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

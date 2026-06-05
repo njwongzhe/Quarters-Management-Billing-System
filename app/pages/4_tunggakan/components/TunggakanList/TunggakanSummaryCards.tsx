@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "@/app/components/Icon";
 import type { TunggakanSummary } from "@/lib/arrears/arrears";
 
 type TunggakanSummaryCardsProps = {
@@ -14,28 +15,39 @@ export default function TunggakanSummaryCards({
   formatRM,
 }: TunggakanSummaryCardsProps) {
   return (
-    <div className="grid grid-cols-2 gap-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <p className="text-sm text-grey font-medium mb-2">Jumlah Rekod</p>
-        <h2 className="text-3xl font-bold mb-4">
-          {isLoading ? "RM 0.00" : formatRM(summary.jumlahRekod)}
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-dark-blue"></span>
-          <span className="text-xs font-bold text-dark-blue tracking-wider">TERKINI</span>
+    <section className="grid gap-3 md:grid-cols-3">
+      <article className="flex flex-col gap-1 rounded-lg border-l-4 border-l-dark-blue bg-white p-4 shadow">
+        <p className="text-xs font-semibold text-grey/70">JUMLAH REKOD</p>
+        <p className="text-3xl font-bold text-dark-grey">
+          {isLoading ? "0" : summary.jumlahRekod}
+        </p>
+        <div className="flex items-center gap-1">
+          <Icon icon="fact_check" size={16} className="text-dark-blue" />
+          <p className="text-xs font-bold text-dark-blue">Terkini</p>
         </div>
-      </div>
+      </article>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <p className="text-sm text-grey font-medium mb-2">Jumlah Tunggakan</p>
-        <h2 className="text-3xl font-bold mb-4">
-          {isLoading ? "RM 0.00" : formatRM(summary.jumlahTunggakan)}
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red"></span>
-          <span className="text-xs font-bold text-red tracking-wider">PERLU DIKUMPUL</span>
+      <article className="flex flex-col gap-1 rounded-lg border-l-4 border-l-green bg-white p-4 shadow">
+        <p className="text-xs font-semibold text-grey/70">JUMLAH KUTIPAN</p>
+        <p className="text-3xl font-bold text-dark-grey">
+          {isLoading ? "RM 0.00" : formatRM(summary.jumlahKutipan)}
+        </p>
+        <div className="flex items-center gap-1">
+          <Icon icon="trending_up" size={16} className="text-green" />
+          <p className="text-xs font-bold text-green">Sudah Dikutip</p>
         </div>
-      </div>
-    </div>
+      </article>
+
+      <article className="flex flex-col gap-1 rounded-lg border-l-4 border-l-red bg-white p-4 shadow">
+        <p className="text-xs font-semibold text-grey/70">JUMLAH TUNGGAKAN</p>
+        <p className="text-3xl font-bold text-dark-grey">
+          {isLoading ? "RM 0.00" : formatRM(summary.jumlahTunggakan)}
+        </p>
+        <div className="flex items-center gap-1">
+          <Icon icon="trending_down" size={16} className="text-red" />
+          <p className="text-xs font-bold text-red">Perlu Dikutip</p>
+        </div>
+      </article>
+    </section>
   );
 }

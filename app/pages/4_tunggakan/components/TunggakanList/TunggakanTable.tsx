@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Icon from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
+import {
+  buildPaginationItems,
+  PaginationControls,
+} from "@/app/components/Pagination/Pagination";
 import type { TunggakanListItem } from "@/lib/arrears/arrears";
 
 type TunggakanTableProps = {
@@ -16,6 +21,14 @@ type TunggakanTableProps = {
   activeFilterCount: number;
 };
 
+// Text size constants for table display
+const mainTextSize = "text-[12px]";
+const subTextSize = "text-[11px]";
+
+const getArrearsBorderClass = (jumlahTunggakan: number) => {
+  return jumlahTunggakan > 0 ? "border-l-red" : "border-l-green";
+};
+
 export default function TunggakanTable({
   isLoading,
   data,
@@ -27,16 +40,20 @@ export default function TunggakanTable({
   selectedChargeMonthLabel,
   activeFilterCount,
 }: TunggakanTableProps) {
+  // Pagination Logic State
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageInput, setPageInput] = useState("");
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 10;
 
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [filteredData]);
 
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / ITEMS_PER_PAGE));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length);
+  
   const paginatedData = useMemo(() => {
     return filteredData.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
@@ -44,210 +61,190 @@ export default function TunggakanTable({
     );
   }, [filteredData, currentPage]);
 
-  const handlePageInputSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const parsed = parseInt(pageInput);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
-        setCurrentPage(parsed);
-      }
-      setPageInput("");
-    }
-  };
-
-  const getPageNumbers = (): (number | "...")[] => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (currentPage <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
-    if (currentPage >= totalPages - 3) return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
-  };
-
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-sky-50 text-grey text-xs uppercase font-semibold">
+    <div className="overflow-x-auto overflow-y-auto">
+      <table className="w-full">
+        {/* Table Header */}
+        <thead className="bg-background text-xs font-bold text-grey">
           <tr>
-            <th className="px-6 py-4 w-12">
+            <th className="text-left p-3 w-min whitespace-nowrap">
               <input
                 type="checkbox"
-                className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
+                className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue accent-dark-blue"
                 onChange={(e) => onSelectAll(e.target.checked)}
                 checked={selectedIds.length === data.length && data.length > 0 && !isLoading}
                 disabled={isLoading || data.length === 0}
               />
             </th>
-            <th className="px-6 py-4">PENGHUNI</th>
-            <th className="px-6 py-4">KUARTERS</th>
-            <th className="px-4 py-4 text-right min-w-24">
-              <span className="block leading-tight">SEWA</span>
+            <th className="text-left p-3 w-min whitespace-nowrap">Penghuni</th>
+            <th className="text-left p-3 w-min whitespace-nowrap">Kuarters</th>
+            <th className="text-right p-3 w-min whitespace-nowrap">
+              <span className="block leading-tight">Sewa (RM)</span>
               <span className="block text-[10px] leading-tight normal-case text-light-grey">{selectedChargeMonthLabel}</span>
             </th>
-            <th className="px-4 py-4 text-right min-w-28">
-              <span className="block leading-tight">SENGGARA</span>
+            <th className="text-right p-3 w-min whitespace-nowrap">
+              <span className="block leading-tight">Senggara (RM)</span>
               <span className="block text-[10px] leading-tight normal-case text-light-grey">{selectedChargeMonthLabel}</span>
             </th>
-            <th className="px-4 py-4 text-right min-w-24">
-              <span className="block leading-tight">PENALTI</span>
+            <th className="text-right p-3 w-min whitespace-nowrap">
+              <span className="block leading-tight">Penalti (RM)</span>
               <span className="block text-[10px] leading-tight normal-case text-light-grey">{selectedChargeMonthLabel}</span>
             </th>
-            <th className="px-4 py-4 text-right min-w-28">
-              <span className="block leading-tight">TAMBAHAN</span>
+            <th className="text-right p-3 w-min whitespace-nowrap">
+              <span className="block leading-tight">Tambahan (RM)</span>
               <span className="block text-[10px] leading-tight normal-case text-light-grey">{selectedChargeMonthLabel}</span>
             </th>
-            <th className="px-4 py-4 text-right min-w-24">
-              <span className="block leading-tight">REBAT</span>
+            <th className="text-right p-3 w-min whitespace-nowrap">
+              <span className="block leading-tight">Rebat (RM)</span>
               <span className="block text-[10px] leading-tight normal-case text-light-grey">{selectedChargeMonthLabel}</span>
             </th>
-            <th className="px-6 py-4 text-right">TUNGGAKAN TERKINI (RM)</th>
-            <th className="px-6 py-4 text-center">TINDAKAN</th>
+            <th className="text-right p-3 w-min whitespace-nowrap">
+              <span className="block leading-tight">Tunggakan (RM)</span>
+              <span className="block text-[10px] leading-tight normal-case text-light-grey">Terkini</span>
+            </th>
+            <th className="w-[0%] text-center p-3 whitespace-nowrap">Tindakan</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        
+        {/* Table Body */}
+        <tbody className="bg-white">
           {isLoading ? (
-            <tr>
-              <td colSpan={10} className="px-6 py-12 text-center text-grey">
-                <div className="flex flex-col items-center gap-3">
-                  <Icon
-                    icon="progress_activity"
-                    size={40}
-                    className="animate-spin text-dark-blue"
-                  />
-                  <p className="text-sm font-bold text-dark-blue uppercase tracking-widest animate-pulse">
-                    Sedang Memuatkan...
-                  </p>
-                  <p className="text-xs text-light-grey">Menarik senarai tunggakan dari pelayan</p>
-                </div>
-              </td>
-            </tr>
+            loadingTableRows({
+              mode: "loading",
+              columnCount: 10,
+              rowCount: 10,
+            })
           ) : data.length === 0 ? (
-            <tr>
-              <td colSpan={10} className="px-6 py-12 text-center text-grey">
-                Tiada rekod tunggakan ditemui.
-              </td>
-            </tr>
+            loadingTableRows({
+              mode: "message",
+              columnCount: 10,
+              rowCount: 1,
+              message: "Tiada rekod tunggakan ditemui.",
+            })
+          ) : filteredData.length === 0 ? (
+            loadingTableRows({
+              mode: "message",
+              columnCount: 10,
+              rowCount: 1,
+              message: "Tiada hasil ditemui dengan penapis semasa.",
+            })
           ) : (
             paginatedData.map((row) => (
-              <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4">
+              <tr
+                key={row.id}
+                className={`text-sm border-l-4 ${getArrearsBorderClass(row.jumlahTunggakan)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60`}
+              >
+                {/* Bulk Selection Checkbox */}
+                <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
+                    className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue accent-dark-blue"
                     checked={selectedIds.includes(row.id)}
                     onChange={() => onSelectRow(row.id)}
                   />
                 </td>
-                <td className="px-6 py-4">
-                  <div className="font-bold text-dark-grey">{row.fullName}</div>
-                  <div className="text-xs text-light-grey mt-1">{row.icNumber}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="font-bold text-dark-grey">{row.quarterClass}</div>
-                  <div className="text-xs text-light-grey mt-1 max-w-60 leading-snug whitespace-normal">
-                    {row.quarterAddress ? `${row.unitCode}, ${row.quarterAddress}` : row.unitCode}
+                
+                {/* Penghuni (Resident Info) */}
+                <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                  <div className={`font-bold ${mainTextSize} text-dark-grey`}>{row.fullName}</div>
+                  <div className={`font-extralight ${subTextSize} text-grey`}>
+                    {row.icNumber && row.icNumber.length === 12
+                      ? row.icNumber.replace(/(\d{6})(\d{2})(\d{4})/, "$1-$2-$3")
+                      : row.icNumber}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                
+                {/* Kuarters (Quarters Info) */}
+                <td className="px-3 py-2 text-left w-min whitespace-nowrap">
+                  <div className={`font-bold ${mainTextSize} text-dark-grey`}>{row.quarterClass}</div>
+                  <div className={`font-extralight ${subTextSize} text-grey max-w-60 leading-snug whitespace-nowrap`}> {
+                      row.unitCode && row.quarterAddress ? `${row.unitCode}, ${row.quarterAddress}` : 
+                      row.unitCode ? `${row.unitCode}` :
+                      row.quarterAddress ? `${row.quarterAddress}` : "N/A"
+                    }
+                  </div>
+                </td>
+                
+                {/* Monthly Rental Charge */}
+                <td className={`px-3 py-2 text-right font-medium text-dark-grey ${mainTextSize} w-min whitespace-nowrap`}>
                   {row.sewa.toFixed(2)}
                 </td>
-                <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                
+                {/* Maintenance Charge */}
+                <td className={`px-3 py-2 text-right font-medium text-dark-grey ${mainTextSize} w-min whitespace-nowrap`}>
                   {row.senggara.toFixed(2)}
                 </td>
-                <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                
+                {/* Penalty Charge */}
+                <td className={`px-3 py-2 text-right font-medium text-dark-grey ${mainTextSize} w-min whitespace-nowrap`}>
                   {row.penalti.toFixed(2)}
                 </td>
-                <td className="px-6 py-4 text-right font-medium text-dark-grey">
+                
+                {/* Additional Charges */}
+                <td className={`px-3 py-2 text-right font-medium text-dark-grey ${mainTextSize} w-min whitespace-nowrap`}>
                   {row.tambahan.toFixed(2)}
                 </td>
-                <td className={`px-6 py-4 text-right font-bold ${row.rebat > 0 ? "text-green" : "text-dark-grey"}`}>
+                
+                {/* Rebate Amount */}
+                <td className={`px-3 py-2 text-right font-medium ${row.rebat > 0 ? "text-green" : "text-dark-grey"} ${mainTextSize} w-min whitespace-nowrap`}>
                   {row.rebat.toFixed(2)}
                 </td>
-                <td className={`px-6 py-4 text-right font-bold ${row.jumlahTunggakan > 0 ? "text-red" : "text-dark-grey"}`}>
+                
+                {/* Total Current Arrears */}
+                <td className={`px-3 py-2 text-right font-bold ${row.jumlahTunggakan > 0 ? "text-red" : "text-dark-grey"} ${mainTextSize} w-min whitespace-nowrap`}>
                   {row.jumlahTunggakan.toFixed(2)}
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <button 
-                    onClick={() => onViewResident(row.id)}
-                    className="text-dark-blue hover:bg-blue-50 p-2 rounded-full transition-colors"
-                  >
-                    <Icon icon="eye" size={20} />
-                  </button>
+                
+                {/* Actions Column */}
+                <td className="px-3 py-2 text-center align-middle w-min whitespace-nowrap">
+                  <div className="flex items-center justify-center">
+                    <button 
+                      type="button"
+                      onClick={() => onViewResident(row.id)}
+                      className="inline-flex items-center justify-center rounded-lg p-2 text-dark-blue transition-colors hover:bg-background"
+                      aria-label={`Lihat butiran ${row.fullName}`}
+                    >
+                      <Icon icon="eye" size={18} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))
           )}
         </tbody>
-      </table>
+        
+        {/* Pagination Controls */}
+        <tfoot>
+          <tr>
+            <td colSpan={10} className="bg-white border-t border-light-grey/20 px-3 py-4">
+              <div className="flex flex-col gap-2">
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalRecords={filteredData.length}
+                  paginationItems={buildPaginationItems(currentPage, totalPages)}
+                  onPageChange={(action, pageNum) => {
+                    const nextPage =
+                      action === "prev"
+                        ? Math.max(1, currentPage - 1)
+                        : action === "next"
+                          ? Math.min(totalPages, currentPage + 1)
+                          : pageNum;
 
-      {/* Pagination Bar */}
-      {!isLoading && data.length > 0 && (
-        <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-grey">
-          <div className="flex items-center gap-1">
-            {/* Prev */}
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              &lt;
-            </button>
+                    if (!nextPage || nextPage === currentPage) {
+                      return;
+                    }
 
-            {/* Page Numbers */}
-            {getPageNumbers().map((page, idx) =>
-              page === "..." ? (
-                <span key={`ellipsis-${idx}`} className="px-2 py-1 text-grey">...</span>
-              ) : (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page as number)}
-                  className={`px-3 py-1 border rounded transition-colors cursor-pointer ${
-                    currentPage === page
-                      ? "bg-dark-blue text-white border-dark-blue"
-                      : "hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
-              )
-            )}
-
-            {/* Next */}
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              &gt;
-            </button>
-
-            {/* Jump to page input — only shown if more than 1 page */}
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2 ml-3 pl-3 border-l border-gray-200">
-                <span className="text-xs text-grey">Ke halaman:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={pageInput}
-                  onChange={(e) => setPageInput(e.target.value)}
-                  onKeyDown={handlePageInputSubmit}
-                  placeholder={String(currentPage)}
-                  className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-dark-blue"
+                    setCurrentPage(nextPage);
+                  }}
                 />
               </div>
-            )}
-          </div>
-
-          <div>
-            Menunjukkan{" "}
-            <span className="font-bold">
-              {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)}
-            </span>{" "}
-            Daripada <span className="font-bold">{filteredData.length}</span> Rekod
-            {activeFilterCount > 0 && (
-              <span className="ml-2 text-xs text-grey">(ditapis daripada {data.length} jumlah rekod)</span>
-            )}
-          </div>
-        </div>
-      )}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

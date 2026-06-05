@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import FilterOption from "@/app/components/FIlter/FilterOption";
+import FilterOption from "@/app/components/Filter/FilterOption";
 import { InputField as SharedInputField } from "@/app/components/InputField";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";

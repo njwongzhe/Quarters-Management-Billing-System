@@ -10,7 +10,7 @@ import {
 import FilterOption, {
   areAllFilterOptionsSelected,
   normalizeSelectedValuesForOptions,
-} from "@/app/components/FIlter/FilterOption";
+} from "@/app/components/Filter/FilterOption";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { PaginationControls } from "@/app/components/Pagination/Pagination";
@@ -548,7 +548,7 @@ export default function KuartersUnitsPanel({
       ) : null}
 
       <div className="rounded-lg overflow-x-auto overflow-y-auto">
-        <div className="rounded-lg overflow-x-auto overflow-y-auto">
+        <div className="overflow-x-auto overflow-y-auto">
           <table className="w-full">
             <thead className="bg-background">
               <tr className="font-bold text-xs text-grey bg-background">

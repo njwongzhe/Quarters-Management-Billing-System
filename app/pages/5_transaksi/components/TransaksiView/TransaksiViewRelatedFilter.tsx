@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
-import FilterDate from "@/app/components/FIlter/FilterDate";
+import FilterDate from "@/app/components/Filter/FilterDate";
 import { commonIcons } from "@/app/components/Icon/Icon";
 
 type DateFilter = { startDate: string; endDate: string };
