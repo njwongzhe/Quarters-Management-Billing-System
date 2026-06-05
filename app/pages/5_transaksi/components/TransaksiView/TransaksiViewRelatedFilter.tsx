@@ -103,7 +103,7 @@ export function useTransaksiViewRelatedFilter(
     <>
       <div ref={buttonRef}>
         <ToolbarIconButton
-          icon={commonIcons.filter}
+          icon={commonIcons.calendar}
           label="Tapis mengikut tarikh"
           isActive={isActive}
           onClick={handleToggle}

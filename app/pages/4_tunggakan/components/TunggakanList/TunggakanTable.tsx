@@ -7,7 +7,6 @@ import {
   buildPaginationItems,
   PaginationControls,
 } from "@/app/components/Pagination/Pagination";
-import type { TunggakanListItem } from "@/lib/arrears/arrears";
 import type { TunggakanListItem, TunggakanFilter } from "@/lib/arrears/arrears";
 
 type TunggakanTableProps = {

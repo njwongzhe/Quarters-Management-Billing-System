@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Icon from "../../../components/Icon";
+import Icon from "../../../../components/Icon";
 
 interface TransaksiAdjustModalProps {
   isOpen: boolean;
@@ -96,17 +96,17 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-      <div className="bg-[#EFF4FF] rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/45 p-12 backdrop-blur-sm">
+      <div className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl">
         
         {/* Header (Dark Blue) */}
-        <div className="bg-[#151E66] p-4 flex justify-between items-center text-white">
+        <div className="flex items-center justify-between bg-dark-blue p-6 text-white">
           <div>
             <h2 className="font-bold text-lg uppercase tracking-wide">Pelarasan Transaksi</h2>
             <p className="text-xs text-gray-300">SILA KEMASKINI BUTIRAN PELARASAN DI BAWAH</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <Icon icon="close" size={24} />
+          <button onClick={onClose} className="text-white transition-colors hover:opacity-80">
+            <Icon icon="close" size={20} />
           </button>
         </div>
 
@@ -114,7 +114,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
           
           {/* Section 1: Maklumat Transaksi */}
           <div className="space-y-4">
-            <h3 className="border-l-4 border-[#151E66] pl-2 font-bold text-sm uppercase text-[#151E66]">Maklumat Transaksi</h3>
+            <h3 className="border-l-4 border-dark-blue pl-2 font-bold text-sm uppercase text-dark-blue">Maklumat Transaksi</h3>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -154,7 +154,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
 
           {/* Section 2: Pratonton (Preview) */}
           <div className="space-y-4">
-            <h3 className="border-l-4 border-[#151E66] pl-2 font-bold text-sm uppercase text-[#151E66]">Pratonton Transaksi Berkaitan</h3>
+            <h3 className="border-l-4 border-dark-blue pl-2 font-bold text-sm uppercase text-dark-blue">Pratonton Transaksi Berkaitan</h3>
             
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <table className="w-full text-xs text-left">
@@ -212,7 +212,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
                   </tr>
                 </tbody>
               </table>
-              <div className="bg-[#151E66] text-white p-3 flex justify-between items-center font-bold text-sm uppercase">
+              <div className="bg-dark-blue p-3 text-sm font-bold uppercase text-white flex justify-between items-center">
                 <span>Amaun Bersih</span>
                 <span>RM {formatRM(targetAmount)}</span>
               </div>

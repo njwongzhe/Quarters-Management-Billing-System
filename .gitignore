@@ -49,4 +49,3 @@ ai_service/.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-app/pages/5_transaksi/components/TransaksiPageHeader.tsx

@@ -292,7 +292,7 @@ export default function TunggakanPageClient() {
       />
 
       {/* --- DATA TABLE SECTION --- */}
-      <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
+      <section className="min-h-0 flex-1 flex flex-col gap-3 rounded-lg bg-light-blue p-1">
         {/* Table Header Controls */}
         <div className="flex flex-col gap-3 pt-3 px-3">
           <div className="flex w-full items-start justify-between gap-3">
@@ -425,7 +425,7 @@ export default function TunggakanPageClient() {
           activeFilterCount={activeFilterCount}
           filters={filters}
         />
-      </div>
+      </section>
 
       {/* --- FLOATING 'KEMAS KINI' BUTTON --- */}
       <button 
