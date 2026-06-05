@@ -1,7 +1,63 @@
 "use client";
 
-import { useState } from "react";
-import Icon from "../../../components/Icon"; // Ensure path matches your setup
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
+import FilterDate from "@/app/components/Filter/FilterDate";
+import FilterOption from "@/app/components/Filter/FilterOption";
+import type { FilterOptionSet } from "@/app/components/Filter/FilterOption";
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { InputField as SharedInputField } from "@/app/components/InputField";
+import ToolbarIconButton from "@/app/components/ToolbarIconButton";
+
+type TransactionStatus =
+  | "NORMAL"
+  | "DIBALIKAN"
+  | "DILARASKAN"
+  | "PEMBALIKAN"
+  | "PELARASAN";
+type TransactionCategory =
+  | "BAYARAN"
+  | "CAJ_SEWA"
+  | "CAJ_PENYELENGGARAAN"
+  | "CAJ_PENALTI"
+  | "CAJ_TAMBAHAN"
+  | "REBAT"
+  | "BAKI_AWAL"
+  | "LAIN_LAIN";
+type TransactionType = "DEBIT" | "CREDIT";
+type FilterOptionValue = TransactionCategory | TransactionStatus | TransactionType;
+
+const STATUS_OPTIONS: Array<{
+  value: TransactionStatus;
+  label: string;
+  dotColor: string;
+}> = [
+  { value: "NORMAL", label: "Normal", dotColor: "bg-cyan-500" },
+  { value: "DIBALIKAN", label: "Dibalikkan", dotColor: "bg-red" },
+  { value: "DILARASKAN", label: "Dilaraskan", dotColor: "bg-amber-500" },
+  { value: "PEMBALIKAN", label: "Pembalikan", dotColor: "bg-red" },
+  { value: "PELARASAN", label: "Pelarasan", dotColor: "bg-amber-500" },
+];
+
+const CATEGORY_OPTIONS: Array<{ value: TransactionCategory; label: string }> = [
+  { value: "BAYARAN", label: "Bayaran" },
+  { value: "CAJ_SEWA", label: "Caj Sewa" },
+  { value: "CAJ_PENYELENGGARAAN", label: "Caj Penyelenggaraan" },
+  { value: "CAJ_PENALTI", label: "Caj Penalti" },
+  { value: "CAJ_TAMBAHAN", label: "Caj Tambahan" },
+  { value: "REBAT", label: "Rebat" },
+  { value: "BAKI_AWAL", label: "Baki Awal" },
+  { value: "LAIN_LAIN", label: "Lain-lain" },
+];
+
+const TYPE_OPTIONS: Array<{
+  value: TransactionType;
+  label: string;
+  dotColor: string;
+}> = [
+  { value: "DEBIT", label: "Debit", dotColor: "bg-red" },
+  { value: "CREDIT", label: "Kredit", dotColor: "bg-green" },
+];
 
 export interface FilterState {
   search: string;
@@ -12,243 +68,319 @@ export interface FilterState {
   types: string[];
 }
 
-interface TransaksiFilterPanelProps {
-  onSearch: (filters: FilterState) => void;
+type TransaksiFilterPanelProps = {
+  children: ReactNode;
+  filters: FilterState;
   isLoading: boolean;
-  onExport: () => void;
   isExporting: boolean;
+  onFiltersChange: (filters: FilterState) => void;
+  onExport: () => void;
+};
+
+function normalizeAsStringArray(value: readonly string[]) {
+  return [...value];
 }
 
-const STATUS_OPTIONS = [
-  { value: "NORMAL", label: "NORMAL", color: "bg-[#CFFAFE] text-[#0E7490] border border-cyan-200/50" },
-  { value: "DIBALIKAN", label: "DIBALIKAN", color: "bg-[#DC2626] text-white border border-[#DC2626]" },
-  { value: "DILARASKAN", label: "DILARASKAN", color: "bg-[#FEF3C7] text-[#92400E] border border-amber-200/50" },
-  { value: "PEMBALIKAN", label: "PEMBALIKAN", color: "bg-[#DC2626] text-white border border-[#DC2626]" },
-  { value: "PELARASAN", label: "PELARASAN", color: "bg-[#FEF3C7] text-[#92400E] border border-amber-200/50" },
-];
+export default function TransaksiFilterPanel({
+  children,
+  filters,
+  isLoading,
+  isExporting,
+  onFiltersChange,
+  onExport,
+}: TransaksiFilterPanelProps) {
+  const filterPanelRef = useRef<HTMLDivElement | null>(null);
+  const datePanelRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLDivElement | null>(null);
 
-const CATEGORY_OPTIONS = [
-  "BAYARAN", "CAJ_SEWA", "CAJ_PENYELENGGARAAN", "CAJ_PENALTI", "CAJ_TAMBAHAN", "REBAT", "BAKI_AWAL", "LAIN_LAIN"
-];
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isDateOpen, setIsDateOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(
+    filters.search.trim().length > 0,
+  );
+  const [searchDraft, setSearchDraft] = useState(filters.search);
 
-const TYPE_OPTIONS = [
-  { value: "DEBIT", label: "DEBIT", color: "bg-[#E0E7FF] text-[#4F46E5] border border-[#C7D2FE]" },
-  { value: "CREDIT", label: "KREDIT", color: "bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]" },
-];
+  const allStatuses = useMemo(
+    () => STATUS_OPTIONS.map((option) => option.value),
+    [],
+  );
+  const allCategories = useMemo(
+    () => CATEGORY_OPTIONS.map((option) => option.value),
+    [],
+  );
+  const allTypes = useMemo(() => TYPE_OPTIONS.map((option) => option.value), []);
 
-export default function TransaksiFilterPanel({ onSearch, isLoading, onExport, isExporting }: TransaksiFilterPanelProps) {
-  const [isOpen, setIsOpen] = useState(true); // Collapsible state
-  
-  const [filters, setFilters] = useState<FilterState>({
-    search: "",
-    startDate: "",
-    endDate: "",
-    categories: [],
-    statuses: ["NORMAL", "DIBALIKAN", "DILARASKAN", "PEMBALIKAN", "PELARASAN"], // Default all selected
-    types: [],
-  });
+  const selectedStatuses = filters.statuses;
+  const selectedCategories = filters.categories;
+  const selectedTypes = filters.types;
 
-  const handleStatusToggle = (status: string) => {
-    setFilters(prev => ({
-      ...prev,
-      statuses: prev.statuses.includes(status)
-        ? prev.statuses.filter(s => s !== status)
-        : [...prev.statuses, status]
-    }));
-  };
+  const optionSets: FilterOptionSet<FilterOptionValue>[] = [
+    {
+      title: "Kategori Transaksi",
+      options: CATEGORY_OPTIONS.map((option) => ({ ...option })),
+      selectedValues: selectedCategories as TransactionCategory[],
+    },
+    {
+      title: "Status Transaksi",
+      options: STATUS_OPTIONS.map((option) => ({ ...option })),
+      selectedValues: selectedStatuses as TransactionStatus[],
+    },
+    {
+      title: "Jenis Transaksi",
+      options: TYPE_OPTIONS.map((option) => ({ ...option })),
+      selectedValues: selectedTypes as TransactionType[],
+    },
+  ];
 
-  const handleCategoryToggle = (category: string) => {
-    setFilters(prev => ({
-      ...prev,
-      categories: prev.categories.includes(category)
-        ? prev.categories.filter(c => c !== category)
-        : [...prev.categories, category]
-    }));
-  };
+  const isSearchActive = filters.search.trim().length > 0;
+  const isSearchPanelOpen = isSearchOpen || isSearchActive;
+  const isDateActive = Boolean(filters.startDate || filters.endDate);
+  const hasOptionFilterActive =
+    filters.categories.length > 0 ||
+    filters.types.length > 0 ||
+    filters.statuses.length !== allStatuses.length;
 
-  const handleTypeToggle = (type: string) => {
-    setFilters(prev => ({
-      ...prev,
-      types: prev.types.includes(type)
-        ? prev.types.filter(t => t !== type)
-        : [...prev.types, type]
-    }));
-  };
+  useEffect(() => {
+    setSearchDraft(filters.search);
+  }, [filters.search]);
 
-  const handleReset = () => {
-    const resetState = {
-      search: "",
-      startDate: "",
-      endDate: "",
-      categories: [],
-      statuses: ["NORMAL", "DIBALIKAN", "DILARASKAN", "PEMBALIKAN", "PELARASAN"],
-      types: [],
+  useEffect(() => {
+    if (!isSearchPanelOpen) {
+      return;
+    }
+
+    searchInputRef.current?.querySelector("input")?.focus();
+  }, [isSearchPanelOpen]);
+
+  useEffect(() => {
+    const normalizedSearch = searchDraft.trim();
+    const normalizedCurrentSearch = filters.search.trim();
+
+    if (normalizedSearch === normalizedCurrentSearch) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      onFiltersChange({
+        ...filters,
+        search: searchDraft,
+      });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
     };
-    setFilters(resetState);
-    onSearch(resetState); // Instantly search with reset values
-  };
+  }, [filters, onFiltersChange, searchDraft]);
+
+  useEffect(() => {
+    if (!isFilterOpen && !isDateOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (target instanceof Element && target.closest("[data-filter-date-calendar]")) {
+        return;
+      }
+
+      if (filterPanelRef.current?.contains(target) || datePanelRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsFilterOpen(false);
+      setIsDateOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isDateOpen, isFilterOpen]);
+
+  function handleToggleSearch() {
+    if (isSearchPanelOpen) {
+      setIsSearchOpen(false);
+
+      // Do not trigger data reload when closing search panel if value did not change.
+      if (filters.search.trim().length > 0 || searchDraft.trim().length > 0) {
+        setSearchDraft("");
+        onFiltersChange({
+          ...filters,
+          search: "",
+        });
+      }
+
+      return;
+    }
+
+    setIsSearchOpen(true);
+  }
+
+  function handleClearSearch() {
+    setSearchDraft("");
+    setIsSearchOpen(false);
+    onFiltersChange({
+      ...filters,
+      search: "",
+    });
+  }
+
+  function handleFilterChange(sets: FilterOptionSet<FilterOptionValue>[]) {
+    const nextCategories = (sets[0]?.selectedValues ?? []) as TransactionCategory[];
+    const nextStatuses = (sets[1]?.selectedValues ?? []) as TransactionStatus[];
+    const nextTypes = (sets[2]?.selectedValues ?? []) as TransactionType[];
+
+    onFiltersChange({
+      ...filters,
+      categories:
+        nextCategories.length === 0 || nextCategories.length === allCategories.length
+          ? []
+          : nextCategories,
+      statuses:
+        nextStatuses.length === allStatuses.length
+          ? normalizeAsStringArray(allStatuses)
+          : nextStatuses,
+      types:
+        nextTypes.length === allTypes.length
+          ? normalizeAsStringArray(allTypes)
+          : nextTypes,
+    });
+  }
 
   return (
-    <div className="bg-white p-6 border-b border-gray-100 rounded-t-xl">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-dark-blue">Senarai Transaksi</h2>
-        <div className="flex items-center gap-2.5">
-          <button 
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
+      <div className="flex items-start justify-between gap-4 px-3 pt-3">
+        <div>
+          <h2 className="text-lg font-bold text-dark-grey">Senarai Transaksi</h2>
+          <p className="text-xs text-grey/70">Rekod transaksi terkini.</p>
+        </div>
+
+        <div className="flex items-center gap-4 text-[#607083]">
+          <ToolbarIconButton
+            icon={commonIcons.search}
+            label="Cari rekod transaksi"
+            isActive={isSearchPanelOpen}
+            onClick={handleToggleSearch}
+          />
+
+          <div ref={datePanelRef} className="relative">
+            <ToolbarIconButton
+              icon={commonIcons.calendar}
+              label="Tapis tarikh transaksi"
+              isActive={isDateOpen || isDateActive}
+              onClick={() => {
+                setIsDateOpen((value) => !value);
+                setIsFilterOpen(false);
+              }}
+            />
+
+            {isDateOpen ? (
+              <FilterDate
+                title="Tarikh"
+                description="Pilih julat tarikh transaksi yang ingin dipaparkan."
+                ariaLabel="Tapisan tarikh transaksi"
+                value={{
+                  startDate: filters.startDate,
+                  endDate: filters.endDate,
+                }}
+                onApply={(nextDate) => {
+                  onFiltersChange({
+                    ...filters,
+                    startDate: nextDate.startDate,
+                    endDate: nextDate.endDate,
+                  });
+                }}
+                onClear={() => {
+                  onFiltersChange({
+                    ...filters,
+                    startDate: "",
+                    endDate: "",
+                  });
+                  setIsDateOpen(false);
+                }}
+              />
+            ) : null}
+          </div>
+
+          <div ref={filterPanelRef} className="relative">
+            <ToolbarIconButton
+              icon={commonIcons.filter}
+              label="Tapis kategori, status dan jenis transaksi"
+              isActive={isFilterOpen || hasOptionFilterActive}
+              isExpanded={isFilterOpen}
+              hasPopup="menu"
+              onClick={() => {
+                setIsFilterOpen((value) => !value);
+                setIsDateOpen(false);
+              }}
+            />
+
+            {isFilterOpen ? (
+              <FilterOption<FilterOptionValue>
+                ariaLabel="Tapisan rekod transaksi"
+                defaultLabel="Semua"
+                optionSets={optionSets}
+                onChange={(sets) => handleFilterChange(sets)}
+              />
+            ) : null}
+          </div>
+
+          <ToolbarIconButton
+            icon={commonIcons.download}
+            label="Muat turun rekod transaksi"
+            disabled={isLoading || isExporting}
+            isActive={isExporting}
             onClick={onExport}
-            disabled={isExporting || isLoading}
-            className="flex items-center justify-center text-gray-500 hover:text-dark-blue p-2 rounded hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer"
-            title="Eksport Excel"
-          >
-            {isExporting ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#5d5c8d]"></div>
-            ) : (
-              <Icon icon="download" size={20} />
-            )}
-          </button>
-          <button 
-            onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 bg-[#5d5c8d] hover:bg-[#4c4b7c] text-white px-4 py-2 rounded text-sm font-semibold transition-colors cursor-pointer"
-          >
-            <Icon icon="filter" size={18} />
-            {isOpen ? "Tutup Penapis" : "Penapis"}
-          </button>
+          />
         </div>
       </div>
 
-      {isOpen && (
-        <div className="space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
-          
-          {/* Row 1: Search Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Carian (ID, Penghuni, IC, Resit)</label>
-              <input 
-                type="text" 
-                placeholder="Cth: Ahmad Ali..." 
-                value={filters.search}
-                onChange={e => setFilters({...filters, search: e.target.value})}
-                className="w-full bg-light-blue border border-transparent rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5d5c8d] text-slate-700 placeholder:text-gray-400"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tarikh Mula</label>
-              <input 
-                type="date" 
-                value={filters.startDate}
-                onChange={e => setFilters({...filters, startDate: e.target.value})}
-                className="w-full bg-light-blue border border-transparent rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5d5c8d] text-slate-700"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tarikh Tamat</label>
-              <input 
-                type="date" 
-                value={filters.endDate}
-                onChange={e => setFilters({...filters, endDate: e.target.value})}
-                className="w-full bg-light-blue border border-transparent rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5d5c8d] text-slate-700"
-              />
-            </div>
-          </div>
-
-          {/* Row 2: Status, Category & Type Checkboxes */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-            
-            {/* Category Filter */}
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Kategori Transaksi</label>
-              <div className="flex flex-wrap gap-3">
-                {CATEGORY_OPTIONS.map(opt => {
-                  const isSelected = filters.categories.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => handleCategoryToggle(opt)}
-                      className="flex items-center gap-2 group transition-all"
-                    >
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${isSelected ? 'border-transparent bg-[#5d5c8d] text-white' : 'border-gray-300 bg-white group-hover:border-gray-400'}`}>
-                        {isSelected && <Icon icon="check" size={10} className="text-white" />}
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${isSelected ? 'bg-[#5d5c8d] text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
-                        {opt.replace(/_/g, ' ')}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-6">
-              {/* Status Filter */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Status Transaksi</label>
-                <div className="flex flex-wrap gap-3">
-                  {STATUS_OPTIONS.map(opt => {
-                    const isSelected = filters.statuses.includes(opt.value);
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => handleStatusToggle(opt.value)}
-                        className="flex items-center gap-2 group transition-all"
-                      >
-                        <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${isSelected ? 'border-transparent bg-[#5d5c8d] text-white' : 'border-gray-300 bg-white group-hover:border-gray-400'}`}>
-                          {isSelected && <Icon icon="check" size={10} className="text-white" />}
-                        </div>
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all uppercase ${isSelected ? opt.color : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
-                          {opt.label}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+      {isSearchPanelOpen ? (
+        <div className="mt-3 px-3">
+          <div className="rounded-lg bg-white p-4 shadow">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div ref={searchInputRef} className="flex-1">
+                <SharedInputField
+                  label="CARIAN REKOD TRANSAKSI"
+                  value={searchDraft}
+                  state="active"
+                  onChange={setSearchDraft}
+                  placeholder="Contoh: T-2026, Ahmad, 850212-01-1234 atau RESIT-001"
+                  showLabel
+                  leadingIcon={(
+                    <Icon
+                      icon={commonIcons.search}
+                      size={18}
+                      className="text-light-grey"
+                    />
+                  )}
+                  className="w-full"
+                  activeBackgroundClass="bg-light-blue"
+                  inputFontSize={12}
+                  inputMinHeight={40}
+                />
               </div>
 
-              {/* Type Filter */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Jenis Transaksi</label>
-                <div className="flex flex-wrap gap-3">
-                  {TYPE_OPTIONS.map(opt => {
-                    const isSelected = filters.types.includes(opt.value);
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => handleTypeToggle(opt.value)}
-                        className="flex items-center gap-2 group transition-all"
-                      >
-                        <div className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${isSelected ? 'border-transparent bg-[#5d5c8d] text-white' : 'border-gray-300 bg-white group-hover:border-gray-400'}`}>
-                          {isSelected && <Icon icon="check" size={10} className="text-white" />}
-                        </div>
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all uppercase ${isSelected ? opt.color : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
-                          {opt.label}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!isSearchActive}
+                onClick={handleClearSearch}
+              >
+                Kosongkan
+              </button>
             </div>
-
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-100 w-full">
-            <button 
-              onClick={handleReset}
-              disabled={isLoading}
-              className="text-sm font-semibold text-gray-500 hover:text-[#5d5c8d] transition-colors px-2"
-            >
-              Set Semula
-            </button>
-            <button 
-              onClick={() => onSearch(filters)}
-              disabled={isLoading}
-              className="flex items-center gap-2 bg-[#5d5c8d] hover:bg-[#4d4c7d] text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors disabled:opacity-50"
-            >
-              <Icon icon="search" size={18} />
-              {isLoading ? "Mencari..." : "Cari"}
-            </button>
           </div>
         </div>
-      )}
-    </div>
+      ) : null}
+
+      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">{children}</div>
+    </section>
   );
 }
