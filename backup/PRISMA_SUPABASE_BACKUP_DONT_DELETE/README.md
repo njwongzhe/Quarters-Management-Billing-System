@@ -4,6 +4,8 @@
 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_<name_of_migration>/migration.sql` and replace its content with this code.
 3. To apply the migration, run: `npx prisma migrate deploy` again.
 
+<br />
+
 4. If any edited has been maded to the migration file, please make sure to do further steps to ensure the changes are applied correctly:
 - Go to Supabase Sidebar > "SQL Editer" and run:
 ```sql
@@ -18,6 +20,8 @@ WHERE migration_name = '<id>_<name_of_migration>'; -- Replace <id> and <name_of_
 
 1. Activate pg_cron extension in your Supabase database to enable scheduled tasks.
 - Go to Supabase Sidebar > "Integrations" > "Cron" and enable "pg_cron" if it's not already active.
+
+<br />
 
 2. To Check The Setup is Working:
 - Go to Supabase Sidebar > "Database" > "Triggers" and verify that the triggers for "UnitOccupancy", "Transaction" and "Resident" are created successfully.
