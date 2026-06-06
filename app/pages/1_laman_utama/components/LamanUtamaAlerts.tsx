@@ -5,6 +5,7 @@ import Icon from "@/app/components/Icon/Icon";
 import { ROUTES } from "@/app/constants/routes";
 
 interface LamanUtamaAlertsProps {
+  isLoading?: boolean;
   arrearsAmount?: string;
   arrearsCount?: number;
   pendingCount?: number;
@@ -13,6 +14,7 @@ interface LamanUtamaAlertsProps {
 }
 
 export default function LamanUtamaAlerts({
+  isLoading = false,
   arrearsAmount = "RM 0.00",
   arrearsCount = 0,
   pendingCount = 0,
@@ -36,10 +38,10 @@ export default function LamanUtamaAlerts({
               Tunggakan Belum Bayar
             </span>
             <span className="text-[24px] font-bold text-red leading-8 mt-0.5">
-              {arrearsAmount}
+              {isLoading ? "Loading..." : arrearsAmount}
             </span>
             <span className="text-xs text-grey mt-0.5">
-              {arrearsCount} Penghuni Terlibat
+              {isLoading ? "Loading..." : `${arrearsCount} Penghuni Terlibat`}
             </span>
           </div>
         </div>
@@ -48,9 +50,9 @@ export default function LamanUtamaAlerts({
         <div className="flex justify-end items-center mt-3">
           <Link
             href={`${ROUTES.tunggakan}?autoSelect=true`}
-            className="flex flex-row items-center gap-1.5 text-sm font-bold text-red hover:underline hover:scale-[0.98] active:scale-[0.96] transition-all cursor-pointer"
+            className="flex flex-row items-center gap-1.5 text-sm font-bold text-red hover:scale-[0.98] active:scale-[0.96] transition-all cursor-pointer"
           >
-            <span>Lihat Senarai</span>
+            <span className=" hover:underline">Lihat Senarai</span>
             <Icon icon="chevronRight" size={14} className="text-red" />
           </Link>
         </div>
@@ -71,10 +73,10 @@ export default function LamanUtamaAlerts({
               Semakan Menunggu
             </span>
             <span className="text-[24px] font-bold text-[#0B1C30] leading-8 mt-0.5">
-              {pendingCount} Rekod
+              {isLoading ? "Loading..." : `${pendingCount} Rekod`}
             </span>
             <span className="text-xs text-grey mt-0.5">
-              {pendingUploadsToday} Fail Dimuat Naik Hari Ini
+              {isLoading ? "Loading..." : `${pendingUploadsToday} Fail Dimuat Naik Hari Ini`}
             </span>
           </div>
         </div>
@@ -83,9 +85,9 @@ export default function LamanUtamaAlerts({
         <div className="flex justify-end items-center mt-3">
           <Link
             href={`${ROUTES.muatNaik}?kategori=${pendingCategory}`}
-            className="flex flex-row items-center gap-1.5 text-sm font-bold text-[#0B1C30] hover:underline hover:scale-[0.98] active:scale-[0.96] transition-all cursor-pointer"
+            className="flex flex-row items-center gap-1.5 text-sm font-bold text-[#0B1C30]  hover:scale-[0.98] active:scale-[0.96] transition-all cursor-pointer"
           >
-            <span>Proses Sekarang</span>
+            <span className=" hover:underline">Proses Sekarang</span>
             <Icon icon="chevronRight" size={14} className="text-[#0B1C30]" />
           </Link>
         </div>

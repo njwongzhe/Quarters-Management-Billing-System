@@ -32,7 +32,23 @@ interface DashboardData {
 }
 
 export default function LamanUtamaPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardData>({
+    monthlyAmount: "---",
+    monthlyChange: "---",
+    monthlyPercentage: 0,
+    totalAmount: "---",
+    totalChange: "---",
+    totalPercentage: 0,
+    occupancyTotal: 0,
+    occupancyOccupied: 0,
+    occupancyVacant: 0,
+    arrearsAmount: "---",
+    arrearsCount: 0,
+    pendingCount: 0,
+    pendingUploadsToday: 0,
+    pendingCategory: "bayaran",
+    analysis: [],
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,18 +87,7 @@ export default function LamanUtamaPage() {
     };
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] w-full gap-4 select-none">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-dark-blue rounded-full animate-spin"></div>
-        <p className="text-sm font-semibold text-[#464651]">
-          Memuatkan data papan pemuka...
-        </p>
-      </div>
-    );
-  }
-
-  if (error || !data) {
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full gap-4 text-center select-none p-6 bg-white border border-[#EFF4FF] rounded-xl shadow-sm">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red/10 text-red">
@@ -108,12 +113,13 @@ export default function LamanUtamaPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 w-full pb-20 relative">
+    <div className="flex flex-col gap-4 w-full pb-20 relative">
       {/* 1. Header Section */}
       <LamanUtamaHeader />
 
       {/* 2. Top Row Metric Card (Banner with Carousel) */}
       <LamanUtamaBanner
+        isLoading={isLoading}
         monthlyAmount={data.monthlyAmount}
         monthlyChange={data.monthlyChange}
         monthlyPercentage={data.monthlyPercentage}
@@ -126,12 +132,14 @@ export default function LamanUtamaPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full items-start">
         {/* Occupancy Card (Left) */}
         <LamanUtamaOccupancyGauge
+          isLoading={isLoading}
           initialTotal={data.occupancyTotal}
           initialOccupied={data.occupancyOccupied}
         />
 
         {/* Warning & Alerts Card (Right) */}
         <LamanUtamaAlerts
+          isLoading={isLoading}
           arrearsAmount={data.arrearsAmount}
           arrearsCount={data.arrearsCount}
           pendingCount={data.pendingCount}
@@ -141,7 +149,7 @@ export default function LamanUtamaPage() {
       </div>
 
       {/* 4. Bottom Section: Analysis Progress Bars */}
-      <LamanUtamaAnalysis items={data.analysis} />
+      <LamanUtamaAnalysis items={data.analysis} isLoading={isLoading} />
     </div>
   );
 }

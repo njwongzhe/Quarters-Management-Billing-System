@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Icon from "@/app/components/Icon/Icon";
 
 interface LamanUtamaOccupancyGaugeProps {
+  isLoading?: boolean;
   initialTotal?: number;
   initialOccupied?: number;
 }
 
 export default function LamanUtamaOccupancyGauge({
+  isLoading = false,
   initialTotal = 0,
   initialOccupied = 0,
 }: LamanUtamaOccupancyGaugeProps) {
@@ -47,10 +49,16 @@ export default function LamanUtamaOccupancyGauge({
     return new Intl.NumberFormat("ms-MY").format(num);
   };
 
+  const totalDisplay = isLoading ? "Loading..." : formatNumber(total);
+  const occupiedDisplay = isLoading ? "---" : formatNumber(occupied);
+  const vacantDisplay = isLoading ? "---" : formatNumber(vacant);
+  const occupancyPercentDisplay = isLoading ? "--%" : `${occupancyPercent}%`;
+  const vacancyPercentDisplay = isLoading ? "--%" : `${vacancyPercent}%`;
+
   return (
-    <div className="relative flex flex-col items-start p-8 w-full h-[332px] bg-light-blue rounded-xl select-none">
+    <div className="relative flex flex-col items-start p-6 w-full h-[332px] bg-light-blue rounded-xl select-none">
       {/* Header section */}
-      <div className="flex flex-row justify-between items-center w-full mb-6">
+      <div className="flex flex-row justify-between items-center w-full mb-2">
         <div className="flex flex-row items-center gap-2">
           <Icon icon="apartment" size={18} className="text-dark-blue" />
           <h4 className="text-lg font-bold text-[#0B1C30]">
@@ -65,7 +73,7 @@ export default function LamanUtamaOccupancyGauge({
         <div className="relative w-[320px] h-[192px] rounded-lg bg-light-blue overflow-visible">
           
           {/* Base Background Border (Light Blue) */}
-          <div className="absolute inset-0 border-[12px] border-[#D3E4FE] rounded-lg pointer-events-none" />
+          <div className="absolute inset-0 border-[16px] border-[#D3E4FE] rounded-lg pointer-events-none" />
 
           {/* Dynamic Foreground Running Border (SVG Overlay) */}
           <svg
@@ -77,7 +85,7 @@ export default function LamanUtamaOccupancyGauge({
             <path
               d={pathD}
               stroke="#151E66"
-              strokeWidth="12"
+              strokeWidth="16"
               strokeLinecap="round"
               strokeDasharray={perimeter}
               strokeDashoffset={strokeOffset}
@@ -95,7 +103,7 @@ export default function LamanUtamaOccupancyGauge({
                 Jumlah
               </span>
               <span className="text-[30px] font-black leading-9 text-dark-blue mt-0.5">
-                {formatNumber(total)}
+                {totalDisplay}
               </span>
             </div>
 
@@ -112,11 +120,11 @@ export default function LamanUtamaOccupancyGauge({
                     Dihuni
                   </span>
                 </div>
-                <span className="text-sm font-black text-[#0B1C30] mt-0.5">
-                  {formatNumber(occupied)}
+                <span className="text-lg font-black text-[#0B1C30] mt-0.5">
+                  {occupiedDisplay}
                 </span>
-                <span className="text-[9px] font-bold text-dark-blue mt-0.5">
-                  {occupancyPercent}%
+                <span className="text-[12px] font-bold text-dark-blue mt-0.5">
+                  {occupancyPercentDisplay}
                 </span>
               </div>
 
@@ -131,11 +139,11 @@ export default function LamanUtamaOccupancyGauge({
                     Kosong
                   </span>
                 </div>
-                <span className="text-sm font-black text-[#0B1C30] mt-0.5">
-                  {formatNumber(vacant)}
+                <span className="text-lg font-black text-[#0B1C30] mt-0.5">
+                  {vacantDisplay}
                 </span>
-                <span className="text-[9px] font-bold text-grey mt-0.5">
-                  {vacancyPercent}%
+                <span className="text-[12px] font-bold text-grey mt-0.5">
+                  {vacancyPercentDisplay}
                 </span>
               </div>
             </div>
