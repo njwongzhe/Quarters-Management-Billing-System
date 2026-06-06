@@ -63,7 +63,13 @@ function getStatusBadgeColor(status: string) {
     }
 }
 
-export default function PenghuniTable({ residents, isLoading, errorMessage, setResidents }: PenghuniTableProps) {
+export default function PenghuniTable({
+    residents,
+    isLoading,
+    errorMessage,
+    setResidents,
+    onFilteredResidentsChange,
+}: PenghuniTableProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStatuses, setSelectedStatuses] = useState<PenghuniStatusFilter[]>([
         ...DEFAULT_PENGHUNI_STATUS_FILTERS,
@@ -76,6 +82,10 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
     const filteredResidents = useMemo(() => {
         return filterResidentsByStatus(searchedResidents, selectedStatuses);
     }, [searchedResidents, selectedStatuses]);
+
+    useEffect(() => {
+        onFilteredResidentsChange(filteredResidents);
+    }, [filteredResidents, onFilteredResidentsChange]);
     
     // Pagination Logic
     const itemsPerPage = 10;

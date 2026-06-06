@@ -41,6 +41,11 @@ export async function GET() {
                 units: true,
               },
             },
+            units: {
+              select: {
+                status: true,
+              },
+            },
           },
         }),
         prisma.unit.count(),
@@ -157,6 +162,11 @@ export async function POST(request: Request) {
           _count: {
             select: {
               units: true,
+            },
+          },
+          units: {
+            select: {
+              status: true,
             },
           },
         },

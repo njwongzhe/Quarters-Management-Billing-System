@@ -117,10 +117,10 @@ export default function KuartersCategoryDetailPageClient({
   const deferredResidentPickerSearchQuery = useDeferredValue(
     residentPicker.searchQuery,
   );
-  const summary = buildQuarterUnitSummary(units);
   const sortedUnits = sortQuarterUnits(units);
   const hasActiveFilters = hasActiveQuarterUnitFilters(filters);
   const filteredUnits = filterQuarterUnits(sortedUnits, filters);
+  const summary = buildQuarterUnitSummary(filteredUnits);
   const pagination = buildQuarterUnitPagination(filteredUnits, currentPage, {
     hasActiveFilter: hasActiveFilters,
     totalRecords: units.length,

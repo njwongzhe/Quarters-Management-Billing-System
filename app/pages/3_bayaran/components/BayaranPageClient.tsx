@@ -89,6 +89,22 @@ export default function BayaranPageClient() {
     () => filterBayaranRecords(data.exportRows, filters),
     [data.exportRows, filters],
   );
+  const filteredStats = useMemo(() => {
+    const total = filteredRows.length;
+    const cukup = filteredRows.filter((row) => row.paymentStatus === "cukup").length;
+    const kurang = filteredRows.filter((row) => row.paymentStatus === "kurang").length;
+    const lebih = filteredRows.filter((row) => row.paymentStatus === "lebih").length;
+    const tidakLengkap = filteredRows.filter(
+      (row) => row.paymentStatus === "tidak-lengkap",
+    ).length;
+
+    const values = [total, cukup, kurang, lebih, tidakLengkap];
+
+    return bayaranStatTemplates.map((template, index) => ({
+      ...template,
+      value: values[index].toLocaleString("ms-MY"),
+    }));
+  }, [filteredRows]);
   const totalRecordCount = filteredRows.length;
   const totalPages = Math.max(
     1,
@@ -217,7 +233,7 @@ export default function BayaranPageClient() {
     <main className="relative flex flex-col gap-4 pb-4 text-[#0B1C30]">
       <div className="flex w-full flex-col gap-4">
         <BayaranPageHeader />
-        <BayaranStatsCards stats={data.stats} />
+        <BayaranStatsCards stats={filteredStats} />
 
         <BayaranFilterShell
           downloadButton={(

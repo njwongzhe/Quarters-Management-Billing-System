@@ -97,6 +97,11 @@ export async function PATCH(request: Request, context: RouteContext) {
             units: true,
           },
         },
+        units: {
+          select: {
+            status: true,
+          },
+        },
       },
     });
 
@@ -177,6 +182,11 @@ export async function PATCH(request: Request, context: RouteContext) {
           _count: {
             select: {
               units: true,
+            },
+          },
+          units: {
+            select: {
+              status: true,
             },
           },
         },
@@ -272,6 +282,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
         _count: {
           select: {
             units: true,
+          },
+        },
+        units: {
+          select: {
+            status: true,
           },
         },
       },

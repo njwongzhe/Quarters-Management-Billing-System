@@ -230,6 +230,20 @@ export default function TunggakanPageClient() {
     return count;
   }, [filters, searchQuery, isSearchOpen]);
 
+  const filteredSummary = useMemo<TunggakanSummary>(() => {
+    const jumlahRekod = filteredData.length;
+    const jumlahTunggakan = filteredData.reduce(
+      (sum, row) => sum + row.jumlahTunggakan,
+      0,
+    );
+
+    return {
+      jumlahRekod,
+      jumlahKutipan: summary.jumlahKutipan,
+      jumlahTunggakan,
+    };
+  }, [filteredData, summary.jumlahKutipan]);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(data.map((row) => row.id));
@@ -287,7 +301,7 @@ export default function TunggakanPageClient() {
       {/* --- SUMMARY CARDS --- */}
       <TunggakanSummaryCards 
         isLoading={isLoading} 
-        summary={summary} 
+        summary={filteredSummary} 
         formatRM={formatRM} 
       />
 
