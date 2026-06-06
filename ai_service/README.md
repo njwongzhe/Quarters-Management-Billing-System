@@ -62,9 +62,9 @@ The AI service owns its own environment config in `ai_service/.env`:
 AI_SERVICE_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
-<br />
-
 For deployment, add the deployed frontend URL to this comma-separated list.
+
+<br />
 
 ## Run From ai_service
 
