@@ -25,6 +25,14 @@ function normalizedParamSql(value: string) {
   return Prisma.sql`regexp_replace(UPPER(COALESCE(${value}::text, '')), '[^A-Z0-9]+', '', 'g')`;
 }
 
+function normalizedUnitSql(column: string) {
+  return Prisma.sql`UPPER(TRIM(regexp_replace(COALESCE(${Prisma.raw(column)}, ''), '\\s+', ' ', 'g')))`;
+}
+
+function normalizedUnitParamSql(value: string) {
+  return Prisma.sql`UPPER(TRIM(regexp_replace(COALESCE(${value}::text, ''), '\\s+', ' ', 'g')))`;
+}
+
 function normalizedPositionSql(column: string) {
   return Prisma.sql`regexp_replace(regexp_replace(UPPER(COALESCE(${Prisma.raw(column)}, '')), '\\s*-?\\s*[A-Z]{1,3}\\d{1,2}\\s*$', ''), '[^A-Z0-9]+', '', 'g')`;
 }
@@ -46,6 +54,10 @@ function normalizeDateForExactMatch(value: string | undefined) {
     : "";
 }
 
+function normalizeAddressForExactMatch(value: string | undefined) {
+  return normalizePenghuniLookupText(value) || "N/A";
+}
+
 export async function findExactPenghuniMatch(
   tx: QueryClient,
   record: ExtractedPenghuniRecord,
@@ -58,6 +70,7 @@ export async function findExactPenghuniMatch(
 
   const moveInDate = normalizeDateForExactMatch(record.tarikhMasuk);
   const moveOutDate = normalizeDateForExactMatch(record.tarikhKeluar);
+  const quarterAddress = normalizeAddressForExactMatch(record.alamatKuarters);
 
   const matches = await tx.$queryRaw<ResidentExactMatch[]>`
     SELECT
@@ -88,9 +101,9 @@ export async function findExactPenghuniMatch(
       AND ${normalizedSql('qc."categoryName"')} =
         ${normalizedParamSql(record.kuarters)}
       AND ${normalizedSql('qc."address"')} =
-        ${normalizedParamSql(record.alamatKuarters)}
-      AND ${normalizedSql('u."unitCode"')} =
-        ${normalizedParamSql(record.unit)}
+        ${normalizedParamSql(quarterAddress)}
+      AND ${normalizedUnitSql('u."unitCode"')} =
+        ${normalizedUnitParamSql(record.unit)}
       AND COALESCE(to_char(o."moveInDate", 'YYYY-MM-DD'), '') =
         COALESCE(${moveInDate}::text, '')
       AND COALESCE(to_char(o."moveOutDate", 'YYYY-MM-DD'), '') =
@@ -119,7 +132,7 @@ export async function findExactPenghuniMatches(
     jabatan: record.jabatan,
     tarafPerkhidmatan: record.tarafPerkhidmatan ?? "",
     kuarters: record.kuarters,
-    alamatKuarters: record.alamatKuarters,
+    alamatKuarters: normalizeAddressForExactMatch(record.alamatKuarters),
     unit: record.unit,
     tarikhMasuk: normalizeDateForExactMatch(record.tarikhMasuk),
     tarikhKeluar: normalizeDateForExactMatch(record.tarikhKeluar),
@@ -174,8 +187,8 @@ export async function findExactPenghuniMatches(
         ${normalizedSql('input."kuarters"')}
       AND ${normalizedSql('qc."address"')} =
         ${normalizedSql('input."alamatKuarters"')}
-      AND ${normalizedSql('u."unitCode"')} =
-        ${normalizedSql('input."unit"')}
+      AND ${normalizedUnitSql('u."unitCode"')} =
+        ${normalizedUnitSql('input."unit"')}
       AND COALESCE(to_char(o."moveInDate", 'YYYY-MM-DD'), '') =
         COALESCE(input."tarikhMasuk", '')
       AND COALESCE(to_char(o."moveOutDate", 'YYYY-MM-DD'), '') =
@@ -194,51 +207,50 @@ export async function findUnitIdForPenghuniRecord(
   tx: QueryClient,
   record: Pick<ExtractedPenghuniRecord, "kuarters" | "unit" | "alamatKuarters">,
 ) {
-  const hasCategory = record.kuarters.trim().length > 0;
-  const hasAddress = record.alamatKuarters.trim().length > 0;
+  const categoryName = normalizePenghuniLookupText(record.kuarters);
+  const address = normalizePenghuniLookupAddress(record.alamatKuarters);
+  const unitCode = normalizePenghuniLookupText(record.unit);
+
+  if (!categoryName || !unitCode) {
+    return "";
+  }
+
   const units = await tx.$queryRaw<{ id: string }[]>`
     SELECT u."id"
     FROM "Unit" u
     INNER JOIN "QuarterCategory" qc
       ON qc."id" = u."categoryId"
-    WHERE UPPER(TRIM(u."unitCode")) = UPPER(TRIM(${record.unit}))
-      AND (
-        (${hasCategory} = true AND ${hasAddress} = true
-          AND UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${record.kuarters}))
-          AND UPPER(TRIM(COALESCE(qc."address", ''))) = UPPER(TRIM(${record.alamatKuarters})))
-        OR (${hasCategory} = true AND ${hasAddress} = false
-          AND UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${record.kuarters})))
-        OR (${hasCategory} = false AND ${hasAddress} = true
-          AND UPPER(TRIM(COALESCE(qc."address", ''))) = UPPER(TRIM(${record.alamatKuarters})))
-        OR (${hasCategory} = false AND ${hasAddress} = false)
-      )
-    ORDER BY
-      CASE
-        WHEN UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${record.kuarters}))
-          AND UPPER(TRIM(COALESCE(qc."address", ''))) = UPPER(TRIM(${record.alamatKuarters})) THEN 0
-        WHEN UPPER(TRIM(qc."categoryName")) = UPPER(TRIM(${record.kuarters})) THEN 1
-        WHEN UPPER(TRIM(COALESCE(qc."address", ''))) = UPPER(TRIM(${record.alamatKuarters})) THEN 2
-        ELSE 2
-      END
+    WHERE UPPER(TRIM(regexp_replace(u."unitCode", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(${unitCode}, '\\s+', ' ', 'g')))
+      AND UPPER(TRIM(regexp_replace(qc."categoryName", '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(${categoryName}, '\\s+', ' ', 'g')))
+      AND UPPER(TRIM(regexp_replace(COALESCE(qc."address", ''), '\\s+', ' ', 'g'))) =
+        UPPER(TRIM(regexp_replace(${address}, '\\s+', ' ', 'g')))
     LIMIT 1
   `;
 
   return units[0]?.id ?? "";
 }
 
+function normalizePenghuniLookupText(value: unknown) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+}
+
+function normalizePenghuniLookupAddress(value: unknown) {
+  return normalizePenghuniLookupText(value) || "N/A";
+}
+
 export async function hasOccupancyConflict(
   tx: Prisma.TransactionClient,
   unitId: string,
-  residentId: string | null,
+  _residentId: string | null,
   moveInDate: Date,
   moveOutDate: Date | null,
 ) {
-  const residentUuid = residentId || null;
   const conflicts = await tx.$queryRaw<{ id: string }[]>`
     SELECT "id"
     FROM "UnitOccupancy"
     WHERE "unitId" = ${unitId}::uuid
-      AND (${residentUuid}::uuid IS NULL OR "residentId" <> ${residentUuid}::uuid)
       AND "moveInDate" <= COALESCE(${moveOutDate}, 'infinity'::timestamp)
       AND COALESCE("moveOutDate", 'infinity'::timestamp) >= ${moveInDate}
     LIMIT 1

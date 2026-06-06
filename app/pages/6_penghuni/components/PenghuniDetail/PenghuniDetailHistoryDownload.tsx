@@ -12,9 +12,11 @@ import type { TransactionRecord } from "./PenghuniDetailHistory";
 type PenghuniDetailHistoryDownloadProps = {
     records: Array<TransactionRecord & { baki: number }>;
     residentId?: string;
+    disabled?: boolean;
 };
 
 export default function PenghuniDetailHistoryDownload({
+    disabled = false,
     records,
     residentId,
 }: PenghuniDetailHistoryDownloadProps) {
@@ -66,6 +68,7 @@ export default function PenghuniDetailHistoryDownload({
         <ToolbarIconButton
             icon={commonIcons.download}
             label="Muat turun sejarah transaksi"
+            disabled={disabled}
             onClick={handleDownload}
         />
     );

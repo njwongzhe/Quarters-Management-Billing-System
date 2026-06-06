@@ -75,8 +75,6 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
 				}),
 			});
 
-			const result = await response.json();
-
 			if (!response.ok) {
 				throw new Error("Gagal menghantar OTP.");
 			}
@@ -116,8 +114,6 @@ export default function AuthRegister({ onSwitchToLogin }: AuthRegisterProps) {
 					otp,
 				}),
 			});
-
-			const result = await response.json();
 
 			if (!response.ok) {
 				throw new Error("OTP tidak sah.");

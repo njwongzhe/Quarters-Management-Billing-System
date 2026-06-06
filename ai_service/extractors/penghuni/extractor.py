@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import date
 from io import BytesIO
 import json
-import os
 import re
 from typing import Iterable
 import urllib.error
@@ -15,6 +14,7 @@ from pypdf import PdfReader
 from extractors.shared import (
     build_header_map_for,
     clean_header,
+    gemini_api_keys,
     get_cell,
     normalize_date,
     normalize_unit,
@@ -608,19 +608,7 @@ def _repair_penghuni_with_gemini(candidates: list[dict]) -> list[ExtractedReside
 
 
 def _gemini_api_keys() -> list[str]:
-    keys = [
-        os.getenv(f"GEMINI_API_KEY_{index}", "").strip()
-        for index in range(1, 51)
-    ]
-
-    unique_keys = []
-    seen_keys = set()
-    for key in keys:
-        if key and key not in seen_keys:
-            unique_keys.append(key)
-            seen_keys.add(key)
-
-    return unique_keys
+    return list(gemini_api_keys())
 
 
 def _call_gemini_penghuni_parser(api_key: str, prompt: dict) -> dict:

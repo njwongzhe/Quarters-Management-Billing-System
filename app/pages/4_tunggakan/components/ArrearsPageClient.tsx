@@ -1,65 +1,137 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { downloadXlsxFile } from "@/lib/download/xlsx-export";
-import TunggakanFilterPanel from "./TunggakanFilterPanel";
-import { defaultFilter, type TunggakanFilter } from "@/lib/arrears/arrears";
-import Icon from "../../../components/Icon/Icon";
-import ToolbarButton from "@/app/components/ToolbarIconButton";
-import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears/arrears"; // Make sure this path is correct!
-import KemasKiniModal from "./KemasKiniModal";
-import ButiranTunggakanModal from "./ButiranTunggakanModal";
+import { useSearchParams } from "next/navigation";
 
+import { areAllFilterOptionsSelected } from "@/app/components/Filter/FilterOption";
+import { defaultFilter, type TunggakanFilter } from "@/lib/arrears/arrears";
+import Icon from "@/app/components/Icon/Icon";
+import { InputField } from "@/app/components/InputField";
+import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears/arrears";
+import KemasKiniModal from "@/app/pages/4_tunggakan/components/KemasKiniModal";
+import ButiranTunggakanModal from "@/app/pages/4_tunggakan/components/ButiranTunggakan/ButiranTunggakanModal";
+
+// New Split Components
+import TunggakanSummaryCards from "./TunggakanList/TunggakanSummaryCards";
+import TunggakanTable from "./TunggakanList/TunggakanTable";
+import ArrearsDownload from "./TunggakanList/TableButton/ArrearsDownload";
+import ArrearsFilter from "./TunggakanList/TableButton/ArrearsFilter";
+import ArrearsSearch from "./TunggakanList/TableButton/ArrearsSearch";
+import ArrearsFilterMonth from "./TunggakanList/TableButton/ArrearsFIlterMonth";
+
+const STATUS_BAYARAN_OPTIONS = [
+  { value: "SUDAH_DIKUTIP", label: "Sudah Dikutip" },
+  { value: "BELUM_DIKUTIP", label: "Belum Dikutip" },
+] as const;
+
+const getCurrentMonthInputValue = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const formatMonthLabel = (monthValue: string) => {
+  const [year, month] = monthValue.split("-").map(Number);
+  if (!year || !month) return "Bulan";
+
+  return new Intl.DateTimeFormat("ms-MY", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+};
 
 export default function TunggakanPageClient() {
   // --- STATE MANAGEMENT ---
   const [data, setData] = useState<TunggakanListItem[]>([]);
-  const [summary, setSummary] = useState<TunggakanSummary>({ jumlahRekod: 0, jumlahTunggakan: 0 });
+  const [summary, setSummary] = useState<TunggakanSummary>({ jumlahRekod: 0, jumlahKutipan: 0, jumlahTunggakan: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
-  // NEW: Billing Automation States
+  // Billing Automation States
   const [isBilledThisMonth, setIsBilledThisMonth] = useState(false);
   const [lastBilledDate, setLastBilledDate] = useState<string | null>(null);
+  const [targetBillingMonthLabel, setTargetBillingMonthLabel] = useState<string | null>(null);
   const [isBillingRunning, setIsBillingRunning] = useState(false);
   
+  const searchParams = useSearchParams();
+  const autoSelect = searchParams.get("autoSelect") === "true";
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const [isKemasKiniModalOpen, setIsKemasKiniModalOpen] = useState(false);
   const [viewResidentId, setViewResidentId] = useState<string | null>(null);
   const [filters, setFilters] = useState<TunggakanFilter>(defaultFilter);
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);  
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageInput, setPageInput] = useState("");
-  const ITEMS_PER_PAGE = 5;
+  const [selectedChargeMonth, setSelectedChargeMonth] = useState(getCurrentMonthInputValue);
+  const selectedChargeMonthLabel = useMemo(() => formatMonthLabel(selectedChargeMonth), [selectedChargeMonth]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const isSearchActive = searchQuery.trim().length > 0;
+  const [isSearchOpen, setIsSearchOpen] = useState(isSearchActive);
+
+  // Synchronize searchQuery with panel open state
+  useEffect(() => {
+    if (!isSearchOpen) {
+      setSearchQuery("");
+    }
+  }, [isSearchOpen]);
+
+  const normalizeSearchValue = (value: string) => {
+    return value
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  };
 
   const fetchBillingStatus = async () => {
     try {
-      const response = await fetch("/api/billing/status");
+      const response = await fetch(`/api/billing/status?t=${Date.now()}`, {
+        cache: "no-store"
+      });
       const result = await response.json();
       if (result.ok) {
         setIsBilledThisMonth(result.isBilledThisMonth);
         setLastBilledDate(result.lastBilledDate);
+        setTargetBillingMonthLabel(result.targetBillingMonthLabel ?? null);
       }
     } catch (error) {
       console.error("Failed to fetch billing status:", error);
     }
   };
+
   // --- DATA FETCHING ---
   const fetchTunggakanData = async () => {
-    console.log(">>> fetch started");
     try {
-      setIsLoading(true);
-      const response = await fetch("/api/arrear");
-      console.log(">>> response status:", response.status);
+      if (data.length === 0) {
+        setIsLoading(true);
+      }
+      const params = new URLSearchParams({
+        t: String(Date.now()),
+        chargeMonth: selectedChargeMonth,
+      });
+      const response = await fetch(`/api/arrear?${params.toString()}`, {
+        cache: "no-store"
+      });
       const result = await response.json();
-      console.log(">>> result:", result);
 
       if (result.ok) {
         setData(result.data);
-        setSummary(result.summary);
-        setCurrentPage(1);
+        
+        setSummary({
+          jumlahRekod: result.data?.length ?? 0, 
+          jumlahKutipan: result.summary?.jumlahRekod ?? 0, 
+          jumlahTunggakan: result.summary?.jumlahTunggakan ?? 0, 
+        });
+        
+        if (autoSelect && !hasAutoSelected) {
+          const idsWithArrears = (result.data as TunggakanListItem[])
+            .filter((item) => item.jumlahTunggakan > 0)
+            .map((item) => item.id);
+          setSelectedIds(idsWithArrears);
+          setHasAutoSelected(true);
+        }
       } else {
         console.error("API Error:", result.message);
-        // You could add a toast error notification here later
       }
     } catch (error) {
       console.error("Failed to fetch tunggakan data:", error);
@@ -68,17 +140,12 @@ export default function TunggakanPageClient() {
     }
   };
 
-
-  // Fetch on page load
+  // Fetch on page load.
   useEffect(() => {
+    setData([]);
     fetchTunggakanData();
     fetchBillingStatus();
-  }, []);
-
-  // Reset to page 1 whenever a filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters]);
+  }, [selectedChargeMonth]);
 
   // --- HANDLERS ---
   const formatRM = (value: number) => {
@@ -91,6 +158,25 @@ export default function TunggakanPageClient() {
 
   const filteredData = useMemo(() => {
     let result = data;
+
+    if (isSearchOpen) {
+      const normalizedQuery = normalizeSearchValue(searchQuery);
+      if (normalizedQuery.length > 0) {
+        result = result.filter((row) => {
+          const searchableFields = [
+            row.fullName,
+            row.icNumber,
+            row.quarterClass,
+            row.unitCode,
+            row.quarterAddress,
+          ].filter(Boolean) as string[];
+
+          return searchableFields.some((field) =>
+            normalizeSearchValue(field).includes(normalizedQuery)
+          );
+        });
+      }
+    }
 
     if (filters.kelasKuarters.length > 0)
       result = result.filter((r) => filters.kelasKuarters.includes(r.quarterClass));
@@ -106,111 +192,60 @@ export default function TunggakanPageClient() {
     if (filters.julatMax !== "")
       result = result.filter((r) => r.jumlahTunggakan <= parseFloat(filters.julatMax));
 
-    if (filters.statusBayaran !== "SEMUA")
-      result = result.filter((r) => (r as any).statusBayaran === filters.statusBayaran);
+    const isAllStatusSelected = areAllFilterOptionsSelected(
+      STATUS_BAYARAN_OPTIONS.map((option) => ({ ...option })),
+      filters.statusBayaranSelections as ("SUDAH_DIKUTIP" | "BELUM_DIKUTIP")[]
+    );
 
-    if (filters.mempunyaiPenalti)
-      result = result.filter((r) => r.penalti > 0);
+    if (!isAllStatusSelected)
+      result = result.filter((r) => {
+        const includeSudahDikutip =
+          filters.statusBayaranSelections.includes("SUDAH_DIKUTIP") &&
+          r.jumlahTunggakan <= 0;
+        const includeBelumDikutip =
+          filters.statusBayaranSelections.includes("BELUM_DIKUTIP") &&
+          r.jumlahTunggakan > 0;
 
-    if (filters.mempunyaiRebat)
-      result = result.filter((r) => r.rebat > 0);
+        return includeSudahDikutip || includeBelumDikutip;
+      });
 
     return result;
-  }, [data, filters]);
+  }, [data, filters, searchQuery, isSearchOpen]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (isSearchOpen && searchQuery.trim() !== "") count++;
     if (filters.kelasKuarters.length > 0) count++;
     if (filters.blok.length > 0) count++;
     if (filters.julatMin !== "") count++;
     if (filters.julatMax !== "") count++;
-    if (filters.statusBayaran !== "SEMUA") count++;
-    if (filters.mempunyaiPenalti) count++;
-    if (filters.mempunyaiRebat) count++;
+
+    const isAllStatusSelected = areAllFilterOptionsSelected(
+      STATUS_BAYARAN_OPTIONS.map((option) => ({ ...option })),
+      filters.statusBayaranSelections as ("SUDAH_DIKUTIP" | "BELUM_DIKUTIP")[]
+    );
+
+    if (!isAllStatusSelected) count += filters.statusBayaranSelections.length;
+
     return count;
-  }, [filters]);
+  }, [filters, searchQuery, isSearchOpen]);
 
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const filteredSummary = useMemo<TunggakanSummary>(() => {
+    const jumlahRekod = filteredData.length;
+    const jumlahTunggakan = filteredData.reduce(
+      (sum, row) => sum + row.jumlahTunggakan,
+      0,
+    );
 
-  const handlePageInputSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const parsed = parseInt(pageInput);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
-        setCurrentPage(parsed);
-      }
-      setPageInput("");
-    }
-  };
+    return {
+      jumlahRekod,
+      jumlahKutipan: summary.jumlahKutipan,
+      jumlahTunggakan,
+    };
+  }, [filteredData, summary.jumlahKutipan]);
 
-  const getPageNumbers = (): (number | "...")[] => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (currentPage <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
-    if (currentPage >= totalPages - 3) return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
-  };
-
-  const handleExport = () => {
-    const exportData = activeFilterCount > 0 ? filteredData : data;
-    const filename = activeFilterCount > 0
-      ? `Tunggakan_Ditapis_${new Date().toISOString().slice(0, 10)}`
-      : `Tunggakan_Semua_${new Date().toISOString().slice(0, 10)}`;
-
-    downloadXlsxFile({
-      filename,
-      sheets: [
-        {
-          name: "Senarai Tunggakan",
-          columns: [
-            { width: 28 }, // Nama
-            { width: 18 }, // IC
-            { width: 16 }, // Kelas
-            { width: 18 }, // Unit
-            { width: 12 }, // Sewa
-            { width: 12 }, // Senggara
-            { width: 12 }, // Penalti
-            { width: 12 }, // Tambahan
-            { width: 12 }, // Rebat
-            { width: 14 }, // Tunggakan
-          ],
-          rows: [
-            // Header row
-            [
-              { value: "NAMA PENGHUNI",   style: "header" },
-              { value: "NO. KAD PENGENALAN", style: "header" },
-              { value: "KELAS KUARTERS",  style: "header" },
-              { value: "KOD UNIT",        style: "header" },
-              { value: "SEWA (RM)",       style: "header", align: "right" },
-              { value: "SENGGARA (RM)",   style: "header", align: "right" },
-              { value: "PENALTI (RM)",    style: "header", align: "right" },
-              { value: "TAMBAHAN (RM)",   style: "header", align: "right" },
-              { value: "REBAT (RM)",      style: "header", align: "right" },
-              { value: "TUNGGAKAN (RM)",  style: "header", align: "right" },
-            ],
-            // Data rows
-            ...exportData.map((row) => [
-              { value: row.fullName },
-              { value: row.icNumber },
-              { value: row.quarterClass },
-              { value: row.unitCode },
-              { value: row.sewa,             type: "number" as const, align: "right" as const },
-              { value: row.senggara,         type: "number" as const, align: "right" as const },
-              { value: row.penalti,          type: "number" as const, align: "right" as const },
-              { value: row.tambahan,         type: "number" as const, align: "right" as const },
-              { value: row.rebat,            type: "number" as const, align: "right" as const },
-              { value: row.jumlahTunggakan,  type: "number" as const, align: "right" as const },
-            ]),
-          ],
-        },
-      ],
-    });
-  };
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
       setSelectedIds(data.map((row) => row.id));
     } else {
       setSelectedIds([]);
@@ -224,20 +259,23 @@ export default function TunggakanPageClient() {
   };
 
   const handleManualRun = async () => {
-    if (!confirm("Adakah anda pasti mahu menjana caj bulanan dan penalti sekarang?")) return;
+    const billingLabel = targetBillingMonthLabel ? ` untuk bulan ${targetBillingMonthLabel}` : "";
+    if (!confirm(`Adakah anda pasti mahu menjana caj bulanan dan penalti${billingLabel} sekarang?`)) return;
     
     setIsBillingRunning(true);
     try {
-      const response = await fetch("/api/cron/billing");
+      const response = await fetch("/api/cron/billing", {
+        method: "POST",
+      });
       const result = await response.json();
       
-      alert(result.message); // You can change this to a nice Toast notification later!
+      alert(result.message);
       
       if (result.ok) {
-        fetchBillingStatus(); // Refresh the status lock
-        fetchTunggakanData(); // Refresh the table to show new charges
+        fetchBillingStatus();
+        fetchTunggakanData();
       }
-    } catch (error) {
+    } catch {
       alert("Ralat sistem berlaku semasa menjana bil.");
     } finally {
       setIsBillingRunning(false);
@@ -246,317 +284,185 @@ export default function TunggakanPageClient() {
 
   const today = new Date();
   const isFirstDayOfMonth = today.getDate() === 1;
-  const isManualButtonDisabled = isFirstDayOfMonth || isBilledThisMonth || isBillingRunning;
+  const isManualButtonDisabled = isLoading || isFirstDayOfMonth || isBilledThisMonth || isBillingRunning;
 
   return (
-    <div className="flex flex-col gap-8 pb-20 relative">
+    <main className="relative flex flex-col gap-4 text-[#0B1C30]">
       {/* --- HEADER SECTION --- */}
-      <div>
-        <h1 className="text-3xl font-bold text-dark-blue mb-2">
+      <header>
+        <h1 className="text-2xl font-extrabold text-dark-grey">
           Tunggakan
         </h1>
-        <p className="text-grey">
+        <p className="text-sm font-extralight text-grey/70">
           Halaman ini memaparkan ringkasan dan perincian tunggakan sewa serta caj tambahan bagi setiap penghuni kuarters.
         </p>
-      </div>
+      </header>
 
       {/* --- SUMMARY CARDS --- */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <p className="text-sm text-grey font-medium mb-2">Jumlah Rekod</p>
-          <h2 className="text-3xl font-bold text-dark-blue mb-4">
-            {isLoading ? "RM 0.00" : formatRM(summary.jumlahRekod)}
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-dark-blue"></span>
-            <span className="text-xs font-bold text-dark-blue tracking-wider">TERKINI</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <p className="text-sm text-grey font-medium mb-2">Jumlah Tunggakan</p>
-          <h2 className="text-3xl font-bold text-dark-blue mb-4">
-            {isLoading ? "RM 0.00" : formatRM(summary.jumlahTunggakan)}
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-(--color-red)"></span>
-            <span className="text-xs font-bold text-(--color-red) tracking-wider">PERLU DIKUMPUL</span>
-          </div>
-        </div>
-      </div>
+      <TunggakanSummaryCards 
+        isLoading={isLoading} 
+        summary={filteredSummary} 
+        formatRM={formatRM} 
+      />
 
       {/* --- DATA TABLE SECTION --- */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <section className="min-h-0 flex-1 flex flex-col gap-3 rounded-lg bg-light-blue p-1">
         {/* Table Header Controls */}
-        <div className="p-6 flex justify-between items-start bg-[#F8FAFC]">
-          <div>
-            <h3 className="text-lg font-bold text-dark-blue">Senarai Tunggakan</h3>
-            <p className="text-sm text-grey mt-1">Klik pada ikon kemaskini untuk mengubah maklumat unit.</p>
-          </div>
-          
-          <div className="flex flex-col items-end gap-3">
-            <div className="flex gap-4">
-              {/* NEW: Manual Run Button */}
-              <button 
-                onClick={handleManualRun}
-                disabled={isManualButtonDisabled}
-                className={`px-4 py-2 text-sm font-bold rounded shadow-sm transition-colors flex items-center gap-2
-                  ${isManualButtonDisabled 
-                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed' 
-                    : 'bg-white border border-dark-blue text-dark-blue hover:bg-blue-50'
-                  }`}
-              >
-                <Icon icon={isBillingRunning ? "progress_activity" : "autorenew"} size={18} className={isBillingRunning ? "animate-spin" : ""} />
-                {isBilledThisMonth ? "Caj Bulan Ini Selesai" : isBillingRunning ? "Sedang Menjana..." : "Jana Bil Manual"}
-              </button>
-
-              <ToolbarButton
-                icon="download"
-                label={
-                  activeFilterCount > 0
-                    ? `Eksport ${filteredData.length} rekod ditapis`
-                    : `Eksport semua ${data.length} rekod`
-                }
-                onClick={handleExport}
-                disabled={isLoading || data.length === 0}
-              />
-              <ToolbarButton
-                icon="filter"
-                label="Tapis rekod tunggakan"
-                onClick={() => setIsFilterPanelOpen(true)}
-                isActive={activeFilterCount > 0}
-                activeBadge={activeFilterCount}
-              />
+        <div className="flex flex-col gap-3 pt-3 px-3">
+          <div className="flex w-full items-start justify-between gap-3">
+            {/* Title and Description */}
+            <div>
+              <h3 className="text-lg font-bold">Senarai Tunggakan</h3>
+              <p className="text-xs text-grey">Klik pada ikon kemaskini untuk mengubah maklumat unit.</p>
             </div>
-
-            {/* NEW: Automated Billing Status Text */}
-            <div className="text-xs text-right">
-              <span className="text-grey">Status Caj Automatik: </span>
-              <span className={`font-bold ${isBilledThisMonth ? "text-(--color-green)" : "text-yellow-600"}`}>
-                {isBilledThisMonth ? "Selesai" : "Belum Dijana"}
-              </span>
-              
-              {lastBilledDate && (
-                <span className="text-grey ml-1">
-                  (Terakhir dijana pada {new Date(lastBilledDate).toLocaleString("en-GB", { 
-                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
-                  })})
-                </span>
-              )}
-
-              {/* Safety Lock Warning - Only shows on the 1st of the month if not billed yet */}
-              {isFirstDayOfMonth && !isBilledThisMonth && (
-                <p className="text-red-500 italic mt-1">
-                  Sistem automatik sedang berjalan hari ini. Butang manual dikunci sehingga 2 haribulan.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-light-blue text-grey text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-6 py-4 w-12">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
-                    onChange={handleSelectAll}
-                    checked={selectedIds.length === data.length && data.length > 0 && !isLoading}
-                    disabled={isLoading || data.length === 0}
-                  />
-                </th>
-                <th className="px-6 py-4">PENGHUNI</th>
-                <th className="px-6 py-4">KUARTERS</th>
-                <th className="px-6 py-4 text-right">SEWA (RM)</th>
-                <th className="px-6 py-4 text-right">SENGGARA (RM)</th>
-                <th className="px-6 py-4 text-right">PENALTI (RM)</th>
-                <th className="px-6 py-4 text-right">TAMBAHAN (RM)</th>
-                <th className="px-6 py-4 text-right">REBAT (RM)</th>
-                <th className="px-6 py-4 text-right">TUNGGAKAN (RM)</th>
-                <th className="px-6 py-4 text-center">TINDAKAN</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-grey">
-                    <div className="flex flex-col items-center gap-3">
-                      <Icon
-                        icon="progress_activity"
-                        size={40}
-                        className="animate-spin text-dark-blue"
-                      />
-                      <p className="text-sm font-bold text-dark-blue uppercase tracking-widest animate-pulse">
-                        Sedang Memuatkan...
-                      </p>
-                      <p className="text-xs text-light-grey">Menarik senarai tunggakan dari pelayan</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : data.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-grey">
-                    Tiada rekod tunggakan ditemui.
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue"
-                        checked={selectedIds.includes(row.id)}
-                        onChange={() => handleSelectRow(row.id)}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-dark-grey">{row.fullName}</div>
-                      <div className="text-xs text-light-grey mt-1">{row.icNumber}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-dark-grey">{row.quarterClass}</div>
-                      <div className="text-xs text-light-grey mt-1">{row.unitCode}</div>
-                    </td>
-                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                      {row.sewa.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                      {row.senggara.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                      {row.penalti.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-right font-medium text-dark-grey">
-                      {row.tambahan.toFixed(2)}
-                    </td>
-                    <td className={`px-6 py-4 text-right font-bold ${row.rebat > 0 ? "text-(--color-green)" : "text-dark-grey"}`}>
-                      {row.rebat.toFixed(2)}
-                    </td>
-                    <td className={`px-6 py-4 text-right font-bold ${row.jumlahTunggakan > 0 ? "text-(--color-red)" : "text-dark-grey"}`}>
-                      {row.jumlahTunggakan.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => setViewResidentId(row.id)}
-                        className="text-dark-blue hover:bg-blue-50 p-2 rounded-full transition-colors"
-                      >
-                        <Icon icon="eye" size={20} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Bar */}
-        {!isLoading && data.length > 0 && (
-          <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-grey">
-            <div className="flex items-center gap-1">
-              {/* Prev */}
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                &lt;
-              </button>
-
-              {/* Page Numbers */}
-              {getPageNumbers().map((page, idx) =>
-                page === "..." ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 py-1 text-grey">...</span>
-                ) : (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page as number)}
-                    className={`px-3 py-1 border rounded transition-colors ${
-                      currentPage === page
-                        ? "bg-dark-blue text-white border-dark-blue"
-                        : "hover:bg-gray-50"
-                    }`}
+            
+            {/* Action Buttons */}
+            <div className="flex flex-col items-end gap-3 text-[#607083]">
+              <div className="flex items-center gap-3">
+                {/* Manual Run Button */}
+                <div className="group relative inline-block">
+                  {/* Manual Run Button */}
+                  <button 
+                    onClick={handleManualRun}
+                    disabled={isManualButtonDisabled}
+                    className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition-colors
+                      ${isManualButtonDisabled 
+                        ? 'border-light-grey/20 bg-white text-grey/50 cursor-not-allowed' 
+                        : 'border-light-grey/20 bg-white text-grey hover:border-dark-blue hover:text-dark-blue'
+                      }`}
                   >
-                    {page}
+                    <Icon icon={isBillingRunning ? "progress_activity" : "autorenew"} size={18} className={isBillingRunning ? "animate-spin" : ""} />
+                    {isBilledThisMonth ? `Caj ${targetBillingMonthLabel ?? "Bulan Sasaran"} Selesai` : isBillingRunning ? "Sedang Menjana..." : "Jana Bil Manual"}
                   </button>
-                )
-              )}
 
-              {/* Next */}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                &gt;
-              </button>
+                  {/* Automated Billing Status Text (Hover Tooltip) */}
+                  <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 absolute right-0 top-full z-50 mt-2 rounded-xl border border-light-grey/20 bg-white p-4 shadow-xl transition-all duration-200 pointer-events-none text-xs text-right">
+                    <div className="flex flex-col gap-1">
+                      <div className="whitespace-nowrap">
+                        <span className="font-bold text-black">Status Caj Automatik{targetBillingMonthLabel ? ` (${targetBillingMonthLabel})` : ""}: </span>
+                        <span className={`font-bold ${isBilledThisMonth ? "text-green" : "text-red"}`}>
+                          {isBilledThisMonth ? "Selesai" : "Belum Dijana"}
+                        </span>
+                      </div>
+                      
+                      {lastBilledDate && (
+                        <div className="text-grey text-[11px] whitespace-nowrap">
+                          Terakhir dijana pada {new Date(lastBilledDate).toLocaleString("en-GB", { 
+                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </div>
+                      )}
 
-              {/* Jump to page input — only shown if more than 1 page */}
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2 ml-3 pl-3 border-l border-gray-200">
-                  <span className="text-xs text-grey">Ke halaman:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalPages}
-                    value={pageInput}
-                    onChange={(e) => setPageInput(e.target.value)}
-                    onKeyDown={handlePageInputSubmit}
-                    placeholder={String(currentPage)}
-                    className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-dark-blue"
+                      {/* Safety Lock Warning */}
+                      {isFirstDayOfMonth && !isBilledThisMonth && (
+                        <p className="text-red-500 italic mt-1 border-t border-dashed border-light-grey/20 pt-1 text-center">
+                          Sistem automatik sedang berjalan hari ini. Butang manual dikunci sehingga 2 haribulan.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Tooltip Arrow */}
+                    <div className="absolute right-6 top-0 h-2 w-2 -translate-y-1 rotate-45 border-l border-t border-light-grey/20 bg-white" />
+                  </div>
+                </div>
+
+                {/* Month Filter */}
+                <ArrearsFilterMonth
+                  value={selectedChargeMonth}
+                  onChange={setSelectedChargeMonth}
+                />
+
+                {/* Search Button */}
+                <ArrearsSearch value={searchQuery} isOpen={isSearchOpen} setIsOpen={setIsSearchOpen} />
+
+                {/* Filter Button */}
+                <ArrearsFilter filters={filters} onChange={setFilters} />
+
+                {/* Download Button */}
+                <ArrearsDownload
+                  isLoading={isLoading}
+                  data={data}
+                  filteredData={filteredData}
+                  activeFilterCount={activeFilterCount}
+                  selectedChargeMonthLabel={selectedChargeMonthLabel}
+                />
+              </div>
+            </div>
+          </div>
+
+          {isSearchOpen ? (
+            <div className="w-full rounded-lg bg-white p-4 shadow border border-light-grey/10">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex-1">
+                  <InputField
+                    label="CARIAN MENGIKUT NAMA, IC, KUARTERS"
+                    value={searchQuery}
+                    state="active"
+                    onChange={setSearchQuery}
+                    placeholder="Cth: Ahmad, 123456-78-9012, atau blok B-04"
+                    showLabel
+                    leadingIcon={(
+                      <Icon icon="search" size={18} className="text-light-grey" />
+                    )}
+                    className="w-full"
+                    activeBackgroundClass="bg-light-blue"
+                    inputFontSize={12}
+                    inputMinHeight={40}
                   />
                 </div>
-              )}
-            </div>
 
-            <div>
-              Menunjukkan{" "}
-              <span className="font-bold">
-                {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, data.length)}
-              </span>{" "}
-              Daripada <span className="font-bold">{filteredData.length}</span> Rekod
-                {activeFilterCount > 0 && (
-                  <span className="ml-2 text-xs text-grey">(ditapis daripada {data.length} jumlah rekod)</span>
-                )}
+                <div className="flex items-center gap-3 self-start lg:self-end">
+                  <button
+                    type="button"
+                    className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={!isSearchActive}
+                    onClick={() => setSearchQuery("")}
+                  >
+                    Kosongkan
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          ) : null}
+        </div>
+
+        {/* Table list and pagination */}
+        <TunggakanTable
+          isLoading={isLoading}
+          data={data}
+          filteredData={filteredData}
+          selectedIds={selectedIds}
+          onSelectAll={handleSelectAll}
+          onSelectRow={handleSelectRow}
+          onViewResident={setViewResidentId}
+          selectedChargeMonthLabel={selectedChargeMonthLabel}
+          activeFilterCount={activeFilterCount}
+          filters={filters}
+        />
+      </section>
 
       {/* --- FLOATING 'KEMAS KINI' BUTTON --- */}
-      <div className={`fixed bottom-8 right-8 transition-opacity duration-200 ${selectedIds.length > 0 ? 'opacity-100 z-40' : 'opacity-0 pointer-events-none'}`}>
-        <button 
-          onClick={() => setIsKemasKiniModalOpen(true)}
-          className="flex items-center gap-2 bg-dark-blue text-white px-6 py-3 rounded-lg shadow-lg font-bold hover:bg-opacity-90 transition-all"
-        >
-          <Icon icon="edit" size={20} />
-          KEMAS KINI {selectedIds.length > 0 && `(${selectedIds.length})`}
-        </button>
-      </div>
+      <button 
+        onClick={() => setIsKemasKiniModalOpen(true)}
+        className="fixed bottom-8 right-8 z-40 flex gap-1 p-4 items-center justify-center rounded-lg bg-dark-blue text-white shadow-[0_4px_10px_rgba(0,0,0,0.3)] transition-transform hover:scale-105 active:scale-95"
+      >
+        <Icon icon="edit" size={15} />
+        <span className="font-bold text-xs">Kemas Kini {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}</span>
+      </button>
 
       {/* --- KEMAS KINI MODAL --- */}
       <KemasKiniModal 
         isOpen={isKemasKiniModalOpen} 
         onClose={() => {
           setIsKemasKiniModalOpen(false);
-          // Optional: You can call fetchTunggakanData() here so the table refreshes after they save!
         }} 
+        onSaved={async () => {
+          await fetchTunggakanData();
+          setSelectedIds([]);
+        }}
+        chargeMonth={selectedChargeMonth}
         selectedCount={selectedIds.length} 
         selectedIds={selectedIds}
-      />
-      {/* --- FILTER PANEL --- */}
-      <TunggakanFilterPanel
-        isOpen={isFilterPanelOpen}
-        onClose={() => setIsFilterPanelOpen(false)}
-        data={data}
-        filters={filters}
-        onChange={setFilters}
-        onClear={() => setFilters(defaultFilter)}
-        activeCount={activeFilterCount}
       />
 
       {/* --- BUTIRAN TUNGGAKAN MODAL --- */}
@@ -565,6 +471,6 @@ export default function TunggakanPageClient() {
         onClose={() => setViewResidentId(null)} 
         residentId={viewResidentId} 
       />
-    </div>
+    </main>
   );
 }

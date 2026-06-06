@@ -1,63 +1,204 @@
 "use client";
 
-import Icon from "@/app/components/Icon/Icon";
-import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import FilterOption from "@/app/components/Filter/FilterOption";
+import { InputField as SharedInputField } from "@/app/components/InputField";
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import ToolbarIconButton from "@/app/components/ToolbarIconButton";
+import { bayaranStatusFilters } from "@/lib/payments/bayaran-constants";
+import type { BayaranStatusFilter } from "@/lib/payments/bayaran-types";
 
 type BayaranFilterShellProps = {
-  filterForm: ReactNode;
   children: ReactNode;
   downloadButton: ReactNode;
+  filterQuery: string;
+  isLoading?: boolean;
+  statusFilter: BayaranStatusFilter[];
+  onFilterQueryChange: (value: string) => void;
+  onStatusFilterChange: (values: BayaranStatusFilter[]) => void;
 };
 
+const statusFilterOptions = bayaranStatusFilters.map((status) => ({
+  value: status.value,
+  label: status.label,
+  dotColor: status.dotColor,
+}));
+
 export default function BayaranFilterShell({
-  filterForm,
   children,
   downloadButton,
+  filterQuery,
+  isLoading = false,
+  statusFilter,
+  onFilterQueryChange,
+  onStatusFilterChange,
 }: BayaranFilterShellProps) {
-  const [isFilterOpen, setIsFilterOpen] = useState(true);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLDivElement | null>(null);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(
+    filterQuery.trim().length > 0,
+  );
+  const isSearchFilterActive = filterQuery.trim().length > 0;
+  const isSearchPanelOpen = isSearchOpen || isSearchFilterActive;
+  const isStatusFilterActive = statusFilter.length !== statusFilterOptions.length;
+  const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
+
+  useEffect(() => {
+    if (isSearchPanelOpen) {
+      searchInputRef.current?.querySelector("input")?.focus();
+    }
+  }, [isSearchPanelOpen]);
+
+  useEffect(() => {
+    if (!isFilterMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (filterMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsFilterMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isFilterMenuOpen]);
+
+  function handleToggleSearch() {
+    if (isSearchPanelOpen) {
+      onFilterQueryChange("");
+      setIsSearchOpen(false);
+      return;
+    }
+
+    setIsSearchOpen(true);
+  }
+
+  function handleClearSearch() {
+    onFilterQueryChange("");
+    setIsSearchOpen(false);
+  }
 
   return (
-    <div className="rounded-xl bg-light-blue p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-      <div className="mb-5 flex items-start justify-between">
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
+      <div className="flex items-start justify-between gap-4 px-3 pt-3">
         <div>
-          <h2 className="text-lg font-extrabold leading-tight text-[#07162F]">
+          <h2 className="text-lg font-bold text-dark-grey">
             Senarai Rekod Bayaran
           </h2>
-          <p className="text-xs font-medium text-[#344054]">
+          <p className="text-xs text-grey">
             Rekod bayaran terkini.
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 text-[#607083]">
+          <ToolbarIconButton
+            icon={commonIcons.search}
+            label="Cari rekod bayaran"
+            isActive={isSearchPanelOpen}
+            onClick={handleToggleSearch}
+          />
+          <div ref={filterMenuRef} className="relative">
+            <ToolbarIconButton
+              icon={commonIcons.filter}
+              label={`Tapis status bayaran: ${getStatusFilterLabel(statusFilter)}`}
+              isActive={isFilterButtonActive}
+              hasPopup="menu"
+              isExpanded={isFilterMenuOpen}
+              onClick={() => {
+                setIsFilterMenuOpen((value) => !value);
+              }}
+            />
+
+            {isFilterMenuOpen ? (
+              <FilterOption
+                ariaLabel="Tapisan status bayaran"
+                defaultLabel="Semua Status"
+                optionSets={[
+                  {
+                    title: "Status Bayaran",
+                    options: statusFilterOptions,
+                    selectedValues: statusFilter,
+                  },
+                ]}
+                onChange={(sets) => onStatusFilterChange(sets[0]?.selectedValues ?? [])}
+              />
+            ) : null}
+          </div>
           {downloadButton}
-          <button
-            type="button"
-            onClick={() => setIsFilterOpen((value) => !value)}
-            aria-label={isFilterOpen ? "Tutup tapisan rekod bayaran" : "Buka tapisan rekod bayaran"}
-            aria-expanded={isFilterOpen}
-            className={[
-              "relative inline-flex h-10 w-10 items-center justify-center rounded-lg border p-2 transition-colors",
-              isFilterOpen
-                ? "border-dark-blue bg-dark-blue text-white hover:bg-[#101966]"
-                : "border-light-grey/20 bg-white text-dark-blue hover:border-dark-blue",
-            ].join(" ")}
-            title={isFilterOpen ? "Tutup tapisan rekod bayaran" : "Buka tapisan rekod bayaran"}
-          >
-            <Icon icon="filter" size={20} />
-          </button>
         </div>
       </div>
 
-      {isFilterOpen ? filterForm : null}
+      {isSearchPanelOpen ? (
+        <div className="mt-3 px-3">
+          <div className="rounded-lg bg-white p-4 shadow">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div ref={searchInputRef} className="flex-1">
+                <SharedInputField
+                  label="CARIAN REKOD BAYARAN"
+                  value={filterQuery}
+                  state="active"
+                  onChange={onFilterQueryChange}
+                  placeholder="Contoh: Ahmad, 850212-01-1234, Kelas A atau A-01-05"
+                  showLabel
+                  leadingIcon={(
+                    <Icon
+                      icon={commonIcons.search}
+                      size={18}
+                      className="text-light-grey"
+                    />
+                  )}
+                  className="w-full"
+                  activeBackgroundClass="bg-light-blue"
+                  inputFontSize={12}
+                  inputMinHeight={40}
+                />
+              </div>
 
-      <div
-        className={[
-          "overflow-hidden bg-white shadow-sm",
-          isFilterOpen ? "rounded-b-xl" : "rounded-xl",
-        ].join(" ")}
-      >
-        {children}
-      </div>
-    </div>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!isSearchFilterActive}
+                onClick={handleClearSearch}
+              >
+                Kosongkan
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">{children}</div>
+    </section>
   );
+}
+
+function getStatusFilterLabel(statuses: BayaranStatusFilter[]) {
+  if (statuses.length === statusFilterOptions.length) {
+    return "Semua Status";
+  }
+
+  if (statuses.length === 0) {
+    return "Tiada Status";
+  }
+
+  return statuses
+    .map(
+      (status) =>
+        statusFilterOptions.find((option) => option.value === status)?.label ??
+        status,
+    )
+    .join(", ");
 }

@@ -13,6 +13,7 @@ export async function GET(request: Request) {
       dateTo: searchParams.get("dateTo") ?? undefined,
       actionType: searchParams.get("actionType") ?? undefined,
       adminId: searchParams.get("adminId") ?? undefined,
+      search: searchParams.get("search") ?? undefined,
     });
     const records = await getAuditLogExportRows(filters);
 

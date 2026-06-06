@@ -163,20 +163,20 @@ export default function PenghuniComplete({
         />
       </div>
 
-      <div className="grid items-start gap-4 md:grid-cols-8">
+      <div className="grid items-start gap-4 md:grid-cols-4">
         <InputField
           label="TARIKH MASUK"
           value={formatDate(currentOccupancy?.moveInDate ?? null)}
           state="inactive"
           inactiveBackgroundClass="bg-[#EEF4FF]"
-          className="md:col-span-3"
+          className="md:col-span-1"
         />
         <InputField
           label="TARIKH KELUAR"
           value={formatDate(currentOccupancy?.moveOutDate ?? null)}
           state="inactive"
           inactiveBackgroundClass="bg-[#EEF4FF]"
-          className="md:col-span-3"
+          className="md:col-span-1"
         />
         <InputField
           label="STATUS"

@@ -19,8 +19,9 @@ export type AuditActionTypeFilter = (typeof AUDIT_ACTION_TYPE_OPTIONS)[number];
 export type AuditLogFilters = {
   dateFrom?: string;
   dateTo?: string;
-  actionType?: AuditActionTypeFilter;
+  actionType?: string;
   adminId?: string;
+  search?: string;
 };
 
 type AuditActor = {
@@ -178,6 +179,7 @@ export function parseAuditLogFilters(input: {
   dateTo?: string;
   actionType?: string;
   adminId?: string;
+  search?: string;
 }): AuditLogFilters {
   const filters: AuditLogFilters = {};
 
@@ -189,12 +191,18 @@ export function parseAuditLogFilters(input: {
     filters.dateTo = input.dateTo;
   }
 
-  if (isAuditActionTypeFilter(input.actionType)) {
-    filters.actionType = input.actionType;
+  const normalizedActionType = normalizeActionTypeInput(input.actionType);
+  if (normalizedActionType) {
+    filters.actionType = normalizedActionType;
   }
 
-  if (input.adminId?.trim()) {
-    filters.adminId = input.adminId.trim();
+  const normalizedAdminId = normalizeCsvInput(input.adminId);
+  if (normalizedAdminId) {
+    filters.adminId = normalizedAdminId;
+  }
+
+  if (input.search?.trim()) {
+    filters.search = input.search.trim();
   }
 
   return filters;
@@ -202,7 +210,11 @@ export function parseAuditLogFilters(input: {
 
 export function hasActiveAuditLogFilters(filters: AuditLogFilters) {
   return Boolean(
-    filters.dateFrom || filters.dateTo || filters.actionType || filters.adminId,
+    filters.dateFrom ||
+      filters.dateTo ||
+      filters.actionType ||
+      filters.adminId ||
+      filters.search,
   );
 }
 
@@ -310,11 +322,90 @@ function buildAuditLogWhere(filters: AuditLogFilters): Prisma.AuditLogWhereInput
   }
 
   if (filters.actionType) {
-    filterConditions.push({ actionType: filters.actionType });
+    if (filters.actionType === "none") {
+      // Force an empty result set with a valid DateTime condition.
+      filterConditions.push({
+        timestamp: {
+          lt: new Date("1970-01-01T00:00:00.000Z"),
+          gt: new Date(),
+        },
+      });
+    } else {
+      const actionTypes = filters.actionType
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value): value is AuditActionTypeFilter => isAuditActionTypeFilter(value));
+
+      if (actionTypes.length === 1) {
+        filterConditions.push({ actionType: actionTypes[0] });
+      } else if (actionTypes.length > 1) {
+        filterConditions.push({ actionType: { in: actionTypes } });
+      }
+    }
   }
 
   if (filters.adminId) {
-    filterConditions.push({ userId: filters.adminId });
+    if (filters.adminId === "none") {
+      // Force an empty result set with a valid DateTime condition.
+      filterConditions.push({
+        timestamp: {
+          lt: new Date("1970-01-01T00:00:00.000Z"),
+          gt: new Date(),
+        },
+      });
+    } else {
+      const adminIds = filters.adminId
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      if (adminIds.length === 1) {
+        filterConditions.push({ userId: adminIds[0] });
+      } else if (adminIds.length > 1) {
+        filterConditions.push({ userId: { in: adminIds } });
+      }
+    }
+  }
+
+  if (filters.search) {
+    const search = filters.search.trim();
+
+    if (search) {
+      const searchableConditions: Prisma.AuditLogWhereInput[] = [
+        {
+          userName: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          moduleName: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
+          targetData: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+      ];
+
+      if (isAuditActionTypeFilter(search)) {
+        searchableConditions.push({ actionType: search });
+      }
+
+      filterConditions.push({
+        OR: searchableConditions,
+      });
+    }
   }
 
   return {
@@ -326,6 +417,58 @@ function isAuditActionTypeFilter(
   value: string | undefined,
 ): value is AuditActionTypeFilter {
   return AUDIT_ACTION_TYPE_OPTIONS.includes(value as AuditActionTypeFilter);
+}
+
+function normalizeActionTypeInput(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (trimmed === "none") {
+    return "none";
+  }
+
+  const validValues = Array.from(
+    new Set(
+      trimmed
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item): item is AuditActionTypeFilter => isAuditActionTypeFilter(item)),
+    ),
+  );
+
+  return validValues.length > 0 ? validValues.join(",") : undefined;
+}
+
+function normalizeCsvInput(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (trimmed === "none") {
+    return "none";
+  }
+
+  const values = Array.from(
+    new Set(
+      trimmed
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  return values.length > 0 ? values.join(",") : undefined;
 }
 
 function isValidDateInput(value: string | undefined) {

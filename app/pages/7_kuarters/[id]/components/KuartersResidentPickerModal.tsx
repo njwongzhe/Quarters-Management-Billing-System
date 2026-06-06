@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import {
   PaginationControls,
   usePaginationLogic,
@@ -43,7 +44,6 @@ export default function KuartersResidentPickerModal({
     startIndex,
     endIndex,
     handlePageChange,
-    paginationItems,
   } = usePaginationLogic(residents.length, itemsPerPage);
   const paginatedResidents = residents.slice(startIndex, endIndex);
 
@@ -66,7 +66,7 @@ export default function KuartersResidentPickerModal({
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    handlePageChange("goto", 1);
+    handlePageChange(1);
   }, [searchQuery]);
 
   if (!isOpen) {
@@ -75,7 +75,7 @@ export default function KuartersResidentPickerModal({
 
   return (
     <div
-      className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-center justify-center"
+      className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 p-12 backdrop-blur-md flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="resident-picker-title"
@@ -166,38 +166,33 @@ export default function KuartersResidentPickerModal({
                 </thead>
                 <tbody className="bg-white">
                   {isLoading ? (
-                    <tr className="text-sm">
-                      <td
-                        colSpan={4}
-                        className="px-4 py-4 text-center text-grey"
-                      >
-                        Memuatkan senarai penghuni...
-                      </td>
-                    </tr>
+                    loadingTableRows({
+                      mode: "loading",
+                      columnCount: 4,
+                      rowCount: 10,
+                    })
                   ) : null}
 
                   {!isLoading && residents.length === 0 ? (
-                    <tr className="text-sm">
-                      <td
-                        colSpan={4}
-                        className="px-4 py-4 text-center text-grey"
-                      >
-                        Tiada penghuni tersedia yang sepadan dengan carian semasa.
-                      </td>
-                    </tr>
+                    loadingTableRows({
+                      mode: "message",
+                      columnCount: 4,
+                      rowCount: 1,
+                      message:
+                        "Tiada penghuni tersedia yang sepadan dengan carian semasa.",
+                    })
                   ) : null}
 
                   {!isLoading
                     ? paginatedResidents.map((resident) => {
                         const isSelected =
                           resident.icNumber === selectedResidentIcNumber;
-                        const hasCurrentUnit = resident.hasCurrentUnit;
-                        const isActionDisabled = isSelected || hasCurrentUnit;
+                        const isActionDisabled = isSelected;
 
                         return (
                           <tr
                             key={resident.id}
-                            className="border-b border-b-light-grey/20 text-sm transition-colors"
+                            className="border-b border-b-light-grey/20 text-sm transition-colors hover:bg-background/60"
                           >
                             <td
                               className="px-4 py-3 text-left font-bold text-dark-grey w-min whitespace-nowrap"
@@ -230,9 +225,7 @@ export default function KuartersResidentPickerModal({
                               >
                                 {isSelected
                                   ? "Dipilih"
-                                  : hasCurrentUnit
-                                    ? "Didiami"
-                                    : "Pilih"}
+                                  : "Pilih"}
                               </button>
                             </td>
                           </tr>
@@ -253,7 +246,6 @@ export default function KuartersResidentPickerModal({
                         startIndex={startIndex}
                         endIndex={endIndex}
                         totalRecords={residents.length}
-                        paginationItems={paginationItems}
                         onPageChange={handlePageChange}
                       />
                     </td>

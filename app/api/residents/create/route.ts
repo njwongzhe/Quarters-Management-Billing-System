@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ResidentStatus } from "@prisma/client";
 
+import {
+    formatAuditTarget,
+    recordDataAuditLog,
+} from "@/lib/audit/data-audit";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "../../../../lib/prisma";
 
 // Error response helper
@@ -39,7 +44,6 @@ function normalizeResidentStatus(status: unknown): ResidentStatus {
     case "TIDAK_LAYAK":
     case "PENCEN_MENDATANG":
     case "DATA_TIDAK_LENGKAP":
-    case "KELUAR":
       return normalized as ResidentStatus;
     default:
       return "AKTIF" as ResidentStatus;
@@ -51,6 +55,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
     try {
+        const currentAdmin = await getCurrentAdmin();
         const body = await req.json();
 
         // Validate required fields
@@ -81,31 +86,52 @@ export async function POST(req: NextRequest) {
         const desiredStatus = normalizeResidentStatus(status);
         const initialStatus: ResidentStatus = (desiredStatus === "AKTIF" || desiredStatus === "TIDAK_LAYAK") ? desiredStatus : "AKTIF";
 
-        const newResident = await prisma.resident.create({
-            data: {
-                fullName: String(fullName).trim(),
-                icNumber: normalizedIcNumber,
-                phone: phone || null,
-                email: email || null,
-                position: position || null,
-                department: department || null,
-                serviceLevel: serviceLevel || null,
-                status: initialStatus,
-                description: description || null,
-            },
-            include: {
-                occupancies: {
-                    where: { status: "CURRENT" },
-                    include: {
-                        unit: {
-                            include: {
-                                quarterCategory: true,
+        const newResident = await prisma.$transaction(async (tx) => {
+            const resident = await tx.resident.create({
+                data: {
+                    fullName: String(fullName).trim(),
+                    icNumber: normalizedIcNumber,
+                    phone: phone || null,
+                    email: email || null,
+                    position: position || null,
+                    department: department || null,
+                    serviceLevel: serviceLevel || null,
+                    status: initialStatus,
+                    description: description || null,
+                },
+                include: {
+                    occupancies: {
+                        where: { status: "CURRENT" },
+                        include: {
+                            unit: {
+                                include: {
+                                    quarterCategory: true,
+                                },
                             },
                         },
                     },
+                    arrearsSummary: true,
                 },
-                arrearsSummary: true,
-            },
+            });
+
+            await recordDataAuditLog(tx, {
+                actor: currentAdmin,
+                moduleName: "Pengurusan Penghuni",
+                actionType: "CREATE",
+                target: formatAuditTarget([resident.fullName, `No. KP ${resident.icNumber}`]),
+                entityType: "RESIDENT",
+                entityId: resident.id,
+                summary: "Menambah rekod penghuni baharu ke dalam sistem.",
+                details: [
+                    `Status awal ditetapkan kepada ${resident.status}.`,
+                    resident.phone ? `No. telefon: ${resident.phone}.` : null,
+                    resident.email ? `Emel: ${resident.email}.` : null,
+                    resident.department ? `Jabatan: ${resident.department}.` : null,
+                    resident.position ? `Jawatan: ${resident.position}.` : null,
+                ],
+            });
+
+            return resident;
         });
 
         // Map to ResidentRecord format

@@ -2,7 +2,11 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import type { ExtractResult } from "@/app/pages/2_muat_naik/components/extract-review-shared";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 import {
@@ -37,6 +41,43 @@ type DraftUpdateKind = ExtractResult["documentType"];
 type DraftUpdateRouteContext = {
   params: Promise<{ id: string }>;
 };
+
+type DraftAuditActor = Awaited<ReturnType<typeof getCurrentAdmin>>;
+
+async function recordUploadedDocumentDraftAudit(
+  tx: Prisma.TransactionClient,
+  currentAdmin: DraftAuditActor,
+  uploadedDocumentId: string,
+  input: {
+    summary: string;
+    details?: Array<string | null | undefined | false>;
+  },
+) {
+  const document = await tx.uploadedDocument.findUnique({
+    where: { id: uploadedDocumentId },
+    select: {
+      category: true,
+      fileName: true,
+      originalName: true,
+    },
+  });
+
+  await recordDataAuditLog(tx, {
+    actor: currentAdmin,
+    moduleName: "Muat Naik",
+    actionType: "UPDATE",
+    target: formatAuditTarget([
+      document?.category ?? "DOKUMEN",
+      document?.originalName ?? document?.fileName ?? uploadedDocumentId,
+    ]),
+    summary: input.summary,
+    details: [
+      `Kategori dokumen: ${document?.category ?? "DOKUMEN"}.`,
+      `Nama fail: ${document?.originalName ?? document?.fileName ?? uploadedDocumentId}.`,
+      ...(input.details ?? []),
+    ],
+  });
+}
 
 export async function updateUploadedDocumentDraftForKind(
   kind: DraftUpdateKind,
@@ -139,12 +180,44 @@ export async function updateUploadedDocumentDraftForKind(
         throw new Error("Data ekstrak tidak lengkap.");
       }
 
-      await createAuditLog(tx, {
-        actor: currentAdmin,
-        moduleName: "Muat Naik",
-        targetData: `${existingDocument.category} / ${existingDocument.originalName ?? existingDocument.fileName}`,
-        actionType: "UPDATE",
-        description: `Mengemaskini draf ekstrak dokumen ${existingDocument.category}: ${existingDocument.originalName ?? existingDocument.fileName}.`,
+      await recordUploadedDocumentDraftAudit(tx, currentAdmin, uploadedDocumentId, {
+        summary: "Mengemaskini draf ekstrak dokumen sebelum pengesahan.",
+        details: [
+          action ? `Tindakan draf: ${action}.` : "Tindakan draf: kemas kini pukal.",
+          extractResult
+            ? `Jumlah rekod draf selepas kemas kini: ${formatAuditValue(extractResult.records.length)}.`
+            : null,
+          kind === "kuarters" && action === "update-kuarters-category"
+            ? `Kategori dikemas kini: ${formatAuditValue(
+                "categoryName" in payload
+                  ? (payload as { categoryName?: unknown }).categoryName
+                  : null,
+              )}; alamat: ${formatAuditValue(
+                "address" in payload
+                  ? (payload as { address?: unknown }).address
+                  : null,
+              )}; sewa: RM ${formatAuditValue(
+                "rentalPrice" in payload
+                  ? (payload as { rentalPrice?: unknown }).rentalPrice
+                  : null,
+              )}; penyelenggaraan: RM ${formatAuditValue(
+                "maintenancePrice" in payload
+                  ? (payload as { maintenancePrice?: unknown }).maintenancePrice
+                  : null,
+              )}; penalti: RM ${formatAuditValue(
+                "penaltyPrice" in payload
+                  ? (payload as { penaltyPrice?: unknown }).penaltyPrice
+                  : null,
+              )}.`
+            : null,
+          kind === "kuarters" && action === "update-kuarters-unit"
+            ? `Unit dikemas kini: ${formatAuditValue(
+                "unitCode" in payload
+                  ? (payload as { unitCode?: unknown }).unitCode
+                  : null,
+              )}.`
+            : null,
+        ],
       });
 
       return existingDocument;
@@ -182,10 +255,35 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
         (action === "delete-kuarters-unit" ||
           action === "delete-kuarters-category")
       ) {
-        await getCurrentAdmin();
+        const currentAdmin = await getCurrentAdmin();
 
         if (action === "delete-kuarters-unit") {
-          await deleteKuartersUnitDraft(prisma, id, payload);
+          await prisma.$transaction(
+            async (tx: Prisma.TransactionClient) => {
+              await deleteKuartersUnitDraft(tx, id, payload);
+              await recordUploadedDocumentDraftAudit(tx, currentAdmin, id, {
+                summary: "Memadam unit kuarters daripada draf semakan.",
+                details: [
+                  `ID kategori draf: ${formatAuditValue(
+                    "categoryId" in payload
+                      ? (payload as { categoryId?: unknown }).categoryId
+                      : null,
+                  )}.`,
+                  `ID unit draf: ${formatAuditValue(
+                    "unitId" in payload
+                      ? (payload as { unitId?: unknown }).unitId
+                      : null,
+                  )}.`,
+                  `Kod unit: ${formatAuditValue(
+                    "unitCode" in payload
+                      ? (payload as { unitCode?: unknown }).unitCode
+                      : null,
+                  )}.`,
+                ],
+              });
+            },
+            uploadedDocumentTransactionOptions,
+          );
 
           return NextResponse.json({
             success: true,
@@ -196,7 +294,27 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
           });
         }
 
-        await deleteKuartersCategoryDraft(prisma, id, payload);
+        await prisma.$transaction(
+          async (tx: Prisma.TransactionClient) => {
+            await deleteKuartersCategoryDraft(tx, id, payload);
+            await recordUploadedDocumentDraftAudit(tx, currentAdmin, id, {
+              summary: "Memadam kategori kuarters daripada draf semakan.",
+              details: [
+                `ID kategori draf: ${formatAuditValue(
+                  "categoryId" in payload
+                    ? (payload as { categoryId?: unknown }).categoryId
+                    : null,
+                )}.`,
+                `Nama kategori: ${formatAuditValue(
+                  "categoryName" in payload
+                    ? (payload as { categoryName?: unknown }).categoryName
+                    : null,
+                )}.`,
+              ],
+            });
+          },
+          uploadedDocumentTransactionOptions,
+        );
 
         return NextResponse.json({
           success: true,
@@ -216,7 +334,7 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
           action === "update-tunggakan-record" ||
           action === "delete-penghuni-record")
       ) {
-        await getCurrentAdmin();
+        const currentAdmin = await getCurrentAdmin();
 
         if (action === "delete-penghuni-record") {
           const residentId =
@@ -228,7 +346,19 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
             throw new Error("Rekod penghuni tidak ditemui.");
           }
 
-          await deletePenghuniDraft(prisma, id, residentId);
+          await prisma.$transaction(
+            async (tx: Prisma.TransactionClient) => {
+              await deletePenghuniDraft(tx, id, residentId);
+              await recordUploadedDocumentDraftAudit(tx, currentAdmin, id, {
+                summary: "Memadam rekod penghuni daripada draf semakan.",
+                details: [
+                  `ID rekod draf penghuni: ${residentId}.`,
+                  "Rekod ini tidak akan disahkan atau dimasukkan ke data penghuni.",
+                ],
+              });
+            },
+            uploadedDocumentTransactionOptions,
+          );
 
           return NextResponse.json({
             success: true,
@@ -244,10 +374,28 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
             throw new Error("Data tunggakan tidak lengkap.");
           }
 
-          const updatedRecord = await updateTunggakanDraft(
-            prisma,
-            id,
-            record as Parameters<typeof updateTunggakanDraft>[2],
+          const updatedRecord = await prisma.$transaction(
+            async (tx: Prisma.TransactionClient) => {
+              const result = await updateTunggakanDraft(
+                tx,
+                id,
+                record as Parameters<typeof updateTunggakanDraft>[2],
+              );
+              await recordUploadedDocumentDraftAudit(tx, currentAdmin, id, {
+                summary: "Mengemaskini satu rekod tunggakan dalam draf semakan.",
+                details: [
+                  `Nama penghuni: ${formatAuditValue(result.nama)}.`,
+                  `No. KP: ${formatAuditValue(result.noKadPengenalan)}.`,
+                  `Jumlah tunggakan: RM ${formatAuditValue(result.jumlahTunggakan)}.`,
+                  `Status import selepas kemas kini: ${formatAuditValue(result.importStatus)}.`,
+                  result.importMessage
+                    ? `Catatan import: ${result.importMessage}`
+                    : null,
+                ],
+              });
+              return result;
+            },
+            uploadedDocumentTransactionOptions,
           );
 
           return NextResponse.json({
@@ -264,10 +412,27 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
             throw new Error("Data bayaran tidak lengkap.");
           }
 
-          const updatedRecord = await updateBayaranDraft(
-            prisma,
-            id,
-            record as Parameters<typeof updateBayaranDraft>[2],
+          const updatedRecord = await prisma.$transaction(
+            async (tx: Prisma.TransactionClient) => {
+              const result = await updateBayaranDraft(
+                tx,
+                id,
+                record as Parameters<typeof updateBayaranDraft>[2],
+              );
+              await recordUploadedDocumentDraftAudit(tx, currentAdmin, id, {
+                summary: "Mengemaskini satu rekod bayaran dalam draf semakan.",
+                details: [
+                  `Nama pembayar: ${formatAuditValue(result.nama)}.`,
+                  `No. KP: ${formatAuditValue(result.noGajiNoKp)}.`,
+                  `Tarikh bayaran: ${formatAuditValue(result.tarikh)}.`,
+                  `No. rujukan/resit: ${formatAuditValue(result.noRujukan)}.`,
+                  `Amaun bayaran: RM ${formatAuditValue(result.amaunRm)}.`,
+                  `Rekod asal ditemui: ${formatAuditValue(result.isExisted)}.`,
+                ],
+              });
+              return result;
+            },
+            uploadedDocumentTransactionOptions,
           );
 
           return NextResponse.json({
@@ -283,10 +448,30 @@ export function createUploadedDocumentDraftUpdateHandler(kind: DraftUpdateKind) 
           throw new Error("Data penghuni tidak lengkap.");
         }
 
-        const updatedRecord = await updatePenghuniDraft(
-          prisma,
-          id,
-          record as Parameters<typeof updatePenghuniDraft>[2],
+        const updatedRecord = await prisma.$transaction(
+          async (tx: Prisma.TransactionClient) => {
+            const result = await updatePenghuniDraft(
+              tx,
+              id,
+              record as Parameters<typeof updatePenghuniDraft>[2],
+            );
+            await recordUploadedDocumentDraftAudit(tx, currentAdmin, id, {
+              summary: "Mengemaskini satu rekod penghuni dalam draf semakan.",
+              details: [
+                `Nama penghuni: ${formatAuditValue(result.nama)}.`,
+                `No. KP: ${formatAuditValue(result.noKadPengenalan)}.`,
+                `No. telefon: ${formatAuditValue(result.perhubungan)}.`,
+                `Emel: ${formatAuditValue(result.gmail)}.`,
+                `Kuarters/unit: ${formatAuditTarget([
+                  result.kuarters,
+                  result.unit,
+                ])}.`,
+                `Rekod asal ditemui: ${formatAuditValue(result.isExisted)}.`,
+              ],
+            });
+            return result;
+          },
+          uploadedDocumentTransactionOptions,
         );
 
         return NextResponse.json({

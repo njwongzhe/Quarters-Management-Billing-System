@@ -1,180 +1,299 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateTransactionNo } from "@/lib/transactions/transactions"; // Ensure this path is correct
+import {
+  getBillingDateKey,
+  getPreviousBillingPeriod,
+} from "@/lib/billing/billing-period";
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import { calculateOccupancyProrationForMonth } from "@/lib/quarters/unit-occupancy-rules";
+import { generateTransactionNos } from "@/lib/transactions/transactions"; // Ensure this path is correct
 
-// Vercel Cron Jobs send a GET request
+// Vercel Cron Jobs send a GET request with Authorization: Bearer <CRON_SECRET>.
 export async function GET(request: Request) {
-  try {
-    //todo
-    // 1. SECURE THE ROUTE (Optional but recommended for Vercel)
-    // const authHeader = request.headers.get('authorization');
-    // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    //   return new NextResponse('Unauthorized', { status: 401 });
-    // }
+  const cronSecret = process.env.CRON_SECRET;
 
-    // 2. IDENTIFY THE CURRENT BILLING MONTH
+  if (!cronSecret) {
+    return NextResponse.json(
+      { ok: false, message: "CRON_SECRET belum ditetapkan dalam .env." },
+      { status: 500 },
+    );
+  }
+
+  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return NextResponse.json(
+      { ok: false, message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  return runBillingGeneration(null);
+}
+
+// Manual generation from the Tunggakan page uses the normal authenticated session.
+export async function POST() {
+  const currentAdmin = await getCurrentAdmin();
+
+  if (!currentAdmin) {
+    return NextResponse.json(
+      { ok: false, message: "Sesi tamat. Sila log masuk semula." },
+      { status: 401 },
+    );
+  }
+
+  return runBillingGeneration(currentAdmin);
+}
+
+async function runBillingGeneration(
+  actor: Awaited<ReturnType<typeof getCurrentAdmin>>,
+) {
+  try {
+    // 2. IDENTIFY THE TARGET BILLING MONTH
     const today = new Date();
-    // We force the date to the 1st of the current month (e.g., 2026-05-01 00:00:00)
-    const currentBillingMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    // Calculate total days in the current month for prorated math
-    const totalDaysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const {
+      billingMonth,
+      billingMonthEnd,
+      startDateKey,
+      endDateKey,
+      label: billingMonthLabel,
+    } = getPreviousBillingPeriod(today);
 
     // 3. THE SAFETY CHECK (THE LOCK)
     const existingCycle = await prisma.billingCycle.findUnique({
-      where: { billingMonth: currentBillingMonth }
+      where: { billingMonth }
     });
 
     if (existingCycle && existingCycle.success) {
       // Abort safely! It has already been run this month.
       return NextResponse.json({ 
         ok: true, 
-        message: `Batal: Caj untuk bulan ${currentBillingMonth.toLocaleDateString()} telah pun dijana.`,
+        message: `Batal: Caj untuk bulan ${billingMonthLabel} telah pun dijana.`,
         data: existingCycle 
       });
     }
 
-    // 4. FETCH ACTIVE RESIDENTS AND THEIR UNITS
-    // We only want people who actually have a 'CURRENT' unit occupancy
+    // 4. FETCH RESIDENTS WHO OCCUPIED A UNIT DURING THE TARGET BILLING MONTH
     const residentsInfo = await prisma.resident.findMany({
       where: {
-        recordStatus: "VERIFIED",
-        occupancies: { some: { status: "CURRENT" } }
+        occupancies: {
+          some: {
+            moveInDate: { lte: billingMonthEnd },
+            OR: [
+              { status: "CURRENT" },
+              { moveOutDate: { gte: billingMonth } }
+            ]
+          }
+        }
       },
       include: {
         occupancies: {
-          where: { status: "CURRENT" },
+          where: {
+            moveInDate: { lte: billingMonthEnd },
+            OR: [
+              { status: "CURRENT" },
+              { moveOutDate: { gte: billingMonth } }
+            ]
+          },
+          orderBy: { moveInDate: "desc" },
           include: { unit: { include: { quarterCategory: true } } }
         }
       }
     });
 
-    let recordsProcessed = 0;
+    const currentCharges = await prisma.monthlyCharge.findMany({
+      where: {
+        chargeMonth: billingMonth,
+        residentId: { in: residentsInfo.map((resident) => resident.id) }
+      }
+    });
 
-    // 5. RUN THE MASSIVE DATABASE TRANSACTION
-    await prisma.$transaction(async (tx) => {
-      
-      for (const resident of residentsInfo) {
-        const occupancy = resident.occupancies[0]; // Assuming 1 active unit per resident
-        if (!occupancy || !occupancy.unit.quarterCategory) continue;
+    const chargeByResidentId = new Map(
+      currentCharges.map((charge) => [charge.residentId, charge])
+    );
+
+    const billableItems = residentsInfo.flatMap((resident) =>
+      resident.occupancies.flatMap((occupancy) => {
+        const moveInKey = getBillingDateKey(occupancy.moveInDate);
+        const moveOutKey = occupancy.moveOutDate
+          ? getBillingDateKey(occupancy.moveOutDate)
+          : null;
+        const overlapsBillingMonth =
+          moveInKey <= endDateKey && (!moveOutKey || moveOutKey >= startDateKey);
+
+        if (!overlapsBillingMonth || !occupancy.unit.quarterCategory) {
+          return [];
+        }
 
         const categoryPrices = occupancy.unit.quarterCategory;
         const standardRental = Number(categoryPrices.rentalPrice);
         const penaltyAmount = Number(categoryPrices.penaltyPrice);
-
-        // --- MATH: CALCULATE PRORATED RENT (FOR MOVE-OUTS) ---
-        let finalRentalToCharge = standardRental;
-        
-        // If they have a moveOutDate AND it falls within this current billing month
-        if (occupancy.moveOutDate) {
-          const moveOutDate = new Date(occupancy.moveOutDate);
-          if (moveOutDate.getFullYear() === currentBillingMonth.getFullYear() && 
-              moveOutDate.getMonth() === currentBillingMonth.getMonth()) {
-            
-            // They only pay for the days they stayed
-            const daysStayed = moveOutDate.getDate();
-            finalRentalToCharge = (standardRental / totalDaysInMonth) * daysStayed;
-          }
-        }
-
-        // --- DATABASE ACTIONS FOR THIS RESIDENT ---
-        
-        // A. Find or Create the Monthly Charge Summary
-        let monthlyCharge = await tx.monthlyCharge.findUnique({
-          where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth: currentBillingMonth } }
+        const currentCharge = chargeByResidentId.get(resident.id);
+        const proration = calculateOccupancyProrationForMonth(billingMonth, {
+          moveInDate: occupancy.moveInDate,
+          moveOutDate: occupancy.moveOutDate,
         });
+        const finalRentalToCharge =
+          (standardRental / proration.totalDaysInMonth) * proration.daysStayed;
+        const finalPenaltyToCharge =
+          (penaltyAmount / proration.totalDaysInMonth) * proration.daysStayed;
+        const rentalToAdd =
+          !currentCharge || Number(currentCharge.rentalAmount) === 0
+            ? Number(finalRentalToCharge.toFixed(2))
+            : 0;
+        const penaltyToAdd =
+          resident.status === "TIDAK_LAYAK" &&
+          (!currentCharge || Number(currentCharge.penaltyAmount) === 0)
+            ? Number(finalPenaltyToCharge.toFixed(2))
+            : 0;
+        const totalNewCharges = rentalToAdd + penaltyToAdd;
 
-        if (!monthlyCharge) {
-          monthlyCharge = await tx.monthlyCharge.create({
-            data: {
-              residentId: resident.id,
-              chargeMonth: currentBillingMonth,
-              unitId: occupancy.unitId,
-              rentalAmount: finalRentalToCharge, // Set the rental
-              penaltyAmount: resident.status === "TIDAK_LAYAK" ? penaltyAmount : 0 // Apply Penalty if TIDAK_LAYAK
-            }
+        if (totalNewCharges <= 0) return [];
+
+        return [
+          {
+            residentId: resident.id,
+            unitId: occupancy.unitId,
+            moveOutDate: occupancy.moveOutDate,
+            rentalToAdd,
+            penaltyToAdd,
+            totalNewCharges,
+          },
+        ];
+      }),
+    );
+
+    const transactionCount = billableItems.reduce((count, item) => {
+      return count + (item.rentalToAdd > 0 ? 1 : 0) + (item.penaltyToAdd > 0 ? 1 : 0);
+    }, 0);
+    const transactionNos = await generateTransactionNos(prisma, transactionCount);
+    let transactionNoIndex = 0;
+    const chunkSize = 10;
+
+    for (let index = 0; index < billableItems.length; index += chunkSize) {
+      const chunk = billableItems.slice(index, index + chunkSize);
+      const transactionsToCreate = chunk.flatMap((item) => {
+        const transactions = [];
+
+        if (item.rentalToAdd > 0) {
+          transactions.push({
+            transactionNo: transactionNos[transactionNoIndex++],
+            residentId: item.residentId,
+            transactionDate: billingMonth,
+            category: "CAJ_SEWA" as const,
+            debitAmount: item.rentalToAdd,
+            description: item.moveOutDate ? "Caj Sewa (Prorata Pindah Keluar)" : "Caj Sewa Bulanan",
           });
         }
 
-        let totalNewCharges = 0;
-
-        // B. Generate Ledger Transaction for RENTAL
-        if (finalRentalToCharge > 0 && Number(monthlyCharge.rentalAmount) === 0) {
-          const txNoSewa = await generateTransactionNo(tx);
-          await tx.transaction.create({
-            data: {
-              transactionNo: txNoSewa,
-              residentId: resident.id,
-              transactionDate: today,
-              category: "CAJ_SEWA",
-              debitAmount: finalRentalToCharge,
-              description: occupancy.moveOutDate ? "Caj Sewa (Prorata Pindah Keluar)" : "Caj Sewa Bulanan",
-            }
+        if (item.penaltyToAdd > 0) {
+          transactions.push({
+            transactionNo: transactionNos[transactionNoIndex++],
+            residentId: item.residentId,
+            transactionDate: billingMonth,
+            category: "CAJ_PENALTI" as const,
+            debitAmount: item.penaltyToAdd,
+            description: "Denda / Penalti Hilang Kelayakan",
           });
-          totalNewCharges += finalRentalToCharge;
         }
 
-        // C. Generate Ledger Transaction for PENALTY (If TIDAK_LAYAK)
-        if (resident.status === "TIDAK_LAYAK" && Number(monthlyCharge.penaltyAmount) === 0) {
-          const txNoPenalti = await generateTransactionNo(tx);
-          await tx.transaction.create({
-            data: {
-              transactionNo: txNoPenalti,
-              residentId: resident.id,
-              transactionDate: today,
-              category: "CAJ_PENALTI",
-              debitAmount: penaltyAmount,
-              description: "Denda / Penalti Hilang Kelayakan",
-            }
-          });
-          totalNewCharges += penaltyAmount;
-        }
-
-        // D. Kemaskini Jadual MonthlyCharge supaya "Sewa" muncul di jadual frontend
-        if (totalNewCharges > 0) {
-          await tx.monthlyCharge.update({
-            where: { id: monthlyCharge.id },
-            data: {
-              rentalAmount: finalRentalToCharge,
-              penaltyAmount: resident.status === "TIDAK_LAYAK" ? penaltyAmount : 0
-            }
-          });
-
-          // E. Update Master Arrears Summary (Jumlah Tunggakan)
-          await tx.arrearsSummary.upsert({
-            where: { residentId: resident.id },
-            create: {
-              residentId: resident.id,
-              totalArrearsAmount: totalNewCharges,
-            },
-            update: {
-              totalArrearsAmount: { increment: totalNewCharges }
-            }
-          });
-          recordsProcessed++;
-        }
-      }
-
-      // 6. CREATE THE LOCK RECORD (Crucial Step)
-      // This tells the system that May 2026 is officially done.
-      await tx.billingCycle.create({
-        data: {
-          billingMonth: currentBillingMonth,
-          runDate: today,
-          success: true,
-          recordsBilled: recordsProcessed
-        }
+        return transactions;
       });
 
-    }, 
-    {
-      maxWait: 5000,
-      timeout: 30000 // Give it 30 seconds to process all residents
+      await prisma.$transaction(
+        async (tx) => {
+          if (transactionsToCreate.length > 0) {
+            await tx.transaction.createMany({ data: transactionsToCreate });
+          }
+
+          for (const item of chunk) {
+            await tx.monthlyCharge.upsert({
+              where: {
+                residentId_chargeMonth: {
+                  residentId: item.residentId,
+                  chargeMonth: billingMonth
+                }
+              },
+              create: {
+                residentId: item.residentId,
+                chargeMonth: billingMonth,
+                unitId: item.unitId,
+                rentalAmount: item.rentalToAdd,
+                penaltyAmount: item.penaltyToAdd,
+                totalMonthlyCharge: item.totalNewCharges,
+                balanceForMonth: item.totalNewCharges,
+              },
+              update: {
+                unitId: item.unitId,
+                rentalAmount: { increment: item.rentalToAdd },
+                penaltyAmount: { increment: item.penaltyToAdd },
+                totalMonthlyCharge: { increment: item.totalNewCharges },
+                balanceForMonth: { increment: item.totalNewCharges },
+              }
+            });
+
+            await tx.arrearsSummary.upsert({
+              where: { residentId: item.residentId },
+              create: {
+                residentId: item.residentId,
+                totalArrearsAmount: item.totalNewCharges,
+                lastUpdatedMonth: billingMonth,
+              },
+              update: {
+                totalArrearsAmount: { increment: item.totalNewCharges },
+                lastUpdatedMonth: billingMonth,
+              }
+            });
+          }
+        },
+        {
+          maxWait: 10000,
+          timeout: 30000,
+        }
+      );
+    }
+
+    const recordsProcessed = billableItems.length;
+
+    // 6. CREATE THE LOCK RECORD (Crucial Step)
+    // This tells the system that the target billing month is officially done.
+    await prisma.billingCycle.upsert({
+      where: { billingMonth },
+      create: {
+        billingMonth,
+        runDate: today,
+        success: true,
+        recordsBilled: recordsProcessed
+      },
+      update: {
+        runDate: today,
+        success: true,
+        recordsBilled: recordsProcessed
+      }
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await recordDataAuditLog(tx, {
+        actor,
+        moduleName: "Tunggakan",
+        actionType: "CREATE",
+        target: formatAuditTarget(["Jana Bil Bulanan", billingMonthLabel]),
+        entityType: "MONTHLY_CHARGE",
+        entityId: null,
+        summary: `Menjana caj bulanan untuk bulan ${billingMonthLabel}.`,
+        details: [
+          `Bilangan penghuni diproses: ${recordsProcessed}.`,
+          `Bilangan transaksi caj dijana: ${transactionCount}.`,
+          actor ? "Dijalankan secara manual oleh admin." : "Dijalankan melalui jadual cron sistem.",
+        ],
+      });
     });
 
     return NextResponse.json({ 
       ok: true, 
-      message: `Berjaya: Caj untuk ${currentBillingMonth.toLocaleDateString()} telah dijana.`,
+      message: `Berjaya: Caj untuk bulan ${billingMonthLabel} telah dijana.`,
       recordsProcessed
     });
 

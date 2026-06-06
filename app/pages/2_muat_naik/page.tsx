@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/app/components/Icon/Icon";
 import { ROUTES } from "../../constants/routes";
@@ -37,6 +37,22 @@ const uploadRouteByKind: Record<ProcessingDraft["kind"], string> = {
 };
 
 export default function MuatNaikPage() {
+  return (
+    <Suspense fallback={<MuatNaikPageFallback />}>
+      <MuatNaikPageContent />
+    </Suspense>
+  );
+}
+
+function MuatNaikPageFallback() {
+  return (
+    <div className="flex min-h-[calc(100vh-120px)] items-center justify-center">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#D9E1F3] border-t-dark-blue" />
+    </div>
+  );
+}
+
+function MuatNaikPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeCategory, setActiveCategory] = useState<Category>(() =>

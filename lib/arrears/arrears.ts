@@ -2,12 +2,14 @@ import type {
   Resident, 
   QuarterCategory, 
   Unit, 
-  Transaction,
   MonthlyCharge,
   AdditionalCharge,
   Rebate,
-  UnitOccupancy
+  UnitOccupancy,
+  ArrearsSummary
 } from "@prisma/client";
+
+import { parseDateOnlyInAppTimeZone } from "@/lib/date-time";
 
 // --- TYPES ---
 
@@ -16,7 +18,8 @@ export type TunggakanListItem = {
   fullName: string;
   icNumber: string;
   quarterClass: string; // e.g., "PPR Kempas"
-  unitCode: string;     // e.g., "Blok B-04-12"
+  unitCode: string | null; // e.g., "Blok B-04-12"
+  quarterAddress: string | null; // e.g., "123 Main St"
   sewa: number;
   senggara: number;
   penalti: number;
@@ -26,7 +29,8 @@ export type TunggakanListItem = {
 };
 
 export type TunggakanSummary = {
-  jumlahRekod: number; // Total Historical Charges (Debits)
+  jumlahRekod: number; // Total People with Arrears
+  jumlahKutipan: number; // Total Amount Collected (Debits)
   jumlahTunggakan: number; // Live Current Outstanding Debt
 };
 
@@ -46,6 +50,7 @@ export type ResidentTunggakanDetails = {
   age: number;
   quarterClass: string;
   unitCode: string;
+  quarterAddress: string;
   moveInDate: string | null;
   moveOutDate: string | null;
   status: string;
@@ -62,13 +67,13 @@ export type ResidentTunggakanDetails = {
 // --- API INPUT VALIDATION TYPES ---
 
 export type TambahanChargeInput = {
-  tarikh: string;
+  tarikh: Date;
   catatan: string;
   amaun: number;
 };
 
 export type RebatInput = {
-  tarikh: string;
+  tarikh: Date;
   catatan: string;
   amaun: number;
 };
@@ -96,32 +101,32 @@ export function mapTunggakanForApi(
   resident: Resident & {
       occupancies: (UnitOccupancy & { unit: Unit & { quarterCategory: QuarterCategory } })[];
       monthlyCharges: (MonthlyCharge & { additionalCharges: AdditionalCharge[], rebates: Rebate[] })[];
+      arrearsSummary?: ArrearsSummary | null;
   }
 ): TunggakanListItem {
   
   const activeOccupancy = resident.occupancies.find(o => o.status === "CURRENT");
-  const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "Tiada";
-  const unitCode = activeOccupancy?.unit.unitCode || "Tiada";
+  const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "N/A";
+  const unitCode = activeOccupancy?.unit.unitCode || null;
+  const quarterAddress = activeOccupancy?.unit.quarterCategory?.address || null;
 
   let sewa = 0;
   let senggara = 0;
   let penalti = 0;
   let tambahan = 0;
   let rebat = 0;
-  let bayaran = 0; // <-- 1. ADD THIS VARIABLE TO TRACK PAYMENTS
 
   resident.monthlyCharges.forEach(charge => {
       sewa += Number(charge.rentalAmount);
       senggara += Number(charge.maintenanceAmount);
       penalti += Number(charge.penaltyAmount);
-      bayaran += Number(charge.paymentReceived); // <-- 2. ADD UP ALL PAYMENTS RECEIVED
       
       charge.additionalCharges.forEach(add => { tambahan += Number(add.amount) });
       charge.rebates.forEach(r => { rebat += Number(r.amount) });
   });
 
-  // 3. SUBTRACT PAYMENTS FROM THE FINAL CALCULATION
-  const jumlahTunggakan = (sewa + senggara + penalti + tambahan) - rebat - bayaran;
+  // DIRECTLY USE THE MASTER ARREARS SUMMARY TABLE FOR NET TOTAL (Single Source of Truth!)
+  const jumlahTunggakan = resident.arrearsSummary ? Number(resident.arrearsSummary.totalArrearsAmount) : 0;
 
   return {
       id: resident.id,
@@ -129,6 +134,7 @@ export function mapTunggakanForApi(
       icNumber: resident.icNumber,
       quarterClass,
       unitCode,
+      quarterAddress,
       sewa: Number(sewa.toFixed(2)),
       senggara: Number(senggara.toFixed(2)),
       penalti: Number(penalti.toFixed(2)),
@@ -195,7 +201,12 @@ function parseChargeItem(item: unknown, label: string): ParseSuccess<TambahanCha
   }
   const data = item as Record<string, unknown>;
 
-  if (typeof data.tarikh !== "string" || isNaN(Date.parse(data.tarikh))) {
+  const parsedDate =
+      typeof data.tarikh === "string"
+          ? parseDateOnlyInAppTimeZone(data.tarikh.slice(0, 10))
+          : null;
+
+  if (!parsedDate) {
       return { ok: false, message: `Tarikh untuk ${label} tidak sah.` };
   }
 
@@ -209,7 +220,7 @@ function parseChargeItem(item: unknown, label: string): ParseSuccess<TambahanCha
   return {
       ok: true,
       data: {
-          tarikh: data.tarikh,
+          tarikh: parsedDate,
           catatan: data.catatan.trim(),
           amaun: parsedAmount.data
       }
@@ -244,6 +255,8 @@ export type TunggakanFilter = {
   statusBayaran: string;
   mempunyaiPenalti: boolean;
   mempunyaiRebat: boolean;
+  statusBayaranSelections: string[];
+  chargePresenceSelections: string[];
 };
 
 export const defaultFilter: TunggakanFilter = {
@@ -254,4 +267,6 @@ export const defaultFilter: TunggakanFilter = {
   statusBayaran: "SEMUA",
   mempunyaiPenalti: false,
   mempunyaiRebat: false,
+  statusBayaranSelections: ["SUDAH_DIKUTIP", "BELUM_DIKUTIP"],
+  chargePresenceSelections: [],
 };

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 
 import Icon from "@/app/components/Icon/Icon";
 import { InputField as SharedInputField } from "@/app/components/InputField";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import SearchingDataOverlay from "@/app/components/Loading/SearchingDataOverlay";
 import { usePaginationLogic, PaginationControls } from "@/app/components/Pagination/Pagination";
 import PenghuniDetail from "./PenghuniDetail/PenghuniDetail";
@@ -62,7 +63,13 @@ function getStatusBadgeColor(status: string) {
     }
 }
 
-export default function PenghuniTable({ residents, isLoading, errorMessage, setResidents }: PenghuniTableProps) {
+export default function PenghuniTable({
+    residents,
+    isLoading,
+    errorMessage,
+    setResidents,
+    onFilteredResidentsChange,
+}: PenghuniTableProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStatuses, setSelectedStatuses] = useState<PenghuniStatusFilter[]>([
         ...DEFAULT_PENGHUNI_STATUS_FILTERS,
@@ -75,10 +82,14 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
     const filteredResidents = useMemo(() => {
         return filterResidentsByStatus(searchedResidents, selectedStatuses);
     }, [searchedResidents, selectedStatuses]);
+
+    useEffect(() => {
+        onFilteredResidentsChange(filteredResidents);
+    }, [filteredResidents, onFilteredResidentsChange]);
     
     // Pagination Logic
     const itemsPerPage = 10;
-    const { currentPage, totalPages, startIndex, endIndex, handlePageChange, paginationItems } = usePaginationLogic(filteredResidents.length, itemsPerPage);
+    const { currentPage, totalPages, startIndex, endIndex, handlePageChange } = usePaginationLogic(filteredResidents.length, itemsPerPage);
     const currentResidents = filteredResidents.slice(startIndex, endIndex);
 
     // Selected Resident for Detail View
@@ -144,9 +155,8 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     <PenghuniFilter
                         selectedValues={selectedStatuses}
                         onSelect={handleStatusFilterChange}
-                        isSearchFilterActive={isSearchFilterActive}
                     />
-                    <PenghuniDownload residents={filteredResidents} />
+                    <PenghuniDownload disabled={isLoading} residents={filteredResidents} />
                 </div>
             </div>
 
@@ -210,24 +220,35 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                     {/* Table Body */}
                     <tbody className="bg-white">
                         {isLoading ? (
-                            <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Sedang membaca data penghuni...</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "loading",
+                                columnCount: 7,
+                                rowCount: 10,
+                            })
                         ) : errorMessage ? (
-                            <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-red" colSpan={7}>{errorMessage}</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "message",
+                                columnCount: 7,
+                                rowCount: 1,
+                                message: errorMessage,
+                            })
                         ) : residents.length === 0 ? (
-                            <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Tiada data penghuni ditemui.</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "message",
+                                columnCount: 7,
+                                rowCount: 1,
+                                message: "Tiada data penghuni ditemui.",
+                            })
                         ) : filteredResidents.length === 0 ? (
-                            <tr className="text-sm">
-                                <td className="px-3 py-4 text-center text-grey" colSpan={7}>Tiada hasil mencari dengan penapis yang dipilih.</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "message",
+                                columnCount: 7,
+                                rowCount: 1,
+                                message: "Tiada hasil mencari dengan penapis yang dipilih.",
+                            })
                         ) : (
                             currentResidents.map((resident) => (
-                                <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20`}>
+                                <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60`}>
                                     {/* Penghuni */}
                                     <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>{resident.fullName}</div>
@@ -306,7 +327,6 @@ export default function PenghuniTable({ residents, isLoading, errorMessage, setR
                                     startIndex={startIndex}
                                     endIndex={endIndex}
                                     totalRecords={filteredResidents.length}
-                                    paginationItems={paginationItems}
                                     onPageChange={handlePageChange}
                                 />
                             </td>

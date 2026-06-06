@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reverseTransaction } from "@/lib/transactions/transactions";
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +32,39 @@ export async function POST(request: NextRequest) {
 
     // 3. EXECUTE REVERSAL (Now using the REAL admin ID!)
     const pembalikan = await reverseTransaction(originalTxId, adminId, remarks);
+
+    await prisma.$transaction(async (tx) => {
+      const original = await tx.transaction.findUnique({
+        where: { id: originalTxId },
+        include: {
+          resident: {
+            select: {
+              fullName: true,
+              icNumber: true,
+            },
+          },
+        },
+      });
+
+      await recordDataAuditLog(tx, {
+        actor: authData,
+        moduleName: "Transaksi",
+        actionType: "REVERSAL",
+        target: formatAuditTarget([
+          original?.transactionNo ?? originalTxId,
+          original?.resident?.fullName,
+          original?.resident?.icNumber ? `No. KP ${original.resident.icNumber}` : null,
+        ]),
+        entityType: "TRANSACTION",
+        entityId: originalTxId,
+        summary: "Membalikkan transaksi dan menjana rekod imbangan.",
+        details: [
+          `Transaksi asal: ${original?.transactionNo ?? originalTxId}.`,
+          `Transaksi pembalikan: ${pembalikan.transactionNo ?? pembalikan.id}.`,
+          `Catatan: ${remarks}.`,
+        ],
+      });
+    });
 
     return NextResponse.json({
       ok: true,

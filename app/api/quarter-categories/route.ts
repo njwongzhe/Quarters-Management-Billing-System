@@ -8,7 +8,10 @@ import {
   mapQuarterCategoryForApi,
   parseQuarterCategoryCreateBody,
 } from "@/lib/quarters/quarter-categories";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -36,6 +39,11 @@ export async function GET() {
             _count: {
               select: {
                 units: true,
+              },
+            },
+            units: {
+              select: {
+                status: true,
               },
             },
           },
@@ -156,17 +164,27 @@ export async function POST(request: Request) {
               units: true,
             },
           },
+          units: {
+            select: {
+              status: true,
+            },
+          },
         },
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `${quarterCategory.categoryName}${quarterCategory.address ? ` / ${quarterCategory.address}` : ""}`,
         actionType: "CREATE",
+        target: formatAuditTarget([quarterCategory.categoryName, quarterCategory.address]),
         entityType: "QUARTER_CATEGORY",
         entityId: quarterCategory.id,
-        description: `Menambah kategori kuarters ${quarterCategory.categoryName}${quarterCategory.address ? ` di ${quarterCategory.address}` : ""}.`,
+        summary: "Menambah kategori kuarters baharu.",
+        details: [
+          `Harga sewa: RM ${Number(quarterCategory.rentalPrice).toFixed(2)}.`,
+          `Caj penyelenggaraan: RM ${Number(quarterCategory.maintenancePrice).toFixed(2)}.`,
+          `Caj penalti: RM ${Number(quarterCategory.penaltyPrice).toFixed(2)}.`,
+        ],
       });
 
       return quarterCategory;

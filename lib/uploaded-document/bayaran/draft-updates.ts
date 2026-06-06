@@ -4,6 +4,7 @@ import type {
   ExtractedBayaranRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import { parseDateOnlyInAppTimeZone } from "@/lib/date-time";
 import { getBayaranPaymentDate } from "@/lib/uploaded-document/bayaran/documents";
 import { findExistingBayaranPayment } from "@/lib/uploaded-document/bayaran/queries";
 import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
@@ -178,10 +179,10 @@ function normalizeAmount(value: string) {
 function parsePaymentDate(value: string) {
   const normalized = normalizeText(value);
   const date = /^\d{4}-\d{2}-\d{2}/.test(normalized)
-    ? new Date(`${normalized.slice(0, 10)}T00:00:00.000Z`)
+    ? parseDateOnlyInAppTimeZone(normalized.slice(0, 10))
     : getBayaranPaymentDate(normalized);
 
-  if (Number.isNaN(date.getTime())) {
+  if (!date || Number.isNaN(date.getTime())) {
     throw new Error("Tarikh bayaran tidak sah.");
   }
 

@@ -4,14 +4,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 import json
-import os
 import re
 import urllib.error
 import urllib.request
 
 from pypdf import PdfReader
 
-from extractors.shared import build_header_map_for, get_cell, read_xlsx
+from extractors.shared import build_header_map_for, gemini_api_keys, get_cell, read_xlsx
 
 
 PARSING_MODE_STRICT = "strict"
@@ -301,14 +300,12 @@ def _payment_from_pdf_tokens(row: list[str]) -> tuple[str, str, str, str, str | 
     if amount is None:
         return None
 
-    ic_index = next(
-        (
-            index
-            for index, cell in enumerate(row[1:-1], start=1)
-            if re.fullmatch(r"\d{12}", _normalize_ic(cell))
-        ),
-        None,
-    )
+    ic_candidates = [
+        index
+        for index, cell in enumerate(row[1:-1], start=1)
+        if re.fullmatch(r"\d{12}", _normalize_ic(cell))
+    ]
+    ic_index = ic_candidates[-1] if ic_candidates else None
 
     if ic_index is None:
         return None
@@ -527,14 +524,7 @@ def _repair_bayaran_with_gemini(candidates: list[dict]) -> list[ExtractedPayment
 
 
 def _gemini_api_keys() -> list[str]:
-    keys = [os.getenv(f"GEMINI_API_KEY_{index}", "").strip() for index in range(1, 51)]
-    unique_keys: list[str] = []
-    seen: set[str] = set()
-    for key in keys:
-        if key and key not in seen:
-            unique_keys.append(key)
-            seen.add(key)
-    return unique_keys
+    return list(gemini_api_keys())
 
 
 def _call_gemini_parser(api_key: str, prompt: dict) -> dict:

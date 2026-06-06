@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import KuartersFeedbackBanner from "@/app/pages/7_kuarters/components/KuartersFeedbackBanner";
-import type { KuartersNotice } from "@/app/pages/7_kuarters/components/kuartersHelpers";
+import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
+import type { GlobalFixedNotice } from "@/app/components/Message/GlobalFixedMessage";
 import {
   type ExtractedQuarterRecord,
   type ExtractedQuarterUnit,
@@ -60,7 +60,7 @@ export default function KuartersReviewTable({
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingUnitKey, setEditingUnitKey] = useState<string | null>(null);
   const [savingTarget, setSavingTarget] = useState<string | null>(null);
-  const [notice, setNotice] = useState<KuartersNotice | null>(null);
+  const [notice, setNotice] = useState<GlobalFixedNotice | null>(null);
   const [categoryPage, setCategoryPage] = useState(1);
   const [unitPage, setUnitPage] = useState(1);
   const isSaving = savingTarget !== null;
@@ -106,7 +106,7 @@ export default function KuartersReviewTable({
     allSelectedCategoryUnitKeys.length > 0 &&
     allSelectedCategoryUnitKeys.every((key) => selectedKeySet.has(key));
 
-  const showNotice = (noticeTone: KuartersNotice["tone"], message: string) => {
+  const showNotice = (noticeTone: GlobalFixedNotice["tone"], message: string) => {
     setNotice({ tone: noticeTone, message });
   };
 
@@ -559,10 +559,9 @@ export default function KuartersReviewTable({
           onStartEdit={startUnitEdit}
           onSaveUnit={saveUnit}
           onDeleteUnit={deleteUnit}
-          onCancelEdit={cancelEditing}
         />
       </div>
-      <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
+      <GlobalFixedMessage notice={notice} onDismiss={() => setNotice(null)} />
     </>
   );
 }

@@ -17,8 +17,15 @@ type FilterDateProps = {
   value: FilterDateValue;
   onApply: (value: FilterDateValue) => void;
   onClear: () => void;
+  renderInFlow?: boolean;
 };
 
+// true: calendar floats over viewport (fixed).
+// false: calendar is positioned in page flow (absolute).
+const USE_FIXED_CALENDAR_PORTAL = false;
+
+// Helper function to format date string from "YYYY-MM-DD" to "DD MMM YYYY" in Malay locale for display in the input buttons. 
+// If the input value is not a valid date, it returns the original value.
 function formatDateLabel(value: string) {
   const date = new Date(`${value}T00:00:00`);
   if (isNaN(date.getTime())) return value;
@@ -29,16 +36,36 @@ function formatDateLabel(value: string) {
   }).format(date);
 }
 
-function calcCalendarPos(buttonRef: React.RefObject<HTMLButtonElement | null>) {
+// Helper function to calculate calendar position based on button and panel refs and whether the calendar is rendered in a fixed portal or not.
+function calcCalendarPos(
+  buttonRef: React.RefObject<HTMLButtonElement | null>,
+  panelRef: React.RefObject<HTMLDivElement | null>,
+  useFixedPosition: boolean,
+) {
   if (!buttonRef.current) return { top: 0, left: 0 };
   const rect = buttonRef.current.getBoundingClientRect();
-  const pickerWidth = 320;
   const gap = 8;
-  const left = Math.min(
-    Math.max(12, rect.left),
-    window.innerWidth - pickerWidth - 12,
-  );
-  return { top: rect.bottom + gap, left };
+
+  if (!useFixedPosition) {
+    const panelRect = panelRef.current?.getBoundingClientRect();
+
+    if (!panelRect) {
+      return { top: 0, left: 12 };
+    }
+
+    // Always align calendar to the input's left edge in panel coordinates.
+    const left = Math.max(12, rect.left - panelRect.left);
+    const top = rect.bottom - panelRect.top + gap;
+
+    return { top, left };
+  }
+
+  const viewportLeft = rect.left;
+  const left = Math.max(12, viewportLeft);
+
+  const top = rect.bottom + gap;
+
+  return { top, left };
 }
 
 export default function FilterDate({
@@ -48,16 +75,22 @@ export default function FilterDate({
   value,
   onApply,
   onClear,
+  renderInFlow = false,
 }: FilterDateProps) {
   const [draft, setDraft] = useState<FilterDateValue>(value);
   const [openField, setOpenField] = useState<"start" | "end" | null>(null);
   const [calendarPos, setCalendarPos] = useState({ top: 0, left: 0 });
   const hasValue = Boolean(draft.startDate || draft.endDate);
 
+  const panelRef = useRef<HTMLDivElement>(null);
   const startButtonRef = useRef<HTMLButtonElement>(null);
   const endButtonRef = useRef<HTMLButtonElement>(null);
   const startContainerRef = useRef<HTMLDivElement>(null);
   const endContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
 
   // Recalculate floating calendar position on open and on resize / scroll.
   useEffect(() => {
@@ -66,7 +99,11 @@ export default function FilterDate({
     const buttonRef = openField === "start" ? startButtonRef : endButtonRef;
 
     function updatePos() {
-      setCalendarPos(calcCalendarPos(buttonRef));
+      setCalendarPos(calcCalendarPos(
+        buttonRef,
+        panelRef,
+        USE_FIXED_CALENDAR_PORTAL,
+      ));
     }
 
     updatePos();
@@ -80,49 +117,70 @@ export default function FilterDate({
 
   const activeContainerRef =
     openField === "start" ? startContainerRef : endContainerRef;
+  const calendarContainerRef = USE_FIXED_CALENDAR_PORTAL
+    ? activeContainerRef
+    : panelRef;
 
-  const calendarPortal =
-    openField && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            data-filter-date-calendar
-            className="fixed z-9999 rounded-3xl border border-light-grey/20 bg-white shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
-            style={{
+  const calendarOverlay = openField ? (
+    <div
+      data-filter-date-calendar
+      className={`${USE_FIXED_CALENDAR_PORTAL ? "fixed" : renderInFlow ? "relative mt-2" : "absolute"} z-9999 rounded-3xl border border-light-grey/20 bg-white shadow-[0_18px_45px_rgba(13,47,86,0.16)]`}
+      style={
+        USE_FIXED_CALENDAR_PORTAL
+          ? {
               top: `${calendarPos.top}px`,
               left: `${calendarPos.left}px`,
-              width: "300px",
-            }}
-            role="dialog"
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Calender
-              containerRef={activeContainerRef}
-              scale={0.85}
-              isOpen={true}
-              value={openField === "start" ? draft.startDate : draft.endDate}
-              maxDate={openField === "start" ? (draft.endDate || undefined) : undefined}
-              minDate={openField === "end" ? (draft.startDate || undefined) : undefined}
-              disableAbsolutePositioning={true}
-              onChange={(val) => {
-                const next =
-                  openField === "start"
-                    ? { ...draft, startDate: val }
-                    : { ...draft, endDate: val };
-                setDraft(next);
-                onApply(next);
-                setOpenField(null);
-              }}
-              onClose={() => setOpenField(null)}
-            />
-          </div>,
-          document.body,
-        )
+              width: "auto",
+              height: "auto",
+            }
+          : renderInFlow
+            ? {
+                marginLeft: `${calendarPos.left}px`,
+                width: "auto",
+                height: "auto",
+              }
+            : {
+                top: `${calendarPos.top}px`,
+                left: `${calendarPos.left}px`,
+                width: "auto",
+                height: "auto",
+              }
+      }
+      role="dialog"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Calender
+        scale={1}
+        containerRef={calendarContainerRef}
+        isOpen={true}
+        value={openField === "start" ? draft.startDate : draft.endDate}
+        maxDate={openField === "start" ? (draft.endDate || undefined) : undefined}
+        minDate={openField === "end" ? (draft.startDate || undefined) : undefined}
+        disableAbsolutePositioning={true}
+        onChange={(val) => {
+          const next =
+            openField === "start"
+              ? { ...draft, startDate: val }
+              : { ...draft, endDate: val };
+          setDraft(next);
+          onApply(next);
+          setOpenField(null);
+        }}
+        onClose={() => setOpenField(null)}
+      />
+    </div>
+  ) : null;
+
+  const calendarPortal =
+    USE_FIXED_CALENDAR_PORTAL && calendarOverlay && typeof document !== "undefined"
+      ? createPortal(calendarOverlay, document.body)
       : null;
 
   return (
     <div
-      className="absolute right-0 top-full z-20 mt-2 w-118 max-w-[90vw] flex flex-col gap-2 rounded-2xl border border-light-grey/20 bg-white p-3 shadow-lg"
+      ref={panelRef}
+      className={`${renderInFlow ? "relative mt-2" : "absolute right-0 top-full mt-2"} z-20 w-118 max-w-[90vw] flex flex-col gap-2 rounded-2xl border border-light-grey/20 bg-white p-3 shadow-lg`}
       role="group"
       aria-label={ariaLabel}
     >
@@ -199,6 +257,7 @@ export default function FilterDate({
         </div>
       </div>
 
+      {!USE_FIXED_CALENDAR_PORTAL ? calendarOverlay : null}
       {calendarPortal}
     </div>
   );

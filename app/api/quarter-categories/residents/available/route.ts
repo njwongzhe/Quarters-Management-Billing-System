@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import { mapAvailableResidentForApi } from "@/lib/residents/residents";
+import { mapAvailableResidentForApi } from "@/lib/quarters/quarter-residents-map";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,12 +46,15 @@ export async function GET(request: Request) {
         fullName: true,
         status: true,
         occupancies: {
-          where: {
-            status: "CURRENT",
+          orderBy: {
+            moveInDate: "desc",
           },
-          take: 1,
           select: {
             id: true,
+            unitId: true,
+            moveInDate: true,
+            moveOutDate: true,
+            status: true,
           },
         },
       },

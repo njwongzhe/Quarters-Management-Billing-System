@@ -7,7 +7,8 @@ import {
   TableInputField,
 } from "@/app/components/InputField";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
-import { PaginationControls } from "@/app/components/Pagination/Pagination";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
+import { PaginationControls, usePaginationLogic } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadQuarterCategoryRates } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
 
@@ -23,25 +24,18 @@ type KuartersCategoryRatesPanelProps = {
   rates: QuarterCategoryRecord[];
   exportRates: QuarterCategoryRecord[];
   isLoading: boolean;
-  currentPage: number;
   editor: KuartersEditorState | null;
   filterQuery: string;
   hasActiveFilters: boolean;
   onCancelEdit: () => void;
   pendingAction: "save" | "delete" | null;
   pendingRowId: string | null;
-  paginationItems: (number | "ellipsis")[];
-  startIndex: number;
-  endIndex: number;
-  totalRecords: number;
-  totalPages: number;
   onAddRow: () => void;
   onClearFilter: () => void;
   onDeleteRow: (rowId: string) => void;
   onDraftChange: (field: keyof QuarterCategoryDraft, value: string) => void;
   onEditRow: (quarterCategory: QuarterCategoryRecord) => void;
   onFilterQueryChange: (value: string) => void;
-  onPageChange: (page: number) => void;
   onSaveRow: () => void;
   onViewRow: (quarterCategory: QuarterCategoryRecord) => void;
 };
@@ -75,7 +69,6 @@ function ActionButton({
 
 export default function KuartersCategoryRatesPanel({
   isLoading,
-  currentPage,
   editor,
   exportRates,
   filterQuery,
@@ -87,18 +80,22 @@ export default function KuartersCategoryRatesPanel({
   onDraftChange,
   onEditRow,
   onFilterQueryChange,
-  onPageChange,
   onSaveRow,
   onViewRow,
   pendingAction,
   pendingRowId,
-  paginationItems,
   rates,
-  startIndex,
-  endIndex,
-  totalRecords,
-  totalPages,
 }: KuartersCategoryRatesPanelProps) {
+  const itemsPerPage = 10;
+  const {
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    handlePageChange,
+  } = usePaginationLogic(rates.length, itemsPerPage);
+  const paginatedRates = rates.slice(startIndex, endIndex);
+
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
   const searchInputRef = useRef<HTMLDivElement | null>(null);
@@ -156,29 +153,6 @@ export default function KuartersCategoryRatesPanel({
   function handleClearSearch() {
     onClearFilter();
     setIsSearchOpen(false);
-  }
-
-  function handlePaginationChange(
-    action: "prev" | "next" | "goto",
-    pageNum?: number,
-  ) {
-    if (pendingAction) {
-      return;
-    }
-
-    if (action === "prev") {
-      onPageChange(Math.max(currentPage - 1, 1));
-      return;
-    }
-
-    if (action === "next") {
-      onPageChange(Math.min(currentPage + 1, totalPages));
-      return;
-    }
-
-    if (action === "goto" && pageNum !== undefined) {
-      onPageChange(pageNum);
-    }
   }
 
   function renderActionCell(rowId: string, isEditing: boolean) {
@@ -256,6 +230,7 @@ export default function KuartersCategoryRatesPanel({
           />
           <ToolbarButton
             icon={commonIcons.download}
+            disabled={isLoading}
             label="Muat turun data kategori kuarters"
             onClick={() => downloadQuarterCategoryRates(exportRates)}
           />
@@ -320,6 +295,14 @@ export default function KuartersCategoryRatesPanel({
               </tr>
             </thead>
             <tbody className="bg-white">
+              {isLoading
+                ? loadingTableRows({
+                    mode: "loading",
+                    columnCount: 6,
+                    rowCount: 10,
+                  })
+                : null}
+
               {isCreateRowVisible ? (
                 <tr
                   ref={editor?.mode === "create" ? editingRowRef : null}
@@ -384,23 +367,19 @@ export default function KuartersCategoryRatesPanel({
               ) : null}
 
               {rates.length === 0 && !isCreateRowVisible ? (
-                <tr className="border-t border-light-grey/20">
-                  <td
-                    colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-medium text-grey"
-                  >
-                    {isLoading ? (
-                      "Sedang membaca data kategori kuarters..."
-                    ) : hasActiveFilters ? (
-                      "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
-                    ) : (
-                      "Tiada kategori kuarters untuk dipaparkan buat masa ini."
-                    )}
-                  </td>
-                </tr>
+                isLoading
+                  ? null
+                  : loadingTableRows({
+                      mode: "message",
+                      columnCount: 6,
+                      rowCount: 1,
+                      message: hasActiveFilters
+                        ? "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
+                        : "Tiada kategori kuarters untuk dipaparkan buat masa ini.",
+                    })
               ) : null}
 
-              {!isLoading && rates.map((rate) => {
+              {!isLoading && paginatedRates.map((rate) => {
                 const isEditing = editor?.mode === "edit" && editor.rowId === rate.id;
                 const isCurrentRowPending = pendingRowId === rate.id;
 
@@ -408,7 +387,7 @@ export default function KuartersCategoryRatesPanel({
                   <tr
                     key={rate.id}
                     ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 ${isEditing ? "bg-dark-blue/3" : ""}`}
+                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60"}`}
                   >
                     <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
@@ -525,9 +504,8 @@ export default function KuartersCategoryRatesPanel({
             totalPages={totalPages}
             startIndex={startIndex}
             endIndex={endIndex}
-            totalRecords={totalRecords}
-            paginationItems={paginationItems}
-            onPageChange={handlePaginationChange}
+            totalRecords={rates.length}
+            onPageChange={handlePageChange}
           />
         </div>
       </div>

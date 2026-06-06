@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 
 import { Prisma } from "@prisma/client";
 
-import { createPaymentRecords } from "@/lib/payments/payment-records";
+import { createPaymentRecords } from "@/lib/payments/payment-creation";
 import type { VerifyResult } from "@/lib/uploaded-document/verification";
 
 export async function verifyBayaranDrafts(
@@ -77,7 +77,6 @@ export async function verifyBayaranDrafts(
       amount: row.draft.amount,
       description: row.draft.description,
       uploadedDocumentId,
-      source: "uploaded",
     })),
   );
 

@@ -2,6 +2,11 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import type { ExtractResult } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 import { verifyBayaranDrafts } from "@/lib/uploaded-document/bayaran/verification";
@@ -47,16 +52,33 @@ export function parseSelectedKeys(body: unknown) {
       ? (body as { selectedKeys?: unknown }).selectedKeys
       : null;
 
-  return Array.isArray(selectedKeys)
-    ? selectedKeys.filter((key: unknown): key is string => typeof key === "string")
-    : [];
+  if (!Array.isArray(selectedKeys)) {
+    return [];
+  }
+
+  const uniqueKeys: string[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const key of selectedKeys) {
+    if (typeof key !== "string" || seenKeys.has(key)) {
+      continue;
+    }
+
+    uniqueKeys.push(key);
+    seenKeys.add(key);
+  }
+
+  return uniqueKeys;
 }
 
 export async function verifyUploadedDocumentForKind(
   kind: VerifyKind,
   uploadedDocumentId: string,
   selectedKeys: string[],
-  options: { skipRemainingExtractResult?: boolean } = {},
+  options: {
+    actor?: Awaited<ReturnType<typeof getCurrentAdmin>>;
+    skipRemainingExtractResult?: boolean;
+  } = {},
 ): Promise<UploadedDocumentVerificationResult> {
   if (selectedKeys.length === 0) {
     throw new Error("Sila pilih sekurang-kurangnya satu rekod untuk disahkan.");
@@ -94,7 +116,20 @@ export async function verifyUploadedDocumentForKind(
   const hasRemainingDrafts = await hasRemainingDraftRows(kind, uploadedDocumentId);
 
   if (!hasRemainingDrafts) {
-    await prisma.uploadedDocument.deleteMany({ where: { id: uploadedDocumentId } });
+    await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        await tx.uploadedDocument.deleteMany({ where: { id: uploadedDocumentId } });
+        await recordVerificationAudit(tx, {
+          actor: options.actor ?? null,
+          document,
+          kind,
+          selectedKeys,
+          result,
+          documentCompleted: true,
+        });
+      },
+      uploadedDocumentTransactionOptions,
+    );
 
     return {
       verifiedRows: result.verifiedRows,
@@ -107,6 +142,20 @@ export async function verifyUploadedDocumentForKind(
   }
 
   if (options.skipRemainingExtractResult) {
+    await prisma.$transaction(
+      (tx: Prisma.TransactionClient) =>
+        recordVerificationAudit(tx, {
+          actor: options.actor ?? null,
+          document,
+          kind,
+          selectedKeys,
+          result,
+          documentCompleted: false,
+          remainingExtractResultSkipped: true,
+        }),
+      uploadedDocumentTransactionOptions,
+    );
+
     return {
       verifiedRows: result.verifiedRows,
       failedMessages: result.failedMessages,
@@ -123,6 +172,19 @@ export async function verifyUploadedDocumentForKind(
     ? await mapUploadedDocumentForReview(result.document)
     : null;
 
+  await prisma.$transaction(
+    (tx: Prisma.TransactionClient) =>
+      recordVerificationAudit(tx, {
+        actor: options.actor ?? null,
+        document,
+        kind,
+        selectedKeys,
+        result,
+        documentCompleted: false,
+      }),
+    uploadedDocumentTransactionOptions,
+  );
+
   return {
     verifiedRows: result.verifiedRows,
     failedMessages: result.failedMessages,
@@ -131,6 +193,44 @@ export async function verifyUploadedDocumentForKind(
     remainingExtractResult: remainingDraft?.extractResult ?? null,
     documentCompleted: false,
   };
+}
+
+async function recordVerificationAudit(
+  tx: Prisma.TransactionClient,
+  input: {
+    actor: Awaited<ReturnType<typeof getCurrentAdmin>> | null;
+    document: NonNullable<Awaited<ReturnType<typeof findUploadedDocumentForVerification>>>;
+    kind: VerifyKind;
+    selectedKeys: string[];
+    result: VerifyResult;
+    documentCompleted: boolean;
+    remainingExtractResultSkipped?: boolean;
+  },
+) {
+  await recordDataAuditLog(tx, {
+    actor: input.actor,
+    moduleName: "Muat Naik",
+    actionType: "VERIFY",
+    target: formatAuditTarget([
+      input.document.category,
+      input.document.originalName ?? input.document.fileName,
+    ]),
+    summary: `Mengesahkan ${formatAuditValue(input.result.verifiedRows)} rekod draf ${input.kind.toUpperCase()} ke data sistem.`,
+    details: [
+      `Jumlah rekod dipilih: ${formatAuditValue(input.selectedKeys.length)}.`,
+      `Jumlah rekod berjaya disahkan: ${formatAuditValue(input.result.verifiedRows)}.`,
+      `Jumlah mesej gagal: ${formatAuditValue(input.result.failedMessages.length)}.`,
+      input.result.failedMessages.length > 0
+        ? `Mesej gagal: ${input.result.failedMessages.slice(0, 5).join(" ")}`
+        : null,
+      `Status dokumen selepas pengesahan: ${
+        input.documentCompleted ? "selesai dan draf dokumen dipadam" : "masih mempunyai baki draf"
+      }.`,
+      input.remainingExtractResultSkipped
+        ? "Baki data ekstrak tidak dibina semula dalam respons untuk mengurangkan beban pemprosesan."
+        : null,
+    ],
+  });
 }
 
 function buildVerificationMessage(result: VerifyResult) {
@@ -214,7 +314,7 @@ type VerifyRouteContext = {
 export function createUploadedDocumentVerifyHandler(kind: VerifyKind) {
   return async function POST(request: Request, context: VerifyRouteContext) {
     try {
-      await getCurrentAdmin();
+      const currentAdmin = await getCurrentAdmin();
       const { id } = await context.params;
       const body = await request.json().catch(() => null);
       const selectedKeys = parseSelectedKeys(body);
@@ -235,6 +335,7 @@ export function createUploadedDocumentVerifyHandler(kind: VerifyKind) {
       }
 
       const result = await verifyUploadedDocumentForKind(kind, id, selectedKeys, {
+        actor: currentAdmin,
         skipRemainingExtractResult,
       });
 

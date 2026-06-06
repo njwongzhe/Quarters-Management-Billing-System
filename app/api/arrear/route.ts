@@ -1,12 +1,43 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears/arrears";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import {
+  getMonthStartInAppTimeZone,
+  parseDateOnlyInAppTimeZone,
+} from "@/lib/date-time";
 import { generateTransactionNo } from "@/lib/transactions/transactions"; 
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+function getChargeMonthFromRequest(request: Request) {
+  const { searchParams } = new URL(request.url);
+  return getChargeMonthFromMonthValue(searchParams.get("chargeMonth"));
+}
+
+function getChargeMonthFromMonthValue(monthValue: unknown) {
+  const monthParam = typeof monthValue === "string" ? monthValue : null;
+
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const parsedMonth = parseDateOnlyInAppTimeZone(`${monthParam}-01`);
+
+    if (parsedMonth) {
+      return parsedMonth;
+    }
+  }
+
+  return getMonthStartInAppTimeZone();
+}
+
+export async function GET(request: Request) {
   try {
+    const selectedChargeMonth = getChargeMonthFromRequest(request);
+
     // 1. Fetch all residents with their active units and complete charge history
     const residents = await prisma.resident.findMany({
       // We only want verified residents. You can adjust this 'where' clause 
@@ -22,6 +53,7 @@ export async function GET() {
           },
         },
         monthlyCharges: {
+          where: { chargeMonth: selectedChargeMonth },
           include: {
             additionalCharges: true,
             rebates: true,
@@ -85,14 +117,14 @@ export async function POST(request: Request) {
     }
 
     const { residentIds, cajSenggaraEnabled, cajTambahan, rebat } = parsedData.data;
+    const chargeMonth = getChargeMonthFromMonthValue(
+      body && typeof body === "object" && !Array.isArray(body)
+        ? (body as Record<string, unknown>).chargeMonth
+        : null
+    );
 
     // We assume the admin making this change is logged in. 
     // In your actual app, you would get this from your Auth session.
-   
-    // We use the start of the current month as the charge period for these new additions
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
 
     // 2. Fetch required reference data for the selected residents
     const residentsInfo = await prisma.resident.findMany({
@@ -112,14 +144,14 @@ export async function POST(request: Request) {
         
         // Find or Create the Monthly Charge record for this month
         let monthlyCharge = await tx.monthlyCharge.findUnique({
-          where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth: currentMonth } }
+          where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth } }
         });
 
         if (!monthlyCharge) {
             monthlyCharge = await tx.monthlyCharge.create({
                 data: {
                     residentId: resident.id,
-                    chargeMonth: currentMonth,
+                    chargeMonth,
                     unitId: resident.occupancies[0]?.unitId || null,
                 }
             });
@@ -144,7 +176,7 @@ export async function POST(request: Request) {
                     data: {
                         transactionNo: txNoSenggara, // 2. ADD THIS
                         residentId: resident.id,
-                        transactionDate: new Date(),
+                        transactionDate: chargeMonth,
                         category: "CAJ_PENYELENGGARAAN",
                         debitAmount: maintenanceRate,
                     }
@@ -160,7 +192,7 @@ export async function POST(request: Request) {
             await tx.additionalCharge.create({
                 data: {
                     monthlyChargeId: monthlyCharge.id,
-                    chargeDate: new Date(item.tarikh),
+                    chargeDate: item.tarikh,
                     description: item.catatan,
                     amount: item.amaun,
                 }
@@ -173,7 +205,7 @@ export async function POST(request: Request) {
                 data: {
                     transactionNo: txNoTambahan, // 2. ADD THIS
                     residentId: resident.id,
-                    transactionDate: new Date(item.tarikh),
+                    transactionDate: chargeMonth,
                     category: "CAJ_TAMBAHAN",
                     description: item.catatan,
                     debitAmount: item.amaun,
@@ -189,7 +221,7 @@ export async function POST(request: Request) {
             await tx.rebate.create({
                 data: {
                     monthlyChargeId: monthlyCharge.id,
-                    rebateDate: new Date(item.tarikh),
+                    rebateDate: item.tarikh,
                     description: item.catatan,
                     amount: item.amaun,
                 }
@@ -202,7 +234,7 @@ export async function POST(request: Request) {
                 data: {
                     transactionNo: txNoRebat, // 2. ADD THIS
                     residentId: resident.id,
-                    transactionDate: new Date(item.tarikh),
+                    transactionDate: chargeMonth,
                     category: "REBAT",
                     description: item.catatan,
                     creditAmount: item.amaun,
@@ -217,6 +249,8 @@ export async function POST(request: Request) {
                 maintenanceAmount: { increment: senggaraChargeToAdd },
                 additionalChargesTotal: { increment: totalNewTambahan },
                 rebateTotal: { increment: totalNewRebat },
+                totalMonthlyCharge: { increment: senggaraChargeToAdd + totalNewTambahan },
+                balanceForMonth: { increment: senggaraChargeToAdd + totalNewTambahan - totalNewRebat },
             }
         });
 
@@ -236,12 +270,24 @@ export async function POST(request: Request) {
         });
       }
 
-      await createAuditLog(tx, {
+      const totalTambahan = cajTambahan.reduce((sum, item) => sum + item.amaun, 0);
+      const totalRebat = rebat.reduce((sum, item) => sum + item.amaun, 0);
+
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Tunggakan",
-        targetData: `${residentIds.length} penghuni`,
         actionType: "UPDATE",
-        description: `Mengemaskini caj tunggakan secara pukal untuk ${residentIds.length} penghuni.`,
+        target: formatAuditTarget([`${residentIds.length} penghuni`, formatAuditValue(chargeMonth)]),
+        entityType: "ARREARS_SUMMARY",
+        entityId: null,
+        summary: `Mengemaskini caj tunggakan secara pukal untuk ${residentIds.length} penghuni.`,
+        details: [
+          `Bulan caj: ${formatAuditValue(chargeMonth)}.`,
+          `Caj penyelenggaraan: ${cajSenggaraEnabled ? "diaktifkan" : "tidak diaktifkan"}.`,
+          `Bilangan caj tambahan: ${cajTambahan.length}, jumlah RM ${totalTambahan.toFixed(2)}.`,
+          `Bilangan rebat: ${rebat.length}, jumlah RM ${totalRebat.toFixed(2)}.`,
+          `Senarai penghuni terlibat: ${residentsInfo.map((resident) => `${resident.fullName} (${resident.icNumber})`).join(", ")}.`,
+        ],
       });
     },
       {

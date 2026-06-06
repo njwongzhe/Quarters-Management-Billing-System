@@ -4,6 +4,7 @@ import type {
   ExtractedTunggakanRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import { parseDateOnlyInAppTimeZone } from "@/lib/date-time";
 import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 type TunggakanDraftUpdateClient = Pick<
@@ -125,9 +126,9 @@ function parseNullableTunggakanDate(value: string | undefined) {
     return null;
   }
 
-  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+  const date = parseDateOnlyInAppTimeZone(value.slice(0, 10));
 
-  return Number.isNaN(date.getTime()) ? null : date;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
 function assertNoDuplicateTunggakanRecords(records: ExtractedTunggakanRecord[]) {

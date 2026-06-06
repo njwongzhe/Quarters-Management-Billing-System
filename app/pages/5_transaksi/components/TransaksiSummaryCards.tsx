@@ -1,5 +1,7 @@
 "use client";
 
+import Icon from "@/app/components/Icon/Icon";
+
 interface TransaksiSummaryCardsProps {
   totalCount: number;
   totalDebit: number;
@@ -8,8 +10,6 @@ interface TransaksiSummaryCardsProps {
 }
 
 export default function TransaksiSummaryCards({ totalCount, totalDebit, totalCredit, isLoading }: TransaksiSummaryCardsProps) {
-  
-  // Formatter for RM currency
   const formatRM = (amount: number) => {
     return new Intl.NumberFormat("ms-MY", {
       style: "currency",
@@ -18,41 +18,40 @@ export default function TransaksiSummaryCards({ totalCount, totalDebit, totalCre
     }).format(amount);
   };
 
-  if (isLoading) {
-    return <div className="h-32 bg-gray-100 animate-pulse rounded-xl mb-8"></div>;
-  }
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {/* Card 1: Jumlah Transaksi */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
-        <p className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">Jumlah Transaksi</p>
-        <h2 className="text-4xl font-bold text-dark-blue">{totalCount.toLocaleString()}</h2>
-        <div className="flex items-center gap-2 mt-3">
-          <div className="w-2 h-2 rounded-full bg-dark-blue"></div>
-          <span className="text-xs font-bold text-dark-blue uppercase tracking-widest">Terkini</span>
+    <section className="grid gap-3 md:grid-cols-3">
+      <article className="flex flex-col gap-1 rounded-lg border-l-4 border-l-dark-blue bg-white p-4 shadow">
+        <p className="text-xs font-semibold text-grey/70">JUMLAH TRANSAKSI</p>
+        <p className="text-3xl font-bold text-dark-grey">
+          {isLoading ? "0" : totalCount.toLocaleString("ms-MY")}
+        </p>
+        <div className="flex items-center gap-1">
+          <Icon icon="fact_check" size={16} className="text-dark-blue" />
+          <p className="text-xs font-bold text-dark-blue">Terkini</p>
         </div>
-      </div>
+      </article>
 
-      {/* Card 2: Amaun Debit (Keluar) */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
-        <p className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">Amaun Debit (RM)</p>
-        <h2 className="text-4xl font-bold text-dark-blue">{formatRM(totalDebit).replace('RM', 'RM ')}</h2>
-        <div className="flex items-center gap-2 mt-3">
-          <div className="w-2 h-2 rounded-full bg-(--color-red)"></div>
-          <span className="text-xs font-bold text-(--color-red) uppercase tracking-widest">Keluar</span>
+      <article className="flex flex-col gap-1 rounded-lg border-l-4 border-l-red bg-white p-4 shadow">
+        <p className="text-xs font-semibold text-grey/70">AMAUN DEBIT</p>
+        <p className="text-3xl font-bold text-dark-grey">
+          {isLoading ? "RM 0.00" : formatRM(totalDebit).replace("RM", "RM")}
+        </p>
+        <div className="flex items-center gap-1">
+          <Icon icon="trending_down" size={16} className="text-red" />
+          <p className="text-xs font-bold text-red">Keluar</p>
         </div>
-      </div>
+      </article>
 
-      {/* Card 3: Amaun Kredit (Masuk) */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
-        <p className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">Amaun Kredit (RM)</p>
-        <h2 className="text-4xl font-bold text-dark-blue">{formatRM(totalCredit).replace('RM', 'RM ')}</h2>
-        <div className="flex items-center gap-2 mt-3">
-          <div className="w-2 h-2 rounded-full bg-(--color-green)"></div>
-          <span className="text-xs font-bold text-(--color-green) uppercase tracking-widest">Masuk</span>
+      <article className="flex flex-col gap-1 rounded-lg border-l-4 border-l-green bg-white p-4 shadow">
+        <p className="text-xs font-semibold text-grey/70">AMAUN KREDIT</p>
+        <p className="text-3xl font-bold text-dark-grey">
+          {isLoading ? "RM 0.00" : formatRM(totalCredit).replace("RM", "RM")}
+        </p>
+        <div className="flex items-center gap-1">
+          <Icon icon="trending_up" size={16} className="text-green" />
+          <p className="text-xs font-bold text-green">Masuk</p>
         </div>
-      </div>
-    </div>
+      </article>
+    </section>
   );
 }

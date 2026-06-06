@@ -8,6 +8,8 @@ export type QuarterCategoryListItem = {
   maintenancePrice: number;
   penaltyPrice: number;
   unitCount: number;
+  occupiedUnitCount: number;
+  vacantUnitCount: number;
   canDelete: boolean;
   updatedAt: string;
 };
@@ -23,6 +25,9 @@ type QuarterCategoryWithUnitCount = QuarterCategory & {
   _count: {
     units: number;
   };
+  units: {
+    status: string;
+  }[];
 };
 
 type ParseSuccess<T> = {
@@ -73,6 +78,13 @@ const fieldLabels: Record<QuarterCategoryField, string> = {
 export function mapQuarterCategoryForApi(
   quarterCategory: QuarterCategoryWithUnitCount,
 ): QuarterCategoryListItem {
+  const occupiedUnitCount = quarterCategory.units.filter(
+    (unit) => unit.status === "OCCUPIED",
+  ).length;
+  const vacantUnitCount = quarterCategory.units.filter(
+    (unit) => unit.status === "VACANT",
+  ).length;
+
   return {
     id: quarterCategory.id,
     categoryName: quarterCategory.categoryName,
@@ -81,6 +93,8 @@ export function mapQuarterCategoryForApi(
     maintenancePrice: Number(quarterCategory.maintenancePrice),
     penaltyPrice: Number(quarterCategory.penaltyPrice),
     unitCount: quarterCategory._count.units,
+    occupiedUnitCount,
+    vacantUnitCount,
     canDelete: quarterCategory._count.units === 0,
     updatedAt: quarterCategory.updatedAt.toISOString(),
   };

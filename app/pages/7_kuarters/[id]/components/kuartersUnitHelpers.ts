@@ -1,6 +1,9 @@
 import type { UnitStatus } from "@prisma/client";
 import type { QuarterCategorySummary } from "@/lib/quarters/quarter-categories";
-import type { AvailableResidentListItem } from "@/lib/residents/residents";
+import type {
+  AvailableResidentListItem,
+  AvailableResidentOccupancyRange,
+} from "@/lib/quarters/quarter-residents-map";
 
 import type {
   QuarterCategoryUnitsDetail,
@@ -42,6 +45,7 @@ export type QuarterUnitMutationResponse = {
 };
 
 export type AvailableResidentRecord = AvailableResidentListItem;
+export type AvailableResidentOccupancyRecord = AvailableResidentOccupancyRange;
 
 export type AvailableResidentsResponse = {
   success: boolean;

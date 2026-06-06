@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { usePaginationLogic, PaginationControls } from "@/app/components/Pagination/Pagination";
 import { Topic } from "../../../../components/InputField";
 import PenghuniDetailHistoryDownload from "./PenghuniDetailHistoryDownload";
@@ -8,6 +9,7 @@ import { usePenghuniDetailHistoryFilter } from "./PenghuniDetailHistoryFilter";
 
 export type TransactionRecord = {
     id: string;
+    transactionNo?: string | null;
     tarikh: string;
     kategori: string;
     catatan: string;
@@ -33,15 +35,18 @@ function getBakiColorClass(baki: number): string {
 // Helper function to calculate running balance for each transaction.
 function calculateRunningBalances(transactions: TransactionRecord[]): (TransactionRecord & { baki: number })[] {
     let runningBalance = 0;
+
+    const reversedTransactions = [...transactions].reverse();
     
-    return transactions.map(transaction => {
-        // Calculate net amount: debit increases balance (owed), kredit decreases it.
+    const withBaki = reversedTransactions.map(transaction => {
         runningBalance += transaction.debit - transaction.kredit;
         return {
             ...transaction,
             baki: runningBalance,
         };
     });
+
+    return withBaki.reverse();
 }
 
 export default function PenghuniDetailHistory({ residentId }: { residentId?: string }) {
@@ -97,7 +102,7 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
     // Apply date range filter via extracted hook.
     const { filteredHistory, FilterButton } = usePenghuniDetailHistoryFilter(historyWithBaki);
 
-    const { currentPage, totalPages, startIndex, endIndex, handlePageChange, paginationItems } = usePaginationLogic(filteredHistory.length, itemsPerPage);
+    const { currentPage, totalPages, startIndex, endIndex, handlePageChange } = usePaginationLogic(filteredHistory.length, itemsPerPage);
     const currentHistory = filteredHistory.slice(startIndex, endIndex);
 
     return (
@@ -111,6 +116,7 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
                 <div className="flex flex-row gap-4 items-center">
                     {FilterButton}
                     <PenghuniDetailHistoryDownload
+                        disabled={isLoading}
                         records={filteredHistory}
                         residentId={residentId}
                     />
@@ -122,38 +128,46 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
                 <table className="w-full overflow-x-auto">
                     <thead>
                         <tr className="font-bold text-xs text-grey bg-background">
-                            <th className="text-left px-4 py-3">Tarikh</th>
-                            <th className="text-left px-4 py-3">ID</th>
-                            <th className="text-left px-4 py-3">Kategori</th>
-                            <th className="text-left px-4 py-3">Catatan</th>
-                            <th className="text-right px-4 py-3">Debit (RM)</th>
-                            <th className="text-right px-4 py-3">Kredit (RM)</th>
-                            <th className="text-right px-4 py-3">Baki (RM)</th>
+                            <th className="w-min text-left p-3 whitespace-nowrap">Tarikh</th>
+                            <th className="w-min text-left p-3 whitespace-nowrap">ID</th>
+                            <th className="w-min text-left p-3 whitespace-nowrap">Kategori</th>
+                            <th className="w-full text-left p-3 whitespace-nowrap">Catatan</th>
+                            <th className="w-min text-right p-3 whitespace-nowrap">Debit (RM)</th>
+                            <th className="w-min text-right p-3 whitespace-nowrap">Kredit (RM)</th>
+                            <th className="w-min text-right p-3 whitespace-nowrap">Baki (RM)</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
                         {isLoading ? (
-                            <tr className="text-sm">
-                                <td className="px-4 py-4 text-center text-grey" colSpan={7}>Sedang membaca sejarah transaksi...</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "loading",
+                                columnCount: 7,
+                                rowCount: 10,
+                            })
                         ) : errorMessage ? (
-                            <tr className="text-sm">
-                                <td className="px-4 py-4 text-center text-red" colSpan={7}>{errorMessage}</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "message",
+                                columnCount: 7,
+                                rowCount: 1,
+                                message: errorMessage,
+                            })
                         ) : currentHistory.length === 0 ? (
-                            <tr className="text-sm">
-                                <td className="px-4 py-4 text-center text-grey" colSpan={7}>Tiada sejarah transaksi ditemui.</td>
-                            </tr>
+                            loadingTableRows({
+                                mode: "message",
+                                columnCount: 7,
+                                rowCount: 1,
+                                message: "Tiada sejarah transaksi ditemui.",
+                            })
                         ) : (
                             currentHistory.map((row) => (
                                 <tr key={row.id} className="text-sm border-b border-b-light-grey/20 transition-colors">
-                                    <td className="px-4 py-3 text-left font-medium">{row.tarikh}</td>
-                                    <td className="px-4 py-3 text-left">{row.id}</td>
-                                    <td className="px-4 py-3 text-left">{row.kategori}</td>
-                                    <td className="px-4 py-3 text-left">{row.catatan}</td>
-                                    <td className="px-4 py-3 text-right text-red">{row.debit > 0 ? formatCurrency(row.debit) : "-"}</td>
-                                    <td className="px-4 py-3 text-right text-green">{row.kredit > 0 ? formatCurrency(row.kredit) : "-"}</td>
-                                    <td className={`px-4 py-3 text-right font-bold ${getBakiColorClass(row.baki)}`}>{formatCurrency(row.baki)}</td>
+                                    <td className="px-3 py-2 text-left font-medium whitespace-nowrap">{row.tarikh}</td>
+                                    <td className="px-3 py-2 text-left whitespace-nowrap">{row.transactionNo || row.id}</td>
+                                    <td className="px-3 py-2 text-left whitespace-nowrap">{row.kategori}</td>
+                                    <td className="px-3 py-2 text-left whitespace-nowrap">{row.catatan}</td>
+                                    <td className="px-3 py-2 text-right text-red whitespace-nowrap">{row.debit > 0 ? formatCurrency(row.debit) : "-"}</td>
+                                    <td className="px-3 py-2 text-right text-green whitespace-nowrap">{row.kredit > 0 ? formatCurrency(row.kredit) : "-"}</td>
+                                    <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${getBakiColorClass(row.baki)}`}>{formatCurrency(row.baki)}</td>
                                 </tr>
                             ))
                         )}
@@ -169,7 +183,6 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
                                     startIndex={startIndex}
                                     endIndex={endIndex}
                                     totalRecords={filteredHistory.length}
-                                    paginationItems={paginationItems}
                                     onPageChange={handlePageChange}
                                 />
                             </td>
@@ -180,4 +193,3 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
         </div>
     );
 }
-

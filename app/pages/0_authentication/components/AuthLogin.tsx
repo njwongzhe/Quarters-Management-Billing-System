@@ -10,10 +10,10 @@ type AuthLoginProps = {
     onForgotPassword: () => void;
 };
 
-// This constant defines the key used to store the remembered login credentials in localStorage.
+// This constant defines the key used to remember the login email in localStorage.
 const STORAGE_KEY = "auth_login";
 
-// This function loads the remembered login credentials from localStorage, if available and valid.
+// This function loads the remembered login email from localStorage, if available and valid.
 function loadRememberedLogin() {
     // If this code is running on the server (during SSR), return default empty values since localStorage is not available.
     if (typeof window === "undefined") 
@@ -126,7 +126,7 @@ export default function AuthLogin({ onSwitchToRegister, onForgotPassword }: Auth
                 return;
             }
 
-            // Save or clear the remembered credentials only after the login really succeeds.
+            // Save or clear the remembered email only after the login really succeeds.
             if (rememberMe) {
                 window.localStorage.setItem(
                     STORAGE_KEY,

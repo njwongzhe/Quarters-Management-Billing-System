@@ -11,9 +11,10 @@ import type { ResidentRecord } from "../page";
 
 type PenghuniDownloadProps = {
   residents: ResidentRecord[];
+  disabled?: boolean;
 };
 
-export default function PenghuniDownload({ residents }: PenghuniDownloadProps) {
+export default function PenghuniDownload({ residents, disabled = false }: PenghuniDownloadProps) {
   function handleDownloadResidents() {
     const headers: XlsxCell[] = [
       { value: "Nama", style: "header" },
@@ -67,6 +68,7 @@ export default function PenghuniDownload({ residents }: PenghuniDownloadProps) {
     <ToolbarIconButton
       icon={commonIcons.download}
       label="Muat turun senarai penghuni"
+      disabled={disabled}
       onClick={handleDownloadResidents}
     />
   );

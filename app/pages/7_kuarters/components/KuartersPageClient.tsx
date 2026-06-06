@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import KuartersCategoryRatesPanel from "./KuartersCategoryRatesPanel";
@@ -9,7 +9,6 @@ import KuartersOverviewCards from "./KuartersOverviewCards";
 import KuartersPageHeader from "./KuartersPageHeader";
 import {
   buildKuartersSummaryCards,
-  buildQuarterCategoryPagination,
   createEmptyQuarterCategoryFilters,
   createDraftFromQuarterCategory,
   createEmptyQuarterCategoryDraft,
@@ -73,7 +72,6 @@ export default function KuartersPageClient({
   const [quarterCategories, setQuarterCategories] = useState<QuarterCategoryRecord[]>(
     initialData?.quarterCategories ?? [],
   );
-  const [currentPage, setCurrentPage] = useState(1);
   const [editor, setEditor] = useState<KuartersEditorState | null>(null);
   const [filters, setFilters] = useState(createEmptyQuarterCategoryFilters);
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
@@ -84,14 +82,31 @@ export default function KuartersPageClient({
   const sortedQuarterCategories = sortQuarterCategories(quarterCategories);
   const hasActiveFilters = hasActiveQuarterCategoryFilters(filters);
   const filteredQuarterCategories = filterQuarterCategories(sortedQuarterCategories, filters);
-  const pagination = buildQuarterCategoryPagination(
-    filteredQuarterCategories,
-    currentPage,
-    {
-      hasActiveFilter: hasActiveFilters,
-      totalRecords: quarterCategories.length,
-    },
-  );
+  const filteredSummary = useMemo(() => {
+    const totalUnits = filteredQuarterCategories.reduce(
+      (sum, category) => sum + category.unitCount,
+      0,
+    );
+    const occupiedUnits = filteredQuarterCategories.reduce(
+      (sum, category) => sum + category.occupiedUnitCount,
+      0,
+    );
+    const vacantUnits = filteredQuarterCategories.reduce(
+      (sum, category) => sum + category.vacantUnitCount,
+      0,
+    );
+    const occupancyRate =
+      totalUnits === 0
+        ? 0
+        : Number(((occupiedUnits / totalUnits) * 100).toFixed(1));
+
+    return {
+      totalUnits,
+      occupiedUnits,
+      vacantUnits,
+      occupancyRate,
+    };
+  }, [filteredQuarterCategories]);
 
   useEffect(() => {
     if (hasValidInitialData) return;
@@ -149,7 +164,6 @@ export default function KuartersPageClient({
 
   function handleAddRow() {
     if (!ensureActionIsAvailable()) return;
-    setCurrentPage(1);
     setEditor({
       mode: "create",
       rowId: EMPTY_QUARTER_CATEGORY_ID,
@@ -184,7 +198,6 @@ export default function KuartersPageClient({
   }
 
   function handleFilterQueryChange(value: string) {
-    setCurrentPage(1);
     setFilters((currentFilters) => ({
       ...currentFilters,
       categoryNameQuery: value,
@@ -192,7 +205,6 @@ export default function KuartersPageClient({
   }
 
   function handleClearFilter() {
-    setCurrentPage(1);
     setFilters(createEmptyQuarterCategoryFilters());
   }
 
@@ -252,7 +264,6 @@ export default function KuartersPageClient({
             ));
 
       setQuarterCategories(nextQuarterCategories);
-      if (editor.mode === "create") setCurrentPage(1);
       setEditor(null);
       showNotice({ tone: "success", message: result.message });
     } catch (error) {
@@ -300,14 +311,6 @@ export default function KuartersPageClient({
 
       setQuarterCategories(nextQuarterCategories);
       setEditor(null);
-      setCurrentPage((previousPage) => {
-        const nextFilteredQuarterCategories = filterQuarterCategories(nextQuarterCategories, filters);
-        const nextPagination = buildQuarterCategoryPagination(nextFilteredQuarterCategories, previousPage, {
-          hasActiveFilter: hasActiveFilters,
-          totalRecords: nextQuarterCategories.length,
-        });
-        return nextPagination.currentPage;
-      });
       showNotice({ tone: "success", message: result.message });
     } catch (error) {
       showNotice({ tone: "error", message: getErrorMessage(error, "Gagal memadam kategori kuarters.") });
@@ -326,10 +329,9 @@ export default function KuartersPageClient({
     <div className="flex flex-col gap-4">
       <KuartersPageHeader />
       <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
-      <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
+      <KuartersOverviewCards cards={buildKuartersSummaryCards(filteredSummary)} />
       <KuartersCategoryRatesPanel
         isLoading={isTableLoading}
-        currentPage={pagination.currentPage}
         editor={editor}
         exportRates={filteredQuarterCategories}
         filterQuery={filters.categoryNameQuery}
@@ -337,21 +339,15 @@ export default function KuartersPageClient({
         onCancelEdit={handleCancelEdit}
         pendingAction={pendingAction}
         pendingRowId={pendingRowId}
-        paginationItems={pagination.pageItems}
-        rates={pagination.visibleRecords}
-        startIndex={pagination.startIndex}
-        endIndex={pagination.endIndex}
-        totalRecords={pagination.totalRecords}
+        rates={filteredQuarterCategories}
         onAddRow={handleAddRow}
         onClearFilter={handleClearFilter}
         onDeleteRow={handleDeleteRow}
         onDraftChange={handleDraftChange}
         onEditRow={handleEditRow}
         onFilterQueryChange={handleFilterQueryChange}
-        onPageChange={setCurrentPage}
         onSaveRow={handleSaveRow}
         onViewRow={handleViewRow}
-        totalPages={pagination.totalPages}
       />
     </div>
   );

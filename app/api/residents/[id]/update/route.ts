@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { ResidentStatus } from "@prisma/client";
 
+import {
+  buildAuditChanges,
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "../../../../../lib/prisma";
 
 // Error response helper
@@ -39,7 +45,6 @@ function normalizeResidentStatus(status: unknown): ResidentStatus {
     case "TIDAK_LAYAK":
     case "PENCEN_MENDATANG":
     case "DATA_TIDAK_LENGKAP":
-    case "KELUAR":
       return normalized as ResidentStatus;
     default:
       return "AKTIF" as ResidentStatus;
@@ -54,6 +59,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const currentAdmin = await getCurrentAdmin();
     const { id } = await params;
     const body = await request.json();
 
@@ -80,7 +86,18 @@ export async function PATCH(
 
     const resident = await prisma.resident.findUnique({
       where: { id },
-      select: { id: true, icNumber: true, status: true },
+      select: {
+        id: true,
+        fullName: true,
+        icNumber: true,
+        phone: true,
+        email: true,
+        position: true,
+        department: true,
+        serviceLevel: true,
+        status: true,
+        description: true,
+      },
     });
 
     if (!resident) {
@@ -105,14 +122,18 @@ export async function PATCH(
       );
     }
 
-    // Server-side: enforce allowed status transitions
+    // Server-side: enforce the same status transition rules used by the
+    // resident detail editor. Age/status automation may set a resident to
+    // PENCEN_MENDATANG, and saving profile fields should not force them to
+    // change into another status.
     const originalStatus = resident.status as ResidentStatus | undefined;
     const requestedStatus = normalizeResidentStatus(status);
 
     const allowedTransition = (() => {
       if (!originalStatus) return true;
       if (originalStatus === "DATA_TIDAK_LENGKAP") return requestedStatus === originalStatus;
-      if (originalStatus === "AKTIF" || originalStatus === "PENCEN_MENDATANG") return ["AKTIF", "TIDAK_LAYAK"].includes(requestedStatus);
+      if (originalStatus === "AKTIF") return ["AKTIF", "TIDAK_LAYAK"].includes(requestedStatus);
+      if (originalStatus === "PENCEN_MENDATANG") return ["PENCEN_MENDATANG", "TIDAK_LAYAK"].includes(requestedStatus);
       if (originalStatus === "TIDAK_LAYAK") return ["TIDAK_LAYAK", "AKTIF"].includes(requestedStatus);
       return true;
     })();
@@ -125,19 +146,49 @@ export async function PATCH(
       );
     }
 
-    const updatedResident = await prisma.resident.update({
-      where: { id },
-      data: {
-        fullName: String(fullName).trim(),
-        icNumber: normalizedIcNumber,
-        phone: phone || null,
-        email: email || null,
-        position: position || null,
-        department: department || null,
-        serviceLevel: serviceLevel || null,
-        status: requestedStatus,
-        description: description || null,
-      },
+    const updateData = {
+      fullName: String(fullName).trim(),
+      icNumber: normalizedIcNumber,
+      phone: phone || null,
+      email: email || null,
+      position: position || null,
+      department: department || null,
+      serviceLevel: serviceLevel || null,
+      status: requestedStatus,
+      description: description || null,
+    };
+    const changes = buildAuditChanges(resident, updateData, {
+      fullName: "Nama penuh",
+      icNumber: "No. KP",
+      phone: "No. telefon",
+      email: "Emel",
+      position: "Jawatan",
+      department: "Jabatan",
+      serviceLevel: "Gred perkhidmatan",
+      status: "Status penghuni",
+      description: "Catatan",
+    });
+
+    const updatedResident = await prisma.$transaction(async (tx) => {
+      const nextResident = await tx.resident.update({
+        where: { id },
+        data: updateData,
+      });
+
+      await recordDataAuditLog(tx, {
+        actor: currentAdmin,
+        moduleName: "Pengurusan Penghuni",
+        actionType: "UPDATE",
+        target: formatAuditTarget([nextResident.fullName, `No. KP ${nextResident.icNumber}`]),
+        entityType: "RESIDENT",
+        entityId: nextResident.id,
+        summary: changes.length > 0
+          ? "Mengemaskini maklumat penghuni."
+          : "Permintaan kemas kini diterima tetapi tiada perubahan data dikesan.",
+        changes,
+      });
+
+      return nextResident;
     });
 
     return NextResponse.json(

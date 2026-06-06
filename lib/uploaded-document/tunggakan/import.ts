@@ -4,6 +4,10 @@ import type {
   ExtractedTunggakanRecord,
   ExtractResult,
 } from "@/app/pages/2_muat_naik/components/extract-review-shared";
+import {
+  getTodayDateInAppTimeZone,
+  parseDateOnlyInAppTimeZone,
+} from "@/lib/date-time";
 import { findResidentByNormalizedIc } from "@/lib/uploaded-document/shared";
 
 function tunggakanIdentityKey(name: string, icNumber: string) {
@@ -117,21 +121,17 @@ function parseTunggakanDate(value: string | undefined) {
     throw new Error("Tarikh tunggakan diperlukan sebelum dokumen disimpan.");
   }
 
-  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+  const date = parseDateOnlyInAppTimeZone(value.slice(0, 10));
 
-  if (Number.isNaN(date.getTime())) {
+  if (!date || Number.isNaN(date.getTime())) {
     throw new Error("Tarikh tunggakan tidak sah.");
   }
 
-  if (startOfDay(date) > startOfDay(new Date())) {
+  if (date > getTodayDateInAppTimeZone()) {
     throw new Error("Tarikh tunggakan tidak boleh melebihi tarikh hari ini.");
   }
 
   return date;
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function normalizeIc(value: string) {

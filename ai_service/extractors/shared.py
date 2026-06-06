@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from functools import lru_cache
 from io import BytesIO
+import os
 import posixpath
 import re
 import zipfile
@@ -35,9 +37,10 @@ def build_header_map_for(
     aliases_by_field: dict[str, tuple[str, ...]],
 ) -> dict[str, int]:
     header_map: dict[str, int] = {}
+    alias_lookup = build_alias_lookup(aliases_by_field)
 
     for index, header in enumerate(row):
-        canonical_field = canonical_field_for_header(header, aliases_by_field)
+        canonical_field = alias_lookup.get(clean_header(header))
         if canonical_field and canonical_field not in header_map:
             header_map[canonical_field] = index
 
@@ -52,12 +55,19 @@ def canonical_field_for_header(
     if not clean_header_value:
         return None
 
-    for field, aliases in aliases_by_field.items():
-        clean_aliases = {clean_header(alias) for alias in aliases}
-        if clean_header_value in clean_aliases:
-            return field
+    return build_alias_lookup(aliases_by_field).get(clean_header_value)
 
-    return None
+
+def build_alias_lookup(aliases_by_field: dict[str, tuple[str, ...]]) -> dict[str, str]:
+    alias_lookup: dict[str, str] = {}
+
+    for field, aliases in aliases_by_field.items():
+        for alias in aliases:
+            clean_alias = clean_header(alias)
+            if clean_alias:
+                alias_lookup.setdefault(clean_alias, field)
+
+    return alias_lookup
 
 
 def get_cell(row: list[str], header_map: dict[str, int], header: str) -> str:
@@ -67,6 +77,7 @@ def get_cell(row: list[str], header_map: dict[str, int], header: str) -> str:
     return row[index].strip()
 
 
+@lru_cache(maxsize=4096)
 def clean_header(value: str) -> str:
     return re.sub(r"[^A-Z0-9]+", " ", value.upper()).strip()
 
@@ -121,6 +132,7 @@ def _read_shared_strings(archive: zipfile.ZipFile) -> list[str]:
 def _read_sheet_paths(archive: zipfile.ZipFile) -> list[tuple[str, str]]:
     workbook = ET.fromstring(archive.read("xl/workbook.xml"))
     rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+    archive_names = set(archive.namelist())
     rel_map = {
         rel.attrib["Id"]: rel.attrib["Target"]
         for rel in rels
@@ -134,13 +146,13 @@ def _read_sheet_paths(archive: zipfile.ZipFile) -> list[tuple[str, str]]:
         if not target:
             continue
 
-        normalized_target = _workbook_relationship_path(target, archive)
+        normalized_target = _workbook_relationship_path(target, archive_names)
 
         sheet_paths.append((sheet.attrib["name"], normalized_target))
 
     return sheet_paths
 
-def _workbook_relationship_path(target: str, archive: zipfile.ZipFile) -> str:
+def _workbook_relationship_path(target: str, archive_names: set[str]) -> str:
     normalized_target = posixpath.normpath(target.replace("\\", "/").lstrip("/"))
     candidates = []
 
@@ -151,7 +163,7 @@ def _workbook_relationship_path(target: str, archive: zipfile.ZipFile) -> str:
         candidates.append(normalized_target)
 
     for candidate in candidates:
-        if candidate in archive.namelist():
+        if candidate in archive_names:
             return candidate
 
     return candidates[0]
@@ -196,6 +208,7 @@ def _cell_value(cell: ET.Element, shared_strings: list[str]) -> str:
     return (value.text or "").strip() if value is not None else ""
 
 
+@lru_cache(maxsize=2048)
 def _column_index(cell_reference: str) -> int:
     match = re.match(r"([A-Z]+)", cell_reference)
     if not match:
@@ -205,3 +218,20 @@ def _column_index(cell_reference: str) -> int:
     for char in match.group(1):
         index = index * 26 + ord(char) - 64
     return index
+
+
+@lru_cache(maxsize=1)
+def gemini_api_keys() -> tuple[str, ...]:
+    keys = [
+        os.getenv(f"GEMINI_API_KEY_{index}", "").strip()
+        for index in range(1, 51)
+    ]
+    unique_keys = []
+    seen_keys = set()
+
+    for key in keys:
+        if key and key not in seen_keys:
+            unique_keys.append(key)
+            seen_keys.add(key)
+
+    return tuple(unique_keys)

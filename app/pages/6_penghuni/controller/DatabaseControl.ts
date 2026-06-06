@@ -151,6 +151,8 @@ export function getResidentApiErrorMessage(errorData: any, fallbackMessage: stri
             return "Penghuni tidak ditemui.";
         case "DELETE_CONFLICT":
             return "Penghuni ini tidak boleh dipadam kerana masih dirujuk oleh data lain.";
+        case "INVALID_STATUS_TRANSITION":
+            return errorData?.message ?? "Perubahan status tidak dibenarkan untuk rekod ini.";
         case "VALIDATION_ERROR":
             return errorData?.message ?? fallbackMessage;
         case "CREATE_FAILED":

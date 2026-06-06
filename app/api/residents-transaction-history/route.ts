@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 type TransactionRecord = {
   id: string;
+  transactionNo: string | null;
   tarikh: string;
   kategori: string;
   catatan: string;
@@ -29,6 +30,7 @@ function formatTransactionCategory(category: string): string {
 
 function mapTransactionForApi(transaction: {
   id: string;
+  transactionNo: string | null;
   transactionDate: Date;
   category: string;
   description: string | null;
@@ -37,6 +39,7 @@ function mapTransactionForApi(transaction: {
 }): TransactionRecord {
   return {
     id: transaction.id,
+    transactionNo: transaction.transactionNo,
     tarikh: transaction.transactionDate.toLocaleDateString("ms-MY", {
       year: "numeric",
       month: "2-digit",
@@ -90,6 +93,7 @@ export async function GET(request: Request) {
       },
       select: {
         id: true,
+        transactionNo: true,
         transactionDate: true,
         category: true,
         description: true,

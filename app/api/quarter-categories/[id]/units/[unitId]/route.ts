@@ -7,17 +7,27 @@ import {
   buildQuarterUnitDeleteBlockedMessage,
   buildQuarterUnitDeletedMessage,
   buildQuarterUnitDuplicateMessage,
-  buildQuarterUnitOccupancyConflictMessage,
   buildQuarterUnitResidentNotFoundMessage,
   buildQuarterUnitUpdatedMessage,
+  getTodayStartInMalaysia,
   mapQuarterUnitDetailsForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitUpdateBody,
   quarterUnitDetailsInclude,
+  resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
+import {
+  createOccupancyBillingAdjustments,
+  syncQuarterUnitStatuses,
+  validateUnitOccupancyPeriod,
+} from "@/lib/quarters/unit-occupancy-rules";
 
 type RouteContext = {
   params: Promise<{
@@ -46,6 +56,16 @@ function isPrismaForeignKeyError(error: unknown) {
     error.code === "P2003"
   );
 }
+
+const changedFieldLabels: Record<
+  "unitCode" | "occupant" | "moveInDate" | "moveOutDate",
+  string
+> = {
+  unitCode: "Kod unit",
+  occupant: "Penghuni",
+  moveInDate: "Tarikh masuk",
+  moveOutDate: "Tarikh keluar",
+};
 
 // Used to fetch the details of a specific quarter unit, including its current occupancy and occupancy history, for display in the unit details overlay.
 export async function GET(_request: Request, context: RouteContext) {
@@ -134,6 +154,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         quarterCategory: {
           select: {
             id: true,
+            categoryName: true,
           },
         },
       },
@@ -202,12 +223,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (parsedBody.data.providedFields.occupantIcNumber) {
       const requestedOccupantIcNumber =
         parsedBody.data.updates.occupantIcNumber ?? null;
-      const nextStatus = requestedOccupantIcNumber ? "OCCUPIED" : "VACANT";
 
       if (requestedOccupantIcNumber === null) {
         if (currentOccupantIcNumber !== null || existingUnit.status !== "VACANT") {
           changedFields.push("occupant");
           shouldReplaceOccupancy = currentOccupantIcNumber !== null;
+          unitUpdateData.status = "VACANT";
         }
       } else {
         if (requestedOccupantIcNumber !== currentOccupantIcNumber) {
@@ -241,10 +262,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         } else if (existingUnit.status !== "OCCUPIED") {
           changedFields.push("occupant");
         }
-      }
-
-      if (existingUnit.status !== nextStatus) {
-        unitUpdateData.status = nextStatus;
       }
     }
 
@@ -301,14 +318,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     const nextOccupancyMoveInDate =
       parsedBody.data.updates.moveInDate ??
       currentOccupancy?.moveInDate ??
-      (nextResident ? new Date() : null);
+      (nextResident ? getTodayStartInMalaysia() : null);
     const nextOccupancyMoveOutDate = parsedBody.data.providedFields.moveOutDate
       ? (parsedBody.data.updates.moveOutDate ?? null)
       : (currentOccupancy?.moveOutDate ?? null);
     const nextOccupancyResidentId =
       nextResident?.id ?? currentOccupancy?.resident.id ?? null;
-    const shouldEndOccupancy = Boolean(nextOccupancyMoveOutDate);
-    const todayStart = getTodayStartInMalaysia();
+    const nextOccupancyState =
+      nextOccupancyMoveInDate && nextOccupancyResidentId
+        ? resolveQuarterUnitOccupancyState({
+            moveInDate: nextOccupancyMoveInDate,
+            moveOutDate: nextOccupancyMoveOutDate,
+          })
+        : null;
 
     if (nextOccupancyMoveInDate && nextOccupancyMoveOutDate) {
       if (nextOccupancyMoveOutDate.getTime() < nextOccupancyMoveInDate.getTime()) {
@@ -331,32 +353,23 @@ export async function PATCH(request: Request, context: RouteContext) {
         parsedBody.data.providedFields.moveOutDate ||
         nextResident)
     ) {
-      const overlappingResidentOccupancy =
-        await findOverlappingResidentOccupancy({
-          residentId: nextOccupancyResidentId,
-          excludedOccupancyId: nextResident
-            ? null
-            : (currentOccupancy?.id ?? null),
+      const periodValidation = await prisma.$transaction((tx) =>
+        validateUnitOccupancyPeriod(tx, {
+          unitId,
+          excludedOccupancyId: nextResident ? null : (currentOccupancy?.id ?? null),
           moveInDate: nextOccupancyMoveInDate,
           moveOutDate: nextOccupancyMoveOutDate,
-        });
+        }),
+      );
 
-      if (overlappingResidentOccupancy) {
+      if (!periodValidation.ok) {
         return NextResponse.json(
           {
             success: false,
-            message: buildQuarterUnitOccupancyConflictMessage(
-              overlappingResidentOccupancy.resident.fullName,
-              overlappingResidentOccupancy.resident.icNumber,
-              overlappingResidentOccupancy.unit.unitCode,
-              overlappingResidentOccupancy.unit.quarterCategory.categoryName,
-            ),
-            data: {
-              unitCode: overlappingResidentOccupancy.unit.unitCode,
-            },
+            message: periodValidation.message,
           },
           {
-            status: 409,
+            status: periodValidation.status,
           },
         );
       }
@@ -364,48 +377,45 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       nextOccupancyMoveInDate &&
+      !nextOccupancyResidentId &&
       (parsedBody.data.providedFields.moveInDate ||
-        parsedBody.data.providedFields.moveOutDate ||
-        nextResident)
+        parsedBody.data.providedFields.moveOutDate)
     ) {
-      const hasOverlappingOccupancy = await hasOverlappingUnitOccupancy({
-        unitId,
-        excludedOccupancyId: nextResident ? null : (currentOccupancy?.id ?? null),
-        moveInDate: nextOccupancyMoveInDate,
-        moveOutDate: nextOccupancyMoveOutDate,
-      });
+      const periodValidation = await prisma.$transaction((tx) =>
+        validateUnitOccupancyPeriod(tx, {
+          unitId,
+          excludedOccupancyId: currentOccupancy?.id ?? null,
+          moveInDate: nextOccupancyMoveInDate,
+          moveOutDate: nextOccupancyMoveOutDate,
+        }),
+      );
 
-      if (hasOverlappingOccupancy) {
+      if (!periodValidation.ok) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Julat tarikh penghunian bertindih dengan rekod penghunian sedia ada untuk unit ini.",
+            message: periodValidation.message,
           },
           {
-            status: 409,
+            status: periodValidation.status,
           },
         );
       }
     }
 
-    if (shouldEndOccupancy) {
-      unitUpdateData.status = "VACANT";
+    if (nextOccupancyState) {
+      unitUpdateData.status = nextOccupancyState.unitStatus;
 
       if (currentOccupancy && !shouldReplaceOccupancy) {
-        occupancyUpdateData.status = "PAST";
+        occupancyUpdateData.status = nextOccupancyState.occupancyStatus;
 
-        if (!changedFields.includes("occupant")) {
+        if (
+          nextOccupancyState.occupancyStatus === "PAST" &&
+          !changedFields.includes("occupant")
+        ) {
           changedFields.push("occupant");
         }
       }
-    } else if (
-      currentOccupancy &&
-      !shouldReplaceOccupancy &&
-      parsedBody.data.providedFields.moveOutDate
-    ) {
-      occupancyUpdateData.status = "CURRENT";
-      unitUpdateData.status = "OCCUPIED";
     }
 
     if (changedFields.length === 0) {
@@ -420,15 +430,47 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const updatedUnit = await prisma.$transaction(async (tx) => {
-      if (parsedBody.data.providedFields.occupantIcNumber && shouldReplaceOccupancy) {
-        await tx.unitOccupancy.updateMany({
+      const oldOccupancySnapshot = currentOccupancy
+        ? await tx.unitOccupancy.findUnique({
+            where: {
+              id: currentOccupancy.id,
+            },
+            include: {
+              resident: {
+                select: {
+                  fullName: true,
+                  icNumber: true,
+                  status: true,
+                },
+              },
+              unit: {
+                select: {
+                  unitCode: true,
+                  quarterCategory: {
+                    select: {
+                      categoryName: true,
+                      rentalPrice: true,
+                      penaltyPrice: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : null;
+
+      if (
+        parsedBody.data.providedFields.occupantIcNumber &&
+        shouldReplaceOccupancy &&
+        currentOccupancy
+      ) {
+        await tx.unitOccupancy.update({
           where: {
-            unitId,
-            status: "CURRENT",
+            id: currentOccupancy.id,
           },
           data: {
             status: "PAST",
-            moveOutDate: new Date(),
+            moveOutDate: getTodayStartInMalaysia(),
           },
         });
       }
@@ -438,9 +480,9 @@ export async function PATCH(request: Request, context: RouteContext) {
           data: {
             residentId: nextResident.id,
             unitId,
-            moveInDate: parsedBody.data.updates.moveInDate ?? new Date(),
+            moveInDate: nextOccupancyMoveInDate ?? getTodayStartInMalaysia(),
             moveOutDate: parsedBody.data.updates.moveOutDate ?? null,
-            status: shouldEndOccupancy ? "PAST" : "CURRENT",
+            status: nextOccupancyState?.occupancyStatus ?? "CURRENT",
           },
         });
       }
@@ -467,6 +509,33 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
       }
 
+      if (oldOccupancySnapshot && (shouldReplaceOccupancy || Object.keys(occupancyUpdateData).length > 0)) {
+        const nextAdjustmentPeriod =
+          shouldReplaceOccupancy || !nextOccupancyMoveInDate || !nextOccupancyResidentId
+            ? null
+            : {
+                residentId: nextOccupancyResidentId,
+                unitId,
+                moveInDate: nextOccupancyMoveInDate,
+                moveOutDate: nextOccupancyMoveOutDate,
+                residentStatus: oldOccupancySnapshot.resident.status,
+                rentalPrice: Number(
+                  oldOccupancySnapshot.unit.quarterCategory.rentalPrice,
+                ),
+                penaltyPrice: Number(
+                  oldOccupancySnapshot.unit.quarterCategory.penaltyPrice,
+                ),
+              };
+
+        await createOccupancyBillingAdjustments(
+          tx,
+          oldOccupancySnapshot,
+          nextAdjustmentPeriod,
+        );
+      }
+
+      await syncQuarterUnitStatuses(tx, [unitId]);
+
       const unit = await tx.unit.findUniqueOrThrow({
         where: {
           id: unitId,
@@ -474,14 +543,53 @@ export async function PATCH(request: Request, context: RouteContext) {
         include: buildQuarterUnitCurrentOccupancyInclude(),
       });
 
-      await createAuditLog(tx, {
+      const updatedOccupancy = unit.occupancies[0];
+
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `Unit ${unit.unitCode}`,
         actionType: "UPDATE",
+        target: formatAuditTarget([
+          existingUnit.quarterCategory.categoryName,
+          `Unit ${unit.unitCode}`,
+        ]),
         entityType: "UNIT",
         entityId: unit.id,
-        description: `Mengemaskini unit ${unit.unitCode}. Medan berubah: ${changedFields.join(", ")}.`,
+        summary: "Mengemaskini maklumat unit kuarters.",
+        changes: [
+          {
+            label: "Kod unit",
+            before: existingUnit.unitCode,
+            after: unit.unitCode,
+          },
+          {
+            label: "Status unit",
+            before: existingUnit.status,
+            after: unit.status,
+          },
+          {
+            label: "Penghuni",
+            before: currentOccupancy
+              ? `${currentOccupancy.resident.fullName} (No. KP ${currentOccupancy.resident.icNumber})`
+              : null,
+            after: updatedOccupancy
+              ? `${updatedOccupancy.resident.fullName} (No. KP ${updatedOccupancy.resident.icNumber})`
+              : null,
+          },
+          {
+            label: "Tarikh masuk",
+            before: currentOccupancy?.moveInDate ?? null,
+            after: updatedOccupancy?.moveInDate ?? null,
+          },
+          {
+            label: "Tarikh keluar",
+            before: currentOccupancy?.moveOutDate ?? null,
+            after: updatedOccupancy?.moveOutDate ?? null,
+          },
+        ],
+        details: [
+          `Medan dikemaskini: ${changedFields.map((field) => changedFieldLabels[field]).join(", ")}.`,
+        ],
       });
 
       return unit;
@@ -525,119 +633,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-async function hasOverlappingUnitOccupancy({
-  unitId,
-  excludedOccupancyId,
-  moveInDate,
-  moveOutDate,
-}: {
-  unitId: string;
-  excludedOccupancyId: string | null;
-  moveInDate: Date;
-  moveOutDate: Date | null;
-}) {
-  const overlappingOccupancy = await prisma.unitOccupancy.findFirst({
-    where: {
-      unitId,
-      ...(excludedOccupancyId
-        ? {
-            NOT: {
-              id: excludedOccupancyId,
-            },
-          }
-        : {}),
-      moveInDate: {
-        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
-      },
-      OR: [
-        {
-          moveOutDate: null,
-        },
-        {
-          moveOutDate: {
-            gte: moveInDate,
-          },
-        },
-      ],
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  return Boolean(overlappingOccupancy);
-}
-
-async function findOverlappingResidentOccupancy({
-  residentId,
-  excludedOccupancyId,
-  moveInDate,
-  moveOutDate,
-}: {
-  residentId: string;
-  excludedOccupancyId: string | null;
-  moveInDate: Date;
-  moveOutDate: Date | null;
-}) {
-  return prisma.unitOccupancy.findFirst({
-    where: {
-      residentId,
-      ...(excludedOccupancyId
-        ? {
-            NOT: {
-              id: excludedOccupancyId,
-            },
-          }
-        : {}),
-      moveInDate: {
-        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
-      },
-      OR: [
-        {
-          moveOutDate: null,
-        },
-        {
-          moveOutDate: {
-            gte: moveInDate,
-          },
-        },
-      ],
-    },
-    include: {
-      resident: {
-        select: {
-          fullName: true,
-          icNumber: true,
-        },
-      },
-      unit: {
-        select: {
-          unitCode: true,
-          quarterCategory: {
-            select: {
-              categoryName: true,
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
-function getTodayStartInMalaysia() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return new Date(`${year}-${month}-${day}T00:00:00.000+08:00`);
-}
-
 // Used to delete a quarter unit, with validations to prevent deletion if the unit has current occupancies or associated monthly charges, and handling of related business logic such as revalidating relevant pages after deletion.
 export async function DELETE(_request: Request, context: RouteContext) {
   const { id, unitId } = await context.params;
@@ -650,6 +645,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
         quarterCategory: {
           select: {
             id: true,
+            categoryName: true,
           },
         },
         _count: {
@@ -702,14 +698,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
         },
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `Unit ${existingUnit.unitCode}`,
         actionType: "DELETE",
+        target: formatAuditTarget([
+          existingUnit.quarterCategory.categoryName,
+          `Unit ${existingUnit.unitCode}`,
+        ]),
         entityType: "UNIT",
         entityId: existingUnit.id,
-        description: `Memadam unit kuarters ${existingUnit.unitCode}.`,
+        summary: "Memadam unit kuarters.",
+        details: [
+          `Jumlah rekod penghunian sebelum dipadam: ${formatAuditValue(existingUnit._count.occupancies)}.`,
+          `Jumlah caj bulanan berkaitan sebelum dipadam: ${formatAuditValue(existingUnit._count.monthlyCharges)}.`,
+        ],
       });
     });
 

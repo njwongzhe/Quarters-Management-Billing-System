@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from extractor import (
     extract_bayaran_document,
@@ -21,6 +22,7 @@ DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+SUPPORTED_UPLOAD_EXTENSIONS = (".xlsx", ".pdf")
 
 
 def load_local_env() -> None:
@@ -54,6 +56,20 @@ def get_allowed_origins() -> list[str]:
     # If no valid origins are configured, fall back to the default allowed origins.
     return origins or DEFAULT_ALLOWED_ORIGINS
 
+
+async def read_upload_file(file: UploadFile) -> bytes:
+    if not file.filename or not file.filename.lower().endswith(SUPPORTED_UPLOAD_EXTENSIONS):
+        raise HTTPException(
+            status_code=400,
+            detail="Sila muat naik fail .xlsx atau .pdf sahaja.",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Fail kosong.")
+
+    return file_bytes
+
 # Load environment variables from .env file if it exists. This allows for local configuration of the AI service without requiring environment variables to be set globally.
 load_local_env()
 
@@ -79,18 +95,11 @@ async def extract_penghuni(
     parsing_mode: str = Query(default="strict", pattern="^(strict|assisted)$"),
     limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> dict:
-    if not file.filename or not file.filename.lower().endswith((".xlsx", ".pdf")):
-        raise HTTPException(
-            status_code=400,
-            detail="Sila muat naik fail .xlsx atau .pdf sahaja.",
-        )
-
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Fail kosong.")
+    file_bytes = await read_upload_file(file)
 
     try:
-        return extract_penghuni_document(
+        return await run_in_threadpool(
+            extract_penghuni_document,
             file_bytes,
             file.filename,
             parsing_mode=parsing_mode,
@@ -109,18 +118,11 @@ async def extract_bayaran(
     parsing_mode: str = Query(default="strict", pattern="^(strict|assisted)$"),
     limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> dict:
-    if not file.filename or not file.filename.lower().endswith((".xlsx", ".pdf")):
-        raise HTTPException(
-            status_code=400,
-            detail="Sila muat naik fail .xlsx atau .pdf sahaja.",
-        )
-
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Fail kosong.")
+    file_bytes = await read_upload_file(file)
 
     try:
-        return extract_bayaran_document(
+        return await run_in_threadpool(
+            extract_bayaran_document,
             file_bytes,
             file.filename,
             parsing_mode=parsing_mode,
@@ -139,18 +141,11 @@ async def extract_kuarters(
     parsing_mode: str = Query(default="strict", pattern="^(strict|assisted)$"),
     limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> dict:
-    if not file.filename or not file.filename.lower().endswith((".xlsx", ".pdf")):
-        raise HTTPException(
-            status_code=400,
-            detail="Sila muat naik fail .xlsx atau .pdf sahaja.",
-        )
-
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Fail kosong.")
+    file_bytes = await read_upload_file(file)
 
     try:
-        return extract_kuarters_document(
+        return await run_in_threadpool(
+            extract_kuarters_document,
             file_bytes,
             file.filename,
             parsing_mode=parsing_mode,
@@ -169,18 +164,11 @@ async def extract_tunggakan(
     parsing_mode: str = Query(default="strict", pattern="^(strict|assisted)$"),
     limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> dict:
-    if not file.filename or not file.filename.lower().endswith((".xlsx", ".pdf")):
-        raise HTTPException(
-            status_code=400,
-            detail="Sila muat naik fail .xlsx atau .pdf sahaja.",
-        )
-
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Fail kosong.")
+    file_bytes = await read_upload_file(file)
 
     try:
-        return extract_tunggakan_document(
+        return await run_in_threadpool(
+            extract_tunggakan_document,
             file_bytes,
             file.filename,
             parsing_mode=parsing_mode,

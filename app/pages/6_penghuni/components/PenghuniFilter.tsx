@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import FilterOption, { type FilterOption as FilterItemOption } from "@/app/components/FIlter/FilterOption";
+import FilterOption, {
+  areAllFilterOptionsSelected,
+  normalizeSelectedValuesForOptions,
+  type FilterOption as FilterItemOption,
+} from "@/app/components/Filter/FilterOption";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import type { ResidentRecord } from "../page";
@@ -57,30 +61,43 @@ export function filterResidentsByStatus(
 }
 
 function getStatusFilterLabel(statuses: PenghuniStatusFilter[]) {
-  if (statuses.length === 0 || statuses.length === DEFAULT_PENGHUNI_STATUS_FILTERS.length) {
+  const normalizedStatuses = normalizeSelectedValuesForOptions(
+    STATUS_FILTER_OPTIONS,
+    statuses,
+  );
+  const isAllSelected = areAllFilterOptionsSelected(
+    STATUS_FILTER_OPTIONS,
+    normalizedStatuses,
+  );
+
+  if (isAllSelected) {
     return "Semua Status";
   }
 
-  return statuses.map((status) => STATUS_LABELS[status]).join(", ");
+  if (normalizedStatuses.length === 0) {
+    return "Tiada Status";
+  }
+
+  return normalizedStatuses.map((status) => STATUS_LABELS[status]).join(", ");
 }
 
 type PenghuniFilterProps = {
   selectedValues: PenghuniStatusFilter[];
   onSelect: (values: PenghuniStatusFilter[]) => void;
-  isSearchFilterActive: boolean;
 };
 
 export default function PenghuniFilter({
   selectedValues,
   onSelect,
-  isSearchFilterActive,
 }: PenghuniFilterProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  const isStatusFilterActive =
-    selectedValues.length !== DEFAULT_PENGHUNI_STATUS_FILTERS.length;
-  const isActive = isOpen || isSearchFilterActive || isStatusFilterActive;
+  const isStatusFilterActive = !areAllFilterOptionsSelected(
+    STATUS_FILTER_OPTIONS,
+    selectedValues,
+  );
+  const isActive = isOpen || isStatusFilterActive;
 
   useEffect(() => {
     if (!isOpen) {
@@ -121,13 +138,16 @@ export default function PenghuniFilter({
 
       {isOpen ? (
         <FilterOption<PenghuniStatusFilter>
-          title="Status Penghuni"
-          description="Pilih status yang ingin dipaparkan."
           ariaLabel="Tapisan status penghuni"
           defaultLabel="Semua Status"
-          options={STATUS_FILTER_OPTIONS}
-          selectedValues={selectedValues}
-          onSelect={onSelect}
+          optionSets={[
+            {
+              title: "Status Penghuni",
+              options: STATUS_FILTER_OPTIONS,
+              selectedValues: selectedValues,
+            },
+          ]}
+          onChange={(sets) => {onSelect(sets[0]?.selectedValues ?? [])}}
         />
       ) : null}
     </div>

@@ -7,8 +7,12 @@ import {
   TableInputField,
   TablePickerField,
 } from "@/app/components/InputField";
-import FilterOption from "@/app/components/FIlter/FilterOption";
+import FilterOption, {
+  areAllFilterOptionsSelected,
+  normalizeSelectedValuesForOptions,
+} from "@/app/components/Filter/FilterOption";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { PaginationControls } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadQuarterUnits } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
@@ -27,6 +31,11 @@ import {
 } from "./kuartersUnitHelpers";
 import KuartersUnitDetailsOverlay from "./KuartersUnitDetailsOverlay";
 
+type UnitOccupancyHistoryState = {
+  unitId: string;
+  records: QuarterUnitOccupancyDetails[];
+} | null;
+
 type KuartersUnitsPanelProps = {
   units: QuarterUnitRecord[];
   exportUnits: QuarterUnitRecord[];
@@ -37,10 +46,10 @@ type KuartersUnitsPanelProps = {
   currentPage: number;
   editor: KuartersUnitEditorState | null;
   filterQuery: string;
+  targetUnitId?: string;
   statusFilter: QuarterUnitStatusFilter[];
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
-  paginationItems: (number | "ellipsis")[];
   pendingAction: "save" | "delete" | null;
   pendingUnitId: string | null;
   startIndex: number;
@@ -100,8 +109,19 @@ const STATUS_LABELS: Record<QuarterUnitStatusFilter, string> = {
 };
 
 function getStatusFilterLabel(statuses: QuarterUnitStatusFilter[]) {
-  if (statuses.length === 0) return "Semua Status";
-  return statuses.map((s) => STATUS_LABELS[s]).join(", ");
+  const normalizedStatuses = normalizeSelectedValuesForOptions(
+    statusFilterOptions,
+    statuses,
+  );
+  const isAllSelected = areAllFilterOptionsSelected(
+    statusFilterOptions,
+    normalizedStatuses,
+  );
+
+  if (isAllSelected) return "Semua Status";
+  if (normalizedStatuses.length === 0) return "Tiada Status";
+
+  return normalizedStatuses.map((s) => STATUS_LABELS[s]).join(", ");
 }
 
 const statusFilterOptions: Array<{
@@ -123,6 +143,7 @@ export default function KuartersUnitsPanel({
   currentPage,
   editor,
   filterQuery,
+  targetUnitId = "",
   statusFilter,
   hasActiveFilters,
   isResidentPickerOpen,
@@ -138,7 +159,6 @@ export default function KuartersUnitsPanel({
   onPageChange,
   onSaveUnit,
   onUnavailableFeature,
-  paginationItems,
   pendingAction,
   pendingUnitId,
   startIndex,
@@ -148,7 +168,10 @@ export default function KuartersUnitsPanel({
 }: KuartersUnitsPanelProps) {
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
-  const [unitOccupancyHistory, setUnitOccupancyHistory] = useState<QuarterUnitOccupancyDetails[]>([]);
+  const targetUnitRowRef = useRef<HTMLTableRowElement | null>(null);
+  const lastScrolledTargetUnitIdRef = useRef<string | null>(null);
+  const [unitOccupancyHistory, setUnitOccupancyHistory] =
+    useState<UnitOccupancyHistoryState>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLDivElement | null>(null);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
@@ -157,12 +180,13 @@ export default function KuartersUnitsPanel({
   );
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const isSearchFilterActive = filterQuery.trim().length > 0;
-  const isStatusFilterActive = statusFilter.length !== 2;
-  const isFilterButtonActive = isFilterMenuOpen || isSearchFilterActive || isStatusFilterActive;
-
+  const isStatusFilterActive = !areAllFilterOptionsSelected(
+    statusFilterOptions,
+    statusFilter,
+  );
+  const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
   useEffect(() => {
     if (editor?.mode !== "edit") {
-      setUnitOccupancyHistory([]);
       return;
     }
 
@@ -173,9 +197,15 @@ export default function KuartersUnitsPanel({
       .then((res) => res.json())
       .then((payload: { success: boolean; data?: { unit?: { occupancyHistory?: QuarterUnitOccupancyDetails[] } } }) => {
         if (payload.success && payload.data?.unit?.occupancyHistory) {
-          setUnitOccupancyHistory(payload.data.unit.occupancyHistory);
+          setUnitOccupancyHistory({
+            unitId,
+            records: payload.data.unit.occupancyHistory,
+          });
         } else {
-          setUnitOccupancyHistory([]);
+          setUnitOccupancyHistory({
+            unitId,
+            records: [],
+          });
         }
       })
       .catch(() => { /* aborted or failed — silently keep previous state */ });
@@ -262,6 +292,26 @@ export default function KuartersUnitsPanel({
     }
   }, [isSearchOpen]);
 
+  useEffect(() => {
+    if (!targetUnitId || isLoading) {
+      return;
+    }
+
+    const targetRow = targetUnitRowRef.current;
+
+    if (!targetRow || lastScrolledTargetUnitIdRef.current === targetUnitId) {
+      return;
+    }
+
+    lastScrolledTargetUnitIdRef.current = targetUnitId;
+    window.setTimeout(() => {
+      targetRow.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  }, [isLoading, targetUnitId, units]);
+
   function renderActionCell(unit: QuarterUnitRecord, isEditing: boolean) {
     if (isEditing) {
       return (
@@ -344,27 +394,11 @@ export default function KuartersUnitsPanel({
     setIsSearchOpen(false);
   }
 
-  function handlePaginationChange(
-    action: "prev" | "next" | "goto",
-    pageNum?: number,
-  ) {
+  function handlePaginationChange(nextPage: number) {
     if (pendingAction) {
       return;
     }
-
-    if (action === "prev") {
-      onPageChange(Math.max(currentPage - 1, 1));
-      return;
-    }
-
-    if (action === "next") {
-      onPageChange(Math.min(currentPage + 1, totalPages));
-      return;
-    }
-
-    if (action === "goto" && pageNum !== undefined) {
-      onPageChange(pageNum);
-    }
+    onPageChange(nextPage);
   }
 
   function handleSelectStatusFilter(values: QuarterUnitStatusFilter[]) {
@@ -419,26 +453,33 @@ export default function KuartersUnitsPanel({
             <ToolbarButton
               icon={commonIcons.filter}
               label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
-
               isActive={isFilterButtonActive}
               hasPopup="menu"
               isExpanded={isFilterMenuOpen}
               onClick={handleToggleFilterMenu}
             />
 
-            {isFilterMenuOpen ? (
+            {isFilterMenuOpen && !isLoading ? (
               <FilterOption
-                title="Status Unit"
-                description="Pilih unit yang ingin dipaparkan."
                 ariaLabel="Tapisan status unit"
-                options={statusFilterOptions}
-                selectedValues={statusFilter}
-                onSelect={handleSelectStatusFilter}
+                defaultLabel="Semua Status"
+                optionSets={[
+                  {
+                    title: "Status Unit",
+                    options: statusFilterOptions,
+                    selectedValues: statusFilter,
+                  },
+                ]}
+                onChange={(sets) => {
+                  // Only one set, so update parent with its selectedValues
+                  handleSelectStatusFilter(sets[0]?.selectedValues ?? []);
+                }}
               />
             ) : null}
           </div>
           <ToolbarButton
             icon={commonIcons.download}
+            disabled={isLoading}
             label="Muat turun senarai unit"
             onClick={handleDownloadUnits}
           />
@@ -489,7 +530,7 @@ export default function KuartersUnitsPanel({
       ) : null}
 
       <div className="rounded-lg overflow-x-auto overflow-y-auto">
-        <div className="rounded-lg overflow-x-auto overflow-y-auto">
+        <div className="overflow-x-auto overflow-y-auto">
           <table className="w-full">
             <thead className="bg-background">
               <tr className="font-bold text-xs text-grey bg-background">
@@ -503,14 +544,11 @@ export default function KuartersUnitsPanel({
             </thead>
             <tbody className="bg-white">
               {isLoading ? (
-                <tr className="border-t border-light-grey/20">
-                  <td
-                    colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-medium text-grey"
-                  >
-                    Sedang membaca data unit kuarters...
-                  </td>
-                </tr>
+                loadingTableRows({
+                  mode: "loading",
+                  columnCount: 6,
+                  rowCount: 10,
+                })
               ) : null}
 
               {!isLoading && isCreateRowVisible ? (
@@ -616,12 +654,36 @@ export default function KuartersUnitsPanel({
                 const draftOccupantName = isEditing
                   ? editor.draft.occupantName.trim()
                   : "";
+                const activeUnitOccupancyHistory =
+                  unitOccupancyHistory?.unitId === unit.id
+                    ? unitOccupancyHistory.records
+                    : [];
+                const editableOccupancyId =
+                  activeUnitOccupancyHistory.find(
+                    (record) =>
+                      record.status === "CURRENT" &&
+                      record.occupantIcNumber === unit.occupantIcNumber,
+                  )?.id ?? null;
 
                 return (
                   <tr
                     key={unit.id}
-                    ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 ${isEditing ? "bg-dark-blue/3" : ""}`}
+                    ref={(node) => {
+                      if (isEditing) {
+                        editingRowRef.current = node;
+                      }
+
+                      if (unit.id === targetUnitId) {
+                        targetUnitRowRef.current = node;
+                      }
+                    }}
+                    className={`border-t border-light-grey/20 ${
+                      unit.id === targetUnitId
+                        ? "bg-dark-blue/8 ring-2 ring-inset ring-dark-blue/20"
+                        : isEditing
+                          ? "bg-dark-blue/3"
+                          : "hover:bg-background/60"
+                    } transition-colors`}
                   >
                     <td
                       className={`overflow-hidden text-sm font-semibold text-dark-grey align-middle w-min whitespace-nowrap
@@ -686,7 +748,8 @@ export default function KuartersUnitsPanel({
                           value={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
                           required
-                          occupancyHistory={unitOccupancyHistory}
+                          occupancyHistory={activeUnitOccupancyHistory}
+                          excludedOccupancyId={editableOccupancyId}
                           onChange={(value) => onDraftChange("moveInDate", value)}
                         />
                       ) : (
@@ -706,7 +769,8 @@ export default function KuartersUnitsPanel({
                           value={editor.draft.moveOutDate}
                           moveInDate={editor.draft.moveInDate}
                           disabled={isCurrentRowPending}
-                          occupancyHistory={unitOccupancyHistory}
+                          occupancyHistory={activeUnitOccupancyHistory}
+                          excludedOccupancyId={editableOccupancyId}
                           onChange={(value) => onDraftChange("moveOutDate", value)}
                         />
                       ) : (
@@ -738,7 +802,6 @@ export default function KuartersUnitsPanel({
             startIndex={startIndex}
             endIndex={endIndex}
             totalRecords={totalRecords}
-            paginationItems={paginationItems}
             onPageChange={handlePaginationChange}
           />
         </div>

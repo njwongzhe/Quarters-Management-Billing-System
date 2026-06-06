@@ -5,51 +5,6 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type ResidentListItem = {
-  id: string;
-  fullName: string;
-  icNumber: string;
-  phone: string | null;
-  email: string | null;
-  unitCode: string | null;
-  quarterName: string | null;
-  totalArrearsAmount: number;
-};
-
-function mapResidentForApi(resident: {
-  id: string;
-  fullName: string;
-  icNumber: string;
-  phone: string | null;
-  email: string | null;
-  occupancies: Array<{
-    moveInDate: Date | null;
-    moveOutDate: Date | null;
-    unit: {
-      unitCode: string;
-      quarterCategory: {
-        categoryName: string;
-      };
-    };
-  }>;
-  arrearsSummary: {
-    totalArrearsAmount: unknown;
-  } | null;
-}): ResidentListItem {
-  const currentOccupancy = resident.occupancies[0] ?? null;
-
-  return {
-    id: resident.id,
-    fullName: resident.fullName,
-    icNumber: resident.icNumber,
-    phone: resident.phone,
-    email: resident.email,
-    unitCode: currentOccupancy?.unit.unitCode ?? null,
-    quarterName: currentOccupancy?.unit.quarterCategory.categoryName ?? null,
-    totalArrearsAmount: Number(resident.arrearsSummary?.totalArrearsAmount ?? 0),
-  };
-}
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -139,12 +94,12 @@ export async function GET(request: Request) {
       icNumber: r.icNumber,
       phone: r.phone ?? null,
       email: r.email ?? null,
-      position: (r as any).position ?? null,
-      department: (r as any).department ?? null,
-      serviceLevel: (r as any).serviceLevel ?? null,
-      status: (r as any).status ?? "",
-      description: (r as any).description ?? null,
-      updatedAt: (r as any).updatedAt?.toISOString?.() ?? new Date().toISOString(),
+      position: r.position ?? null,
+      department: r.department ?? null,
+      serviceLevel: r.serviceLevel ?? null,
+      status: r.status ?? "",
+      description: r.description ?? null,
+      updatedAt: r.updatedAt.toISOString(),
       quarters:
         r.occupancies && r.occupancies.length > 0
           ? {

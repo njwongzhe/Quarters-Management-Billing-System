@@ -314,7 +314,7 @@ export default function PenghuniReviewDetail({
                     <Icon icon="edit" size={13} />
                     <div className="text-xs">Sedang menyunting rekod ini...</div>
                   </div>
-                  <div className="flex gap-3 w-[28rem]">
+                  <div className="flex gap-3 w-md">
                     <button
                       className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90 disabled:cursor-not-allowed disabled:opacity-60"
                       type="button"

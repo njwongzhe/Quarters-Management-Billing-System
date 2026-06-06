@@ -1,7 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import Icon from "../../../components/Icon"; // Ensure path matches your setup
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { FilterOptionSet } from "@/app/components/Filter/FilterOption";
+
+import TransaksiDownload from "./TableButton/TransaksiDownload";
+import TransaksiFilter from "./TableButton/TransaksiFilter";
+import TransaksiFilterDate from "./TableButton/TransaksiFilterDate";
+import TransaksiSearch, { TransaksiSearchPanel } from "./TableButton/TransaksiSearch";
+
+type TransactionStatus = "NORMAL" | "DIBALIKAN" | "DILARASKAN" | "PEMBALIKAN" | "PELARASAN";
+type TransactionCategory = "BAYARAN" | "CAJ_SEWA" | "CAJ_PENYELENGGARAAN" | "CAJ_PENALTI" | "CAJ_TAMBAHAN" | "REBAT" | "BAKI_AWAL" | "LAIN_LAIN";
+type TransactionType = "DEBIT" | "CREDIT";
+type FilterOptionValue = TransactionCategory | TransactionStatus | TransactionType;
 
 export interface FilterState {
   search: string;
@@ -9,183 +19,259 @@ export interface FilterState {
   endDate: string;
   categories: string[];
   statuses: string[];
+  types: string[];
 }
 
-interface TransaksiFilterPanelProps {
-  onSearch: (filters: FilterState) => void;
+type TransaksiFilterPanelProps = {
+  children: ReactNode;
+  filters: FilterState;
   isLoading: boolean;
-}
+  isExporting: boolean;
+  onFiltersChange: (filters: FilterState) => void;
+  onExport: () => void;
+};
 
-const STATUS_OPTIONS = [
-  { value: "NORMAL", label: "NORMAL", color: "bg-blue-100 text-blue-700" },
-  { value: "DIBALIKAN", label: "DIBALIKAN", color: "bg-red-100 text-red-700" },
-  { value: "DILARASKAN", label: "DILARASKAN", color: "bg-yellow-100 text-yellow-700" },
-  { value: "PEMBALIKAN", label: "PEMBALIKAN", color: "bg-red-600 text-white" },
-  { value: "PELARASAN", label: "PELARASAN", color: "bg-yellow-500 text-white" },
+// Layout static design parameters configuration mapping arrays
+const STATUS_OPTIONS: Array<{ value: TransactionStatus; label: string; dotColor: string }> = [
+  { value: "NORMAL", label: "Normal", dotColor: "bg-cyan-500" },
+  { value: "DIBALIKAN", label: "Dibalikkan", dotColor: "bg-red" },
+  { value: "DILARASKAN", label: "Dilaraskan", dotColor: "bg-amber-500" },
+  { value: "PEMBALIKAN", label: "Pembalikan", dotColor: "bg-red" },
+  { value: "PELARASAN", label: "Pelarasan", dotColor: "bg-amber-500" },
 ];
 
-const CATEGORY_OPTIONS = [
-  "BAYARAN", "CAJ_SEWA", "CAJ_PENYELENGGARAAN", "CAJ_PENALTI", "CAJ_TAMBAHAN", "REBAT", "LAIN_LAIN"
+const CATEGORY_OPTIONS: Array<{ value: TransactionCategory; label: string }> = [
+  { value: "BAYARAN", label: "Bayaran" },
+  { value: "CAJ_SEWA", label: "Caj Sewa" },
+  { value: "CAJ_PENYELENGGARAAN", label: "Caj Penyelenggaraan" },
+  { value: "CAJ_PENALTI", label: "Caj Penalti" },
+  { value: "CAJ_TAMBAHAN", label: "Caj Tambahan" },
+  { value: "REBAT", label: "Rebat" },
+  { value: "BAKI_AWAL", label: "Baki Awal" },
+  { value: "LAIN_LAIN", label: "Lain-lain" },
 ];
 
-export default function TransaksiFilterPanel({ onSearch, isLoading }: TransaksiFilterPanelProps) {
-  const [isOpen, setIsOpen] = useState(true); // Collapsible state
+const TYPE_OPTIONS: Array<{ value: TransactionType; label: string; dotColor: string }> = [
+  { value: "DEBIT", label: "Debit", dotColor: "bg-red" },
+  { value: "CREDIT", label: "Kredit", dotColor: "bg-green" },
+];
+
+export default function TransaksiFilterPanel({
+  children,
+  filters,
+  isLoading,
+  isExporting,
+  onFiltersChange,
+  onExport,
+}: TransaksiFilterPanelProps) {
+  // DOM element nodes tracker refs
+  const filterPanelRef = useRef<HTMLDivElement | null>(null);
+  const datePanelRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLDivElement | null>(null);
+  const pendingFilterUpdateRef = useRef<number | null>(null);
+
+  // Panel toggles states visibility mapping
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isDateOpen, setIsDateOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(filters.search.trim().length > 0);
   
-  const [filters, setFilters] = useState<FilterState>({
-    search: "",
-    startDate: "",
-    endDate: "",
-    categories: [],
-    statuses: ["NORMAL", "DIBALIKAN", "DILARASKAN", "PEMBALIKAN", "PELARASAN"], // Default all selected
-  });
+  /** Un-debounced quick text-buffer sync for rapid type responsiveness */
+  const [searchDraft, setSearchDraft] = useState(filters.search);
 
-  const handleStatusToggle = (status: string) => {
-    setFilters(prev => ({
-      ...prev,
-      statuses: prev.statuses.includes(status)
-        ? prev.statuses.filter(s => s !== status)
-        : [...prev.statuses, status]
-    }));
-  };
+  // Compute lookup tables structures metrics safely
+  const allStatuses = useMemo(() => STATUS_OPTIONS.map((o) => o.value), []);
+  const allCategories = useMemo(() => CATEGORY_OPTIONS.map((o) => o.value), []);
+  const allTypes = useMemo(() => TYPE_OPTIONS.map((o) => o.value), []);
 
-  const handleCategoryToggle = (category: string) => {
-    setFilters(prev => ({
-      ...prev,
-      categories: prev.categories.includes(category)
-        ? prev.categories.filter(c => c !== category)
-        : [...prev.categories, category]
-    }));
-  };
+  const optionSets: FilterOptionSet<FilterOptionValue>[] = [
+    { title: "Kategori Transaksi", options: CATEGORY_OPTIONS.map((o) => ({ ...o })), selectedValues: filters.categories as TransactionCategory[] },
+    { title: "Status Transaksi", options: STATUS_OPTIONS.map((o) => ({ ...o })), selectedValues: filters.statuses as TransactionStatus[] },
+    { title: "Jenis Transaksi", options: TYPE_OPTIONS.map((o) => ({ ...o })), selectedValues: filters.types as TransactionType[] },
+  ];
 
-  const handleReset = () => {
-    const resetState = {
-      search: "",
-      startDate: "",
-      endDate: "",
-      categories: [],
-      statuses: ["NORMAL", "DIBALIKAN", "DILARASKAN", "PEMBALIKAN", "PELARASAN"],
+  // Derive visual indicator highlights properties safely
+  const isSearchActive = filters.search.trim().length > 0;
+  const isSearchPanelOpen = isSearchOpen || isSearchActive;
+  const isDateActive = Boolean(filters.startDate || filters.endDate);
+  const hasOptionFilterActive =
+    filters.categories.length !== allCategories.length ||
+    filters.types.length !== allTypes.length ||
+    filters.statuses.length !== allStatuses.length;
+
+  // Track incoming external properties mutations to force internal buffer alignment
+  useEffect(() => {
+    setSearchDraft(filters.search);
+  }, [filters.search]);
+
+  // Focus utility management effect
+  useEffect(() => {
+    if (isSearchPanelOpen) {
+      searchInputRef.current?.querySelector("input")?.focus();
+    }
+  }, [isSearchPanelOpen]);
+
+  // -------------------------------------------------------------------------
+  // DEBOUNCER LOGIC ENGINE FOR TEXT FILTERING
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const normalizedDraft = searchDraft.trim();
+    const normalizedActive = filters.search.trim();
+
+    if (normalizedDraft === normalizedActive) return;
+
+    // Wait 300ms since user stopped typing before propagating down page layout filters
+    const timeoutId = window.setTimeout(() => {
+      onFiltersChange({
+        ...filters,
+        search: searchDraft,
+      });
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchDraft, filters, onFiltersChange]);
+
+  // Cleanup timers natively on destruction routines
+  useEffect(() => {
+    return () => {
+      if (pendingFilterUpdateRef.current !== null) {
+        window.clearTimeout(pendingFilterUpdateRef.current);
+      }
     };
-    setFilters(resetState);
-    onSearch(resetState); // Instantly search with reset values
-  };
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // OUTSIDE PORTAL POINTER-CLICK DETECTION CONTROLLERS
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isFilterOpen && !isDateOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      // Skip closed checks if user clicked natively inside external modal date calendars portal frames
+      if (target instanceof Element && target.closest("[data-filter-date-calendar]")) return;
+
+      // Skip if user interacted directly within boundaries of the dynamic panel sheets
+      if (filterPanelRef.current?.contains(target) || datePanelRef.current?.contains(target)) return;
+
+      setIsFilterOpen(false);
+      setIsDateOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isDateOpen, isFilterOpen]);
+
+  // -------------------------------------------------------------------------
+  // HANDLERS & CONTROL OPERATIONS
+  // -------------------------------------------------------------------------
+  function handleToggleSearch() {
+    if (isSearchPanelOpen) {
+      setIsSearchOpen(false);
+      if (filters.search.trim().length > 0 || searchDraft.trim().length > 0) {
+        setSearchDraft("");
+        onFiltersChange({ ...filters, search: "" });
+      }
+      return;
+    }
+    setIsSearchOpen(true);
+  }
+
+  function handleClearSearch() {
+    if (pendingFilterUpdateRef.current !== null) {
+      window.clearTimeout(pendingFilterUpdateRef.current);
+    }
+    setSearchDraft("");
+    setIsSearchOpen(false);
+    onFiltersChange({ ...filters, search: "" });
+  }
+
+  /** Schedules structural data operations safely with an incremental timing scheduler */
+  function scheduleFiltersChange(nextFilters: FilterState) {
+    if (pendingFilterUpdateRef.current !== null) {
+      window.clearTimeout(pendingFilterUpdateRef.current);
+    }
+
+    pendingFilterUpdateRef.current = window.setTimeout(() => {
+      onFiltersChange(nextFilters);
+      pendingFilterUpdateRef.current = null;
+    }, 180); // 180ms delay buffer for multi-select clicks stabilization
+  }
+
+  function handleFilterChange(sets: FilterOptionSet<FilterOptionValue>[]) {
+    const nextCategories = (sets[0]?.selectedValues ?? []) as TransactionCategory[];
+    const nextStatuses = (sets[1]?.selectedValues ?? []) as TransactionStatus[];
+    const nextTypes = (sets[2]?.selectedValues ?? []) as TransactionType[];
+
+    scheduleFiltersChange({
+      ...filters,
+      categories: nextCategories.length === allCategories.length ? [...allCategories] : nextCategories,
+      statuses: nextStatuses.length === allStatuses.length ? [...allStatuses] : nextStatuses,
+      types: nextTypes.length === allTypes.length ? [...allTypes] : nextTypes,
+    });
+  }
 
   return (
-    <div className="bg-white p-6 border-b border-gray-100 rounded-t-xl">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-dark-blue">Senarai Transaksi</h2>
-        <button 
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold transition-colors"
-        >
-          <Icon icon="filter" size={18} />
-          {isOpen ? "Tutup Penapis" : "Penapis"}
-        </button>
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
+      <div className="flex items-start justify-between gap-4 px-3 pt-3">
+        <div>
+          <h2 className="text-lg font-bold text-dark-grey">Senarai Transaksi</h2>
+          <p className="text-xs text-grey/70">Rekod transaksi terkini.</p>
+        </div>
+
+        <div className="flex items-center gap-4 text-[#607083]">
+          <TransaksiSearch isActive={isSearchPanelOpen} onToggle={handleToggleSearch} />
+
+          <TransaksiFilterDate
+            panelRef={datePanelRef}
+            isActive={isDateActive}
+            isOpen={isDateOpen}
+            startDate={filters.startDate}
+            endDate={filters.endDate}
+            onApply={(nextDate) => {
+              scheduleFiltersChange({
+                ...filters,
+                startDate: nextDate.startDate,
+                endDate: nextDate.endDate,
+              });
+            }}
+            onClear={() => {
+              scheduleFiltersChange({ ...filters, startDate: "", endDate: "" });
+              setIsDateOpen(false);
+            }}
+            onToggle={() => {
+              setIsDateOpen((v) => !v);
+              setIsFilterOpen(false);
+            }}
+          />
+
+          <TransaksiFilter<FilterOptionValue>
+            panelRef={filterPanelRef}
+            isActive={hasOptionFilterActive}
+            isOpen={isFilterOpen}
+            optionSets={optionSets}
+            onChange={handleFilterChange}
+            onToggle={() => {
+              setIsFilterOpen((v) => !v);
+              setIsDateOpen(false);
+            }}
+          />
+
+          <TransaksiDownload disabled={isLoading || isExporting} isExporting={isExporting} onExport={onExport} />
+        </div>
       </div>
 
-      {isOpen && (
-        <div className="space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
-          
-          {/* Row 1: Search Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Carian (ID, Penghuni, IC, Resit)</label>
-              <input 
-                type="text" 
-                placeholder="Cth: Ahmad Ali..." 
-                value={filters.search}
-                onChange={e => setFilters({...filters, search: e.target.value})}
-                className="w-full bg-gray-50 border border-gray-200 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tarikh Mula</label>
-              <input 
-                type="date" 
-                value={filters.startDate}
-                onChange={e => setFilters({...filters, startDate: e.target.value})}
-                className="w-full bg-gray-50 border border-gray-200 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tarikh Tamat</label>
-              <input 
-                type="date" 
-                value={filters.endDate}
-                onChange={e => setFilters({...filters, endDate: e.target.value})}
-                className="w-full bg-gray-50 border border-gray-200 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-              />
-            </div>
-          </div>
+      {isSearchPanelOpen ? (
+        <TransaksiSearchPanel
+          inputRef={searchInputRef}
+          searchDraft={searchDraft}
+          onChange={setSearchDraft}
+          onClear={handleClearSearch}
+        />
+      ) : null}
 
-          {/* Row 2: Status & Category Checkboxes */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            
-            {/* Status Filter */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Status Transaksi</label>
-              <div className="flex flex-wrap gap-3">
-                {STATUS_OPTIONS.map(opt => {
-                  const isSelected = filters.statuses.includes(opt.value);
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => handleStatusToggle(opt.value)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? opt.color : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                    >
-                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
-                        {isSelected && <Icon icon="check" size={10} className="text-current" />}
-                      </div>
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Kategori Transaksi</label>
-              <div className="flex flex-wrap gap-3">
-                {CATEGORY_OPTIONS.map(opt => {
-                  const isSelected = filters.categories.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => handleCategoryToggle(opt)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-all ${isSelected ? 'bg-dark-blue text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                    >
-                      <div className={`w-3 h-3 rounded flex items-center justify-center border ${isSelected ? 'border-white/50' : 'border-gray-400'}`}>
-                        {isSelected && <Icon icon="check" size={10} className="text-current" />}
-                      </div>
-                      {opt.replace(/_/g, ' ')}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-gray-100 w-full">
-            <button 
-              onClick={handleReset}
-              disabled={isLoading}
-              className="text-sm font-semibold text-gray-500 hover:text-dark-blue transition-colors px-2"
-            >
-              Set Semula
-            </button>
-            <button 
-              onClick={() => onSearch(filters)}
-              disabled={isLoading}
-              className="flex items-center gap-2 bg-dark-blue hover:bg-blue-900 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors disabled:opacity-50"
-            >
-              <Icon icon="search" size={18} />
-              {isLoading ? "Mencari..." : "Cari"}
-            </button>
-
-          </div>
-        </div>
-      )}
-    </div>
+      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">{children}</div>
+    </section>
   );
 }

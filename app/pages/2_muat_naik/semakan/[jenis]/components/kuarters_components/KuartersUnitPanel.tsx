@@ -25,7 +25,6 @@ type KuartersUnitPanelProps = {
   onStartEdit: (unitKey: string, unitCode: string) => void;
   onSaveUnit: (unitKey: string) => Promise<void>;
   onDeleteUnit: (unitKey: string) => Promise<void>;
-  onCancelEdit: () => void;
 };
 
 function ActionButton({
@@ -81,7 +80,6 @@ export default function KuartersUnitPanel({
   onStartEdit,
   onSaveUnit,
   onDeleteUnit,
-  onCancelEdit,
 }: KuartersUnitPanelProps) {
   const hasSelectableUnits = units.some(isSelectableUnit);
 

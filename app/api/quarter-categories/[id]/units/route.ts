@@ -6,13 +6,18 @@ import {
   buildQuarterUnitCurrentOccupancyInclude,
   buildQuarterUnitCreatedMessage,
   buildQuarterUnitDuplicateMessage,
-  buildQuarterUnitOccupancyConflictMessage,
   buildQuarterUnitResidentNotFoundMessage,
+  getTodayStartInMalaysia,
   mapQuarterCategoryUnitsDetailForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitCreateBody,
+  resolveQuarterUnitOccupancyState,
 } from "@/lib/quarters/quarter-units";
-import { createAuditLog } from "@/lib/audit/audit-logs";
+import {
+  formatAuditTarget,
+  formatAuditValue,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
 
@@ -200,31 +205,6 @@ export async function POST(request: Request, context: RouteContext) {
 
       const moveInDate = parsedBody.data.moveInDate ?? getTodayStartInMalaysia();
       const moveOutDate = parsedBody.data.moveOutDate ?? null;
-      const todayStart = getTodayStartInMalaysia();
-
-      if (moveInDate.getTime() > todayStart.getTime()) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Tarikh masuk tidak boleh selepas hari ini.",
-          },
-          {
-            status: 400,
-          },
-        );
-      }
-
-      if (moveOutDate && moveOutDate.getTime() > todayStart.getTime()) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Tarikh keluar tidak boleh selepas hari ini.",
-          },
-          {
-            status: 400,
-          },
-        );
-      }
 
       if (moveOutDate && moveOutDate.getTime() < moveInDate.getTime()) {
         return NextResponse.json(
@@ -238,41 +218,19 @@ export async function POST(request: Request, context: RouteContext) {
         );
       }
 
-      const conflictingOccupancy = await findOverlappingResidentOccupancy({
-        residentId: resident.id,
-        moveInDate,
-        moveOutDate,
-      });
-
-      if (conflictingOccupancy) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: buildQuarterUnitOccupancyConflictMessage(
-              resident.fullName,
-              resident.icNumber,
-              conflictingOccupancy.unit.unitCode,
-              conflictingOccupancy.unit.quarterCategory.categoryName,
-            ),
-            data: {
-              unitCode: conflictingOccupancy.unit.unitCode,
-            },
-          },
-          {
-            status: 409,
-          },
-        );
-      }
     }
 
     const createdUnit = await prisma.$transaction(async (tx) => {
       const moveInDate = parsedBody.data.moveInDate ?? getTodayStartInMalaysia();
       const moveOutDate = parsedBody.data.moveOutDate ?? null;
-      const isPastOccupancy = Boolean(moveOutDate);
+      const occupancyState = resolveQuarterUnitOccupancyState({
+        moveInDate,
+        moveOutDate,
+      });
       const unit = await tx.unit.create({
         data: {
           unitCode: parsedBody.data.unitCode,
-          status: resident && !isPastOccupancy ? "OCCUPIED" : "VACANT",
+          status: resident ? occupancyState.unitStatus : "VACANT",
           categoryId: id,
           occupancies: resident
             ? {
@@ -280,7 +238,7 @@ export async function POST(request: Request, context: RouteContext) {
                   residentId: resident.id,
                   moveInDate,
                   moveOutDate,
-                  status: isPastOccupancy ? "PAST" : "CURRENT",
+                  status: occupancyState.occupancyStatus,
                 },
               }
             : undefined,
@@ -288,14 +246,22 @@ export async function POST(request: Request, context: RouteContext) {
         include: buildQuarterUnitCurrentOccupancyInclude(),
       });
 
-      await createAuditLog(tx, {
+      await recordDataAuditLog(tx, {
         actor: currentAdmin,
         moduleName: "Pengurusan Kuarters",
-        targetData: `${quarterCategory.categoryName} / Unit ${unit.unitCode}`,
         actionType: "CREATE",
+        target: formatAuditTarget([quarterCategory.categoryName, `Unit ${unit.unitCode}`]),
         entityType: "UNIT",
         entityId: unit.id,
-        description: `Menambah unit ${unit.unitCode} dalam kategori ${quarterCategory.categoryName}${resident ? ` dan menetapkan penghuni ${resident.fullName}` : ""}.`,
+        summary: "Menambah unit kuarters baharu.",
+        details: [
+          `Status unit: ${formatAuditValue(unit.status)}.`,
+          resident
+            ? `Penghuni ditetapkan: ${resident.fullName} (No. KP ${resident.icNumber}).`
+            : "Tiada penghuni ditetapkan semasa unit dicipta.",
+          resident ? `Tarikh masuk: ${formatAuditValue(moveInDate)}.` : null,
+          resident ? `Tarikh keluar: ${formatAuditValue(moveOutDate)}.` : null,
+        ],
       });
 
       return unit;
@@ -346,59 +312,4 @@ export async function POST(request: Request, context: RouteContext) {
       },
     );
   }
-}
-
-async function findOverlappingResidentOccupancy({
-  residentId,
-  moveInDate,
-  moveOutDate,
-}: {
-  residentId: string;
-  moveInDate: Date;
-  moveOutDate: Date | null;
-}) {
-  return prisma.unitOccupancy.findFirst({
-    where: {
-      residentId,
-      moveInDate: {
-        lte: moveOutDate ?? new Date("9999-12-31T23:59:59.999Z"),
-      },
-      OR: [
-        {
-          moveOutDate: null,
-        },
-        {
-          moveOutDate: {
-            gte: moveInDate,
-          },
-        },
-      ],
-    },
-    include: {
-      unit: {
-        select: {
-          unitCode: true,
-          quarterCategory: {
-            select: {
-              categoryName: true,
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
-function getTodayStartInMalaysia() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return new Date(`${year}-${month}-${day}T00:00:00.000+08:00`);
 }
