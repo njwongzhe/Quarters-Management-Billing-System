@@ -1,4 +1,4 @@
-## Summary of AI Setup Steps
+# Summary of AI Setup Steps
 
 ```txt
 Preconditions:
@@ -36,7 +36,7 @@ Deactivate the Virtual Environment:
 
 <br />
 
-## AI Extraction Service
+# AI Extraction Service
 
 This project uses a Python virtual environment under:
 
@@ -46,7 +46,7 @@ This project uses a Python virtual environment under:
 
 <br />
 
-### Run From Project Root
+## Run From Project Root
 
 ```powershell
 npm run dev:ai
@@ -54,7 +54,7 @@ npm run dev:ai
 
 <br />
 
-### Environment
+## Environment
 
 The AI service owns its own environment config in `ai_service/.env`:
 
@@ -66,7 +66,7 @@ AI_SERVICE_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 For deployment, add the deployed frontend URL to this comma-separated list.
 
-### Run From ai_service
+## Run From ai_service
 
 ```powershell
 cd D:\AP1\Application_Development_Project_I\ai_service
@@ -75,7 +75,7 @@ cd D:\AP1\Application_Development_Project_I\ai_service
 
 <br />
 
-### Activate The Venv
+## Activate The Venv
 
 ```powershell
 cd D:\AP1\Application_Development_Project_I\ai_service
@@ -90,7 +90,7 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000
 
 <br />
 
-### Test
+## Test
 
 ```powershell
 Invoke-WebRequest http://127.0.0.1:8000/health
