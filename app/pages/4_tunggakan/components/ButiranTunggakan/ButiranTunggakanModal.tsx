@@ -280,7 +280,7 @@ export default function ButiranTunggakanModal({
 
   return (
     <div
-      className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/45 p-12 backdrop-blur-sm"
+      className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-md"
       onClick={onClose}
     >
       <section

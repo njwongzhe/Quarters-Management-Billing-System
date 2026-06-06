@@ -63,7 +63,6 @@ export default function ButiranTunggakanHistory({
     startIndex,
     endIndex,
     handlePageChange,
-    paginationItems,
   } = usePaginationLogic(filteredHistory.length, itemsPerPage);
   const currentHistory = filteredHistory.slice(startIndex, endIndex);
 
@@ -140,7 +139,6 @@ export default function ButiranTunggakanHistory({
                   startIndex={startIndex}
                   endIndex={endIndex}
                   totalRecords={filteredHistory.length}
-                  paginationItems={paginationItems}
                   onPageChange={handlePageChange}
                 />
               </td>

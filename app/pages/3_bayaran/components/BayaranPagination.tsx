@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  buildPaginationItems,
   PaginationControls,
 } from "@/app/components/Pagination/Pagination";
 
@@ -28,21 +27,7 @@ export default function BayaranPagination({
         startIndex={Math.max(0, firstVisibleRecord - 1)}
         endIndex={lastVisibleRecord}
         totalRecords={totalRecordCount}
-        paginationItems={buildPaginationItems(currentPage, totalPages)}
-        onPageChange={(action, pageNum) => {
-          const nextPage =
-            action === "prev"
-              ? Math.max(1, currentPage - 1)
-              : action === "next"
-                ? Math.min(totalPages, currentPage + 1)
-                : pageNum;
-
-          if (!nextPage || nextPage === currentPage) {
-            return;
-          }
-
-          onPageChange(nextPage);
-        }}
+        onPageChange={onPageChange}
       />
     </div>
   );

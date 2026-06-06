@@ -159,13 +159,12 @@ export default function AuditLogTablePanel({
 
         <div className="flex items-center gap-4 text-[#607083]">
           <AuditSearch
-            disabled={isToolbarDisabled}
             filters={filters}
             isOpen={isSearchOpen}
             onToggle={handleToggleSearch}
           />
-          <AuditFilterDate disabled={isToolbarDisabled} filters={filters} onBeforeOpen={() => {}} />
-          <AuditFilter disabled={isToolbarDisabled} filters={filters} options={filterOptions} />
+          <AuditFilterDate filters={filters} onBeforeOpen={() => {}} />
+          <AuditFilter filters={filters} options={filterOptions} />
           <AuditDownload
             disabled={isToolbarDisabled}
             exportHref={`/api/audit-logs/export${buildAuditLogQueryString(
@@ -242,6 +241,12 @@ export default function AuditLogTablePanel({
             </thead>
             <tbody className="bg-white">
               {isBootstrapping ? (
+                loadingTableRows({
+                  mode: "loading",
+                  columnCount: 6,
+                  rowCount: 10,
+                })
+              ) : isLoadingPage ? (
                 loadingTableRows({
                   mode: "loading",
                   columnCount: 6,

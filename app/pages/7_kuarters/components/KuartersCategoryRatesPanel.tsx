@@ -93,7 +93,6 @@ export default function KuartersCategoryRatesPanel({
     startIndex,
     endIndex,
     handlePageChange,
-    paginationItems,
   } = usePaginationLogic(rates.length, itemsPerPage);
   const paginatedRates = rates.slice(startIndex, endIndex);
 
@@ -506,7 +505,6 @@ export default function KuartersCategoryRatesPanel({
             startIndex={startIndex}
             endIndex={endIndex}
             totalRecords={rates.length}
-            paginationItems={paginationItems}
             onPageChange={handlePageChange}
           />
         </div>

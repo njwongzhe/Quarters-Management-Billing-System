@@ -137,13 +137,12 @@ export default function KuartersUnitDetailsHistoryTab({
     startIndex,
     endIndex,
     handlePageChange,
-    paginationItems,
   } = usePaginationLogic(historyRecords.length, HISTORY_PAGE_SIZE);
 
   const currentHistory = historyRecords.slice(startIndex, endIndex);
 
   useEffect(() => {
-    handlePageChange("goto", 1);
+    handlePageChange(1);
   }, [dateFilterKey, searchKey, statusFilterKey, unitDetails.id]);
 
   useEffect(() => {
@@ -644,7 +643,6 @@ export default function KuartersUnitDetailsHistoryTab({
                   startIndex={startIndex}
                   endIndex={endIndex}
                   totalRecords={historyRecords.length}
-                  paginationItems={paginationItems}
                   onPageChange={handlePageChange}
                 />
               </td>

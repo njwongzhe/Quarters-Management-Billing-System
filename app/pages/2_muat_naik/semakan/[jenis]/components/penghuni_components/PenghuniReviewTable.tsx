@@ -43,7 +43,6 @@ export default function PenghuniReviewTable({
     startIndex,
     endIndex,
     handlePageChange,
-    paginationItems,
   } = usePaginationLogic(records.length, itemsPerPage);
   const currentRecords = records.slice(startIndex, endIndex);
   const selectedKeySet = new Set(selectedKeys);
@@ -286,7 +285,6 @@ export default function PenghuniReviewTable({
                     startIndex={startIndex}
                     endIndex={endIndex}
                     totalRecords={records.length}
-                    paginationItems={paginationItems}
                     onPageChange={handlePageChange}
                   />
                 </td>

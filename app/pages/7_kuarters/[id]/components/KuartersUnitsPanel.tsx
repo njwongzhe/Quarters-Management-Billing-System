@@ -50,7 +50,6 @@ type KuartersUnitsPanelProps = {
   statusFilter: QuarterUnitStatusFilter[];
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
-  paginationItems: (number | "ellipsis")[];
   pendingAction: "save" | "delete" | null;
   pendingUnitId: string | null;
   startIndex: number;
@@ -160,7 +159,6 @@ export default function KuartersUnitsPanel({
   onPageChange,
   onSaveUnit,
   onUnavailableFeature,
-  paginationItems,
   pendingAction,
   pendingUnitId,
   startIndex,
@@ -396,27 +394,11 @@ export default function KuartersUnitsPanel({
     setIsSearchOpen(false);
   }
 
-  function handlePaginationChange(
-    action: "prev" | "next" | "goto",
-    pageNum?: number,
-  ) {
+  function handlePaginationChange(nextPage: number) {
     if (pendingAction) {
       return;
     }
-
-    if (action === "prev") {
-      onPageChange(Math.max(currentPage - 1, 1));
-      return;
-    }
-
-    if (action === "next") {
-      onPageChange(Math.min(currentPage + 1, totalPages));
-      return;
-    }
-
-    if (action === "goto" && pageNum !== undefined) {
-      onPageChange(pageNum);
-    }
+    onPageChange(nextPage);
   }
 
   function handleSelectStatusFilter(values: QuarterUnitStatusFilter[]) {
@@ -820,7 +802,6 @@ export default function KuartersUnitsPanel({
             startIndex={startIndex}
             endIndex={endIndex}
             totalRecords={totalRecords}
-            paginationItems={paginationItems}
             onPageChange={handlePaginationChange}
           />
         </div>

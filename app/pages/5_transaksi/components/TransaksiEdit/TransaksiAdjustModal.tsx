@@ -111,7 +111,7 @@ export default function TransaksiAdjustModal({ isOpen, onClose, transaction, onS
   };
 
   return (
-    <div className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/45 p-8 backdrop-blur-sm lg:p-12">
+    <div className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-md lg:p-12">
       <div
         className="flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl"
         role="dialog"

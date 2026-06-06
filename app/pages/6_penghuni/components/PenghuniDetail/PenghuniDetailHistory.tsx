@@ -102,7 +102,7 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
     // Apply date range filter via extracted hook.
     const { filteredHistory, FilterButton } = usePenghuniDetailHistoryFilter(historyWithBaki);
 
-    const { currentPage, totalPages, startIndex, endIndex, handlePageChange, paginationItems } = usePaginationLogic(filteredHistory.length, itemsPerPage);
+    const { currentPage, totalPages, startIndex, endIndex, handlePageChange } = usePaginationLogic(filteredHistory.length, itemsPerPage);
     const currentHistory = filteredHistory.slice(startIndex, endIndex);
 
     return (
@@ -183,7 +183,6 @@ export default function PenghuniDetailHistory({ residentId }: { residentId?: str
                                     startIndex={startIndex}
                                     endIndex={endIndex}
                                     totalRecords={filteredHistory.length}
-                                    paginationItems={paginationItems}
                                     onPageChange={handlePageChange}
                                 />
                             </td>

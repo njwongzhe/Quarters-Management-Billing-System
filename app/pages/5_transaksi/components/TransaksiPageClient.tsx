@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  buildPaginationItems,
   PaginationControls,
 } from "@/app/components/Pagination/Pagination";
 
@@ -372,7 +371,6 @@ export default function TransaksiPageClient() {
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + transactions.length;
-  const paginationItems = buildPaginationItems(currentPage, totalPages);
 
   const handleViewDetails = (tx: any) => {
     setSelectedViewTx(tx);
@@ -411,18 +409,7 @@ export default function TransaksiPageClient() {
             startIndex={startIndex}
             endIndex={Math.min(endIndex, totalItems)}
             totalRecords={totalItems}
-            paginationItems={paginationItems}
-            onPageChange={(action, pageNum) => {
-              const nextPage =
-                action === "prev"
-                  ? Math.max(1, currentPage - 1)
-                  : action === "next"
-                    ? Math.min(totalPages, currentPage + 1)
-                    : pageNum;
-
-              if (!nextPage || nextPage === currentPage) return;
-              setCurrentPage(nextPage);
-            }}
+            onPageChange={setCurrentPage}
           />
         </div>
       </TransaksiFilterPanel>

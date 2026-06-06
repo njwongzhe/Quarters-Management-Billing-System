@@ -89,7 +89,7 @@ export default function PenghuniTable({
     
     // Pagination Logic
     const itemsPerPage = 10;
-    const { currentPage, totalPages, startIndex, endIndex, handlePageChange, paginationItems } = usePaginationLogic(filteredResidents.length, itemsPerPage);
+    const { currentPage, totalPages, startIndex, endIndex, handlePageChange } = usePaginationLogic(filteredResidents.length, itemsPerPage);
     const currentResidents = filteredResidents.slice(startIndex, endIndex);
 
     // Selected Resident for Detail View
@@ -327,7 +327,6 @@ export default function PenghuniTable({
                                     startIndex={startIndex}
                                     endIndex={endIndex}
                                     totalRecords={filteredResidents.length}
-                                    paginationItems={paginationItems}
                                     onPageChange={handlePageChange}
                                 />
                             </td>

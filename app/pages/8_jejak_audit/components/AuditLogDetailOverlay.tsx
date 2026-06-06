@@ -33,7 +33,7 @@ export default function AuditLogDetailOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-sm">
+    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-md">
       <section
         className="relative flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl"
         role="dialog"

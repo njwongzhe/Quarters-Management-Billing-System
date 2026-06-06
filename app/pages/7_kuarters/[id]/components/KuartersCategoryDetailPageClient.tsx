@@ -666,7 +666,6 @@ export default function KuartersCategoryDetailPageClient({
         onPageChange={setCurrentPage}
         onSaveUnit={handleSaveUnit}
         onUnavailableFeature={handleUnavailableFeature}
-        paginationItems={pagination.pageItems}
         pendingAction={pendingAction}
         pendingUnitId={pendingUnitId}
         startIndex={pagination.startIndex}

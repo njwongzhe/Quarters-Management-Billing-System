@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import Icon from "@/app/components/Icon/Icon";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import {
-  buildPaginationItems,
   PaginationControls,
 } from "@/app/components/Pagination/Pagination";
 import type { TunggakanListItem, TunggakanFilter } from "@/lib/arrears/arrears";
@@ -226,21 +225,7 @@ export default function TunggakanTable({
                   startIndex={startIndex}
                   endIndex={endIndex}
                   totalRecords={filteredData.length}
-                  paginationItems={buildPaginationItems(currentPage, totalPages)}
-                  onPageChange={(action, pageNum) => {
-                    const nextPage =
-                      action === "prev"
-                        ? Math.max(1, currentPage - 1)
-                        : action === "next"
-                          ? Math.min(totalPages, currentPage + 1)
-                          : pageNum;
-
-                    if (!nextPage || nextPage === currentPage) {
-                      return;
-                    }
-
-                    setCurrentPage(nextPage);
-                  }}
+                  onPageChange={setCurrentPage}
                 />
               </div>
             </td>
