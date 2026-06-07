@@ -189,10 +189,30 @@ export async function POST(request: Request) {
         for (const item of cajTambahan) {
             totalNewTambahan += item.amaun;
             
+            // Resolve specific target month based on item.tarikh (already parsed as Date)
+            const itemChargeMonth = item.tarikh 
+                ? getMonthStartInAppTimeZone(item.tarikh)
+                : chargeMonth;
+
+            // Find or Create the Monthly Charge record for this specific month
+            let itemMonthlyCharge = await tx.monthlyCharge.findUnique({
+              where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth: itemChargeMonth } }
+            });
+
+            if (!itemMonthlyCharge) {
+                itemMonthlyCharge = await tx.monthlyCharge.create({
+                    data: {
+                        residentId: resident.id,
+                        chargeMonth: itemChargeMonth,
+                        unitId: resident.occupancies[0]?.unitId || null,
+                    }
+                });
+            }
+
             // 1. Add to AdditionalCharge Table
             await tx.additionalCharge.create({
                 data: {
-                    monthlyChargeId: monthlyCharge.id,
+                    monthlyChargeId: itemMonthlyCharge.id,
                     chargeDate: item.tarikh,
                     description: item.catatan,
                     amount: item.amaun,
@@ -206,11 +226,21 @@ export async function POST(request: Request) {
                 data: {
                     transactionNo: txNoTambahan,
                     residentId: resident.id,
-                    transactionDate: item.tarikh ? new Date(item.tarikh) : new Date(), // Actual date of charge
-                    chargeMonth: chargeMonth, // Target billing period
+                    transactionDate: new Date(), // Actual date of creation (today)
+                    chargeMonth: itemChargeMonth, // Target billing period
                     category: "CAJ_TAMBAHAN",
                     description: item.catatan,
                     debitAmount: item.amaun,
+                }
+            });
+
+            // Update this specific monthlyCharge record
+            await tx.monthlyCharge.update({
+                where: { id: itemMonthlyCharge.id },
+                data: {
+                    additionalChargesTotal: { increment: item.amaun },
+                    totalMonthlyCharge: { increment: item.amaun },
+                    balanceForMonth: { increment: item.amaun }
                 }
             });
         }
@@ -219,10 +249,30 @@ export async function POST(request: Request) {
         for (const item of rebat) {
             totalNewRebat += item.amaun;
             
+            // Resolve specific target month based on item.tarikh (already parsed as Date)
+            const itemChargeMonth = item.tarikh 
+                ? getMonthStartInAppTimeZone(item.tarikh)
+                : chargeMonth;
+
+            // Find or Create the Monthly Charge record for this specific month
+            let itemMonthlyCharge = await tx.monthlyCharge.findUnique({
+              where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth: itemChargeMonth } }
+            });
+
+            if (!itemMonthlyCharge) {
+                itemMonthlyCharge = await tx.monthlyCharge.create({
+                    data: {
+                        residentId: resident.id,
+                        chargeMonth: itemChargeMonth,
+                        unitId: resident.occupancies[0]?.unitId || null,
+                    }
+                });
+            }
+
             // 1. Add to Rebate Table
             await tx.rebate.create({
                 data: {
-                    monthlyChargeId: monthlyCharge.id,
+                    monthlyChargeId: itemMonthlyCharge.id,
                     rebateDate: item.tarikh,
                     description: item.catatan,
                     amount: item.amaun,
@@ -236,26 +286,35 @@ export async function POST(request: Request) {
                 data: {
                     transactionNo: txNoRebat,
                     residentId: resident.id,
-                    transactionDate: item.tarikh ? new Date(item.tarikh) : new Date(), // Actual date of rebate
-                    chargeMonth: chargeMonth, // Target billing period
+                    transactionDate: new Date(), // Actual date of creation (today)
+                    chargeMonth: itemChargeMonth, // Target billing period
                     category: "REBAT",
                     description: item.catatan,
                     creditAmount: item.amaun,
                 }
             });
+
+            // Update this specific monthlyCharge record
+            await tx.monthlyCharge.update({
+                where: { id: itemMonthlyCharge.id },
+                data: {
+                    rebateTotal: { increment: item.amaun },
+                    balanceForMonth: { increment: -item.amaun }
+                }
+            });
         }
 
-        // D. Update the MonthlyCharge totals
-        await tx.monthlyCharge.update({
-            where: { id: monthlyCharge.id },
-            data: {
-                maintenanceAmount: { increment: senggaraChargeToAdd },
-                additionalChargesTotal: { increment: totalNewTambahan },
-                rebateTotal: { increment: totalNewRebat },
-                totalMonthlyCharge: { increment: senggaraChargeToAdd + totalNewTambahan },
-                balanceForMonth: { increment: senggaraChargeToAdd + totalNewTambahan - totalNewRebat },
-            }
-        });
+        // D. Update the top-level MonthlyCharge totals for Senggara
+        if (senggaraChargeToAdd > 0) {
+            await tx.monthlyCharge.update({
+                where: { id: monthlyCharge.id },
+                data: {
+                    maintenanceAmount: { increment: senggaraChargeToAdd },
+                    totalMonthlyCharge: { increment: senggaraChargeToAdd },
+                    balanceForMonth: { increment: senggaraChargeToAdd },
+                }
+            });
+        }
 
         // E. Update the Master Arrears Summary (Live Sum)
         // Arrears = Previous Arrears + New Senggara + New Tambahan - New Rebat
