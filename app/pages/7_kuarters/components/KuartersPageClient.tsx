@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import KuartersCategoryRatesPanel from "./KuartersCategoryRatesPanel";
@@ -82,6 +82,31 @@ export default function KuartersPageClient({
   const sortedQuarterCategories = sortQuarterCategories(quarterCategories);
   const hasActiveFilters = hasActiveQuarterCategoryFilters(filters);
   const filteredQuarterCategories = filterQuarterCategories(sortedQuarterCategories, filters);
+  const filteredSummary = useMemo(() => {
+    const totalUnits = filteredQuarterCategories.reduce(
+      (sum, category) => sum + category.unitCount,
+      0,
+    );
+    const occupiedUnits = filteredQuarterCategories.reduce(
+      (sum, category) => sum + category.occupiedUnitCount,
+      0,
+    );
+    const vacantUnits = filteredQuarterCategories.reduce(
+      (sum, category) => sum + category.vacantUnitCount,
+      0,
+    );
+    const occupancyRate =
+      totalUnits === 0
+        ? 0
+        : Number(((occupiedUnits / totalUnits) * 100).toFixed(1));
+
+    return {
+      totalUnits,
+      occupiedUnits,
+      vacantUnits,
+      occupancyRate,
+    };
+  }, [filteredQuarterCategories]);
 
   useEffect(() => {
     if (hasValidInitialData) return;
@@ -304,7 +329,7 @@ export default function KuartersPageClient({
     <div className="flex flex-col gap-4">
       <KuartersPageHeader />
       <KuartersFeedbackBanner notice={notice} onDismiss={() => setNotice(null)} />
-      <KuartersOverviewCards cards={buildKuartersSummaryCards(summary)} />
+      <KuartersOverviewCards cards={buildKuartersSummaryCards(filteredSummary)} />
       <KuartersCategoryRatesPanel
         isLoading={isTableLoading}
         editor={editor}

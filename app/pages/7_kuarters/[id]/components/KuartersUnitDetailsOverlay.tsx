@@ -177,13 +177,15 @@ export default function KuartersUnitDetailsOverlay({
           </TabButton>
         </nav>
 
-        <div className="p-6 bg-light-blue overflow-y-auto">
-          {isLoading ? (
+        {isLoading ? (
+          <div className="h-full">
             <SearchingDetailDataOverlay
               mode="loading"
               loadingMessage="Mendapatkan Maklumat Unit Kuarters..."
             />
-          ) : errorMessage ? (
+          </div>
+        ) : errorMessage ? (
+          <div className="h-full">
             <SearchingDetailDataOverlay
               mode="warning"
               title="Maklumat Tidak Dapat Dipaparkan"
@@ -191,18 +193,23 @@ export default function KuartersUnitDetailsOverlay({
               onRetry={() => setReloadToken((currentValue) => currentValue + 1)}
               retryLabel="Cuba Lagi"
             />
-          ) : activeTab === "unit" && unitDetails ? (
+          </div>
+        ) : activeTab === "unit" && unitDetails ? (
+          <div className="overflow-y-auto bg-light-blue p-6">
             <KuartersUnitDetailsUnitTab
               unitDetails={unitDetails}
               onAssignOccupant={() => onAssignOccupant(unitDetails.id)}
             />
-          ) : unitDetails ? (
+          </div>
+          
+        ) : unitDetails ? (
+          <div className="overflow-y-auto bg-light-blue p-6">
             <KuartersUnitDetailsHistoryTab
               unitDetails={unitDetails}
               onUnitUpdated={setUnitDetails}
             />
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

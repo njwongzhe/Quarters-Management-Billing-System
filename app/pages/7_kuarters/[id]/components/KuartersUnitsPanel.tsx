@@ -10,8 +10,9 @@ import {
 import FilterOption, {
   areAllFilterOptionsSelected,
   normalizeSelectedValuesForOptions,
-} from "@/app/components/FIlter/FilterOption";
+} from "@/app/components/Filter/FilterOption";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { PaginationControls } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadQuarterUnits } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
@@ -49,7 +50,6 @@ type KuartersUnitsPanelProps = {
   statusFilter: QuarterUnitStatusFilter[];
   hasActiveFilters: boolean;
   isResidentPickerOpen: boolean;
-  paginationItems: (number | "ellipsis")[];
   pendingAction: "save" | "delete" | null;
   pendingUnitId: string | null;
   startIndex: number;
@@ -159,7 +159,6 @@ export default function KuartersUnitsPanel({
   onPageChange,
   onSaveUnit,
   onUnavailableFeature,
-  paginationItems,
   pendingAction,
   pendingUnitId,
   startIndex,
@@ -395,27 +394,11 @@ export default function KuartersUnitsPanel({
     setIsSearchOpen(false);
   }
 
-  function handlePaginationChange(
-    action: "prev" | "next" | "goto",
-    pageNum?: number,
-  ) {
+  function handlePaginationChange(nextPage: number) {
     if (pendingAction) {
       return;
     }
-
-    if (action === "prev") {
-      onPageChange(Math.max(currentPage - 1, 1));
-      return;
-    }
-
-    if (action === "next") {
-      onPageChange(Math.min(currentPage + 1, totalPages));
-      return;
-    }
-
-    if (action === "goto" && pageNum !== undefined) {
-      onPageChange(pageNum);
-    }
+    onPageChange(nextPage);
   }
 
   function handleSelectStatusFilter(values: QuarterUnitStatusFilter[]) {
@@ -470,14 +453,13 @@ export default function KuartersUnitsPanel({
             <ToolbarButton
               icon={commonIcons.filter}
               label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
-
               isActive={isFilterButtonActive}
               hasPopup="menu"
               isExpanded={isFilterMenuOpen}
               onClick={handleToggleFilterMenu}
             />
 
-            {isFilterMenuOpen ? (
+            {isFilterMenuOpen && !isLoading ? (
               <FilterOption
                 ariaLabel="Tapisan status unit"
                 defaultLabel="Semua Status"
@@ -497,6 +479,7 @@ export default function KuartersUnitsPanel({
           </div>
           <ToolbarButton
             icon={commonIcons.download}
+            disabled={isLoading}
             label="Muat turun senarai unit"
             onClick={handleDownloadUnits}
           />
@@ -547,7 +530,7 @@ export default function KuartersUnitsPanel({
       ) : null}
 
       <div className="rounded-lg overflow-x-auto overflow-y-auto">
-        <div className="rounded-lg overflow-x-auto overflow-y-auto">
+        <div className="overflow-x-auto overflow-y-auto">
           <table className="w-full">
             <thead className="bg-background">
               <tr className="font-bold text-xs text-grey bg-background">
@@ -561,14 +544,11 @@ export default function KuartersUnitsPanel({
             </thead>
             <tbody className="bg-white">
               {isLoading ? (
-                <tr className="border-t border-light-grey/20">
-                  <td
-                    colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-medium text-grey"
-                  >
-                    Sedang membaca data unit kuarters...
-                  </td>
-                </tr>
+                loadingTableRows({
+                  mode: "loading",
+                  columnCount: 6,
+                  rowCount: 10,
+                })
               ) : null}
 
               {!isLoading && isCreateRowVisible ? (
@@ -702,8 +682,8 @@ export default function KuartersUnitsPanel({
                         ? "bg-dark-blue/8 ring-2 ring-inset ring-dark-blue/20"
                         : isEditing
                           ? "bg-dark-blue/3"
-                          : ""
-                    }`}
+                          : "hover:bg-background/60"
+                    } transition-colors`}
                   >
                     <td
                       className={`overflow-hidden text-sm font-semibold text-dark-grey align-middle w-min whitespace-nowrap
@@ -822,7 +802,6 @@ export default function KuartersUnitsPanel({
             startIndex={startIndex}
             endIndex={endIndex}
             totalRecords={totalRecords}
-            paginationItems={paginationItems}
             onPageChange={handlePaginationChange}
           />
         </div>

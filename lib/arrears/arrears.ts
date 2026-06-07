@@ -18,8 +18,8 @@ export type TunggakanListItem = {
   fullName: string;
   icNumber: string;
   quarterClass: string; // e.g., "PPR Kempas"
-  unitCode: string;     // e.g., "Blok B-04-12"
-  quarterAddress: string;
+  unitCode: string | null; // e.g., "Blok B-04-12"
+  quarterAddress: string | null; // e.g., "123 Main St"
   sewa: number;
   senggara: number;
   penalti: number;
@@ -29,7 +29,8 @@ export type TunggakanListItem = {
 };
 
 export type TunggakanSummary = {
-  jumlahRekod: number; // Total Historical Charges (Debits)
+  jumlahRekod: number; // Total People with Arrears
+  jumlahKutipan: number; // Total Amount Collected (Debits)
   jumlahTunggakan: number; // Live Current Outstanding Debt
 };
 
@@ -105,9 +106,9 @@ export function mapTunggakanForApi(
 ): TunggakanListItem {
   
   const activeOccupancy = resident.occupancies.find(o => o.status === "CURRENT");
-  const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "Tiada";
-  const unitCode = activeOccupancy?.unit.unitCode || "Tiada";
-  const quarterAddress = activeOccupancy?.unit.quarterCategory?.address || "";
+  const quarterClass = activeOccupancy?.unit.quarterCategory?.categoryName || "N/A";
+  const unitCode = activeOccupancy?.unit.unitCode || null;
+  const quarterAddress = activeOccupancy?.unit.quarterCategory?.address || null;
 
   let sewa = 0;
   let senggara = 0;
@@ -254,6 +255,8 @@ export type TunggakanFilter = {
   statusBayaran: string;
   mempunyaiPenalti: boolean;
   mempunyaiRebat: boolean;
+  statusBayaranSelections: string[];
+  chargePresenceSelections: string[];
 };
 
 export const defaultFilter: TunggakanFilter = {
@@ -264,4 +267,6 @@ export const defaultFilter: TunggakanFilter = {
   statusBayaran: "SEMUA",
   mempunyaiPenalti: false,
   mempunyaiRebat: false,
+  statusBayaranSelections: ["SUDAH_DIKUTIP", "BELUM_DIKUTIP"],
+  chargePresenceSelections: [],
 };

@@ -30,8 +30,10 @@ type AuditLogExportResponse = {
 
 export default function AuditDownload({
   exportHref,
+  disabled = false,
 }: {
   exportHref: string;
+  disabled?: boolean;
 }) {
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -65,7 +67,7 @@ export default function AuditDownload({
     <ToolbarIconButton
       icon="download"
       label="Muat turun rekod audit"
-      disabled={isDownloading}
+      disabled={isDownloading || disabled}
       onClick={handleDownload}
     />
   );

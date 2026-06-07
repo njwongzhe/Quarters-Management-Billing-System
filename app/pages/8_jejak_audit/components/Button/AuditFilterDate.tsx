@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import FilterDate from "@/app/components/FIlter/FilterDate";
+import FilterDate from "@/app/components/Filter/FilterDate";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import {

@@ -1,11 +1,11 @@
 -- How to Use This Migration:
--- 1. In command line, run: `npx prisma migrate dev --name add_status_automation`.
--- 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_add_status_automation/migration.sql` and replace its content with this code.
+-- 1. In command line, run: `npx prisma migrate dev --name pg_cron_add_resident_status_automation`.
+-- 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_pg_cron_add_resident_status_automation/migration.sql` and replace its content with this code.
 -- 3. To apply the migration, run: `npx prisma migrate deploy` again.
 -- If any edited has been maded to this file, please make sure to do further steps to ensure the changes are applied correctly:
 -- 1. Go to Supabase Sidebar > "SQL Editer" and run:
 --    DELETE FROM _prisma_migrations 
---    WHERE migration_name = '<id>_add_status_automation'; -- Replace <id> with the actual ID of the migration folder you just created.
+--    WHERE migration_name = '<id>_pg_cron_add_resident_status_automation'; -- Replace <id> with the actual ID of the migration folder you just created.
 -- 2. Then, re-run Step 1 to Step 3 above to ensure the migration is applied with the correct changes.
 
 -- Prerequisites:

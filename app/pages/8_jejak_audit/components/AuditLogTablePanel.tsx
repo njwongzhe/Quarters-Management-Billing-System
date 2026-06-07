@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import Icon from "@/app/components/Icon/Icon";
 import { InputField as SharedInputField } from "@/app/components/InputField";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import AuditDownload from "./Button/AuditDownload";
 import AuditFilter from "./Button/AuditFilter";
 import AuditLogPagination from "./AuditLogPagination";
@@ -93,6 +94,7 @@ export default function AuditLogTablePanel({
   const rows = activePageData?.rows ?? auditRows;
   const currentPagination = activePageData?.pagination ?? pagination;
   const currentPageError = pageError?.dataKey === dataKey ? pageError.message : "";
+  const isToolbarDisabled = isBootstrapping || isInitialLoading || isLoadingPage;
 
   async function handlePageChange(page: number) {
     const safePage = Math.min(Math.max(1, page), currentPagination.totalPages);
@@ -164,6 +166,7 @@ export default function AuditLogTablePanel({
           <AuditFilterDate filters={filters} onBeforeOpen={() => {}} />
           <AuditFilter filters={filters} options={filterOptions} />
           <AuditDownload
+            disabled={isToolbarDisabled}
             exportHref={`/api/audit-logs/export${buildAuditLogQueryString(
               filters,
             )}`}
@@ -238,16 +241,23 @@ export default function AuditLogTablePanel({
             </thead>
             <tbody className="bg-white">
               {isBootstrapping ? (
-                <tr className="border-t border-light-grey/20">
-                  <td
-                    colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-medium text-grey"
-                  >
-                    Sedang membaca rekod jejak audit...
-                  </td>
-                </tr>
+                loadingTableRows({
+                  mode: "loading",
+                  columnCount: 6,
+                  rowCount: 10,
+                })
+              ) : isLoadingPage ? (
+                loadingTableRows({
+                  mode: "loading",
+                  columnCount: 6,
+                  rowCount: 10,
+                })
               ) : isInitialLoading ? (
-                <AuditLoadingRows />
+                loadingTableRows({
+                  mode: "loading",
+                  columnCount: 6,
+                  rowCount: 10,
+                })
               ) : rows.length > 0 ? (
                 rows.map((row) => (
                   <tr
@@ -283,14 +293,12 @@ export default function AuditLogTablePanel({
                   </tr>
                 ))
               ) : (
-                <tr className="border-t border-light-grey/20">
-                  <td
-                    colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-medium text-grey"
-                  >
-                    Tiada rekod audit operasi ditemui.
-                  </td>
-                </tr>
+                loadingTableRows({
+                  mode: "message",
+                  columnCount: 6,
+                  rowCount: 1,
+                  message: "Tiada rekod audit operasi ditemui.",
+                })
               )}
             </tbody>
           </table>
@@ -302,22 +310,6 @@ export default function AuditLogTablePanel({
         />
       </div>
     </section>
-  );
-}
-
-function AuditLoadingRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }, (_, index) => (
-        <tr key={index} className="border-t border-light-grey/20">
-          {Array.from({ length: 6 }, (_, cellIndex) => (
-            <td key={cellIndex} className="px-3 py-3">
-              <div className="h-4 w-full max-w-32 animate-pulse rounded bg-light-blue" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }
 

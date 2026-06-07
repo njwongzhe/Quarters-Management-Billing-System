@@ -7,7 +7,7 @@ import FilterOption, {
   areAllFilterOptionsSelected,
   normalizeSelectedValuesForOptions,
   type FilterOption as FilterItemOption,
-} from "@/app/components/FIlter/FilterOption";
+} from "@/app/components/Filter/FilterOption";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 

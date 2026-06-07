@@ -46,6 +46,7 @@ export type PenghuniTableProps = {
     isLoading: boolean;
     errorMessage: string | null;
     setResidents: Dispatch<SetStateAction<ResidentRecord[]>>;
+    onFilteredResidentsChange: (rows: ResidentRecord[]) => void;
 };
 
 type ResidentsResponse = {
@@ -66,6 +67,7 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
 
 export default function PenghuniPage() {
     const [residents, setResidents] = useState<ResidentRecord[]>([]);
+    const [filteredResidents, setFilteredResidents] = useState<ResidentRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -89,12 +91,14 @@ export default function PenghuniPage() {
                 }
 
                 setResidents(payload.data?.residents ?? []);
+                setFilteredResidents(payload.data?.residents ?? []);
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;
                 }
 
                 setResidents([]);
+                setFilteredResidents([]);
                 setErrorMessage(getErrorMessage(error, "Gagal mendapatkan senarai penghuni."));
             } finally {
                 if (!controller.signal.aborted) {
@@ -114,9 +118,9 @@ export default function PenghuniPage() {
     const onCreateSuccess = handleCreateSuccess.bind(null, setResidents);
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
             {/* Page Header */}
-            <PenghuniHeader residents={residents} />
+            <PenghuniHeader residents={filteredResidents} />
 
             {/* Table */}
             <Suspense>
@@ -125,6 +129,7 @@ export default function PenghuniPage() {
                     isLoading={isLoading}
                     errorMessage={errorMessage}
                     setResidents={setResidents}
+                    onFilteredResidentsChange={setFilteredResidents}
                 />
             </Suspense>
 

@@ -89,7 +89,6 @@ export type BayaranStatCard = {
   helper: string;
   icon: string;
   accent: string;
-  dot: string;
   helperColor: string;
   value: string;
 };

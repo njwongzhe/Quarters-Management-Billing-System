@@ -1,12 +1,12 @@
 export default function BayaranPageHeader() {
   return (
-    <div>
-      <h1 className="text-[30px] font-extrabold leading-tight tracking-normal text-[#06152D]">
+    <header className="flex flex-col">
+      <h1 className="text-2xl font-extrabold leading-tight text-dark-grey">
         Semakan Bayaran
       </h1>
-      <p className="mt-1 text-xs font-medium text-[#667085]">
+      <p className="text-sm font-extralight text-grey/70">
         Pengesahan potongan gaji bulanan melalui data perbendaharaan.
       </p>
-    </div>
+    </header>
   );
 }

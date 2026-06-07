@@ -6,7 +6,7 @@ import FilterOption, {
   areAllFilterOptionsSelected,
   normalizeSelectedValuesForOptions,
   type FilterOption as FilterItemOption,
-} from "@/app/components/FIlter/FilterOption";
+} from "@/app/components/Filter/FilterOption";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import type { ResidentRecord } from "../page";

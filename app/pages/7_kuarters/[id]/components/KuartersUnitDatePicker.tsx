@@ -26,18 +26,13 @@ type KuartersUnitDatePickerProps = {
   onChange: (value: string) => void;
 };
 
-// Helper function to parse a date string in "YYYY-MM-DD" format and return a Date object.
-// If the input is invalid or not in the correct format, it returns null.
 function parseDateInput(value: string | undefined) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value))
     return null;
-
   const date = new Date(`${value}T00:00:00`);
-
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// Formats a Date object to "YYYY-MM-DD" using LOCAL date parts to avoid UTC offset issues.
 function formatDateToString(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -45,55 +40,35 @@ function formatDateToString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-// Helper function that returns all dates (inclusive) between a start and end date as "YYYY-MM-DD" strings.
-// If either date is invalid, returns an empty array.
 function getDatesBetween(startDate: string, endDate: string): string[] {
   const start = parseDateInput(startDate);
   const end = parseDateInput(endDate);
-
   if (!start || !end || start > end) return [];
-
   const dates: string[] = [];
   const current = new Date(start);
-
   while (current <= end) {
     dates.push(formatDateToString(current));
     current.setDate(current.getDate() + 1);
   }
-
   return dates;
 }
 
-// Returns occupied dates for completed ranges only. Open-ended records are handled
-// by backend validation and by the next move-in upper bound.
 function getOccupiedDates(occupancyHistory: OccupancyDateRange[]): string[] {
   const dateSet = new Set<string>();
-
   for (const record of occupancyHistory) {
-    if (!record.moveOutDate) {
-      continue;
-    }
-
+    if (!record.moveOutDate) continue;
     const start = record.moveInDate.slice(0, 10);
     const end = record.moveOutDate.slice(0, 10);
-
     for (const date of getDatesBetween(start, end)) {
       dateSet.add(date);
     }
   }
-
   return Array.from(dateSet);
 }
 
-// Helper function to format the date value for display in the button. 
-// It converts a "YYYY-MM-DD" string into a more user-friendly format like "DD MMM YYYY" (e.g., "25 Dec 2024"). 
-// If the input is invalid, it returns the original string.
 function formatDatePickerLabel(value: string) {
   const date = parseDateInput(value);
-
-  if (!date)
-    return value;
-
+  if (!date) return value;
   return new Intl.DateTimeFormat("ms-MY", {
     day: "2-digit",
     month: "short",
@@ -111,34 +86,37 @@ export default function KuartersUnitDatePicker({
   excludedOccupancyId = null,
   onChange,
 }: KuartersUnitDatePickerProps) {
-  // Floating Picker State & Refs 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [pickerPosition, setPickerPosition] = useState({ left: 0, bottom: 0 });
+  
+  const [pickerPosition, setPickerPosition] = useState({ left: "auto", right: "0px", bottom: 0 });
 
   // Position Calculation Logic
   const getFloatingPosition = () => {
-    if (!buttonRef.current) return { left: 0, bottom: 0 };
+    if (!buttonRef.current) return { left: "auto", right: "0px", bottom: 0 };
 
     const buttonRect = buttonRef.current.getBoundingClientRect();
-    const horizontalPadding = 12;
     const verticalGap = 8;
-    const pickerWidth = 320;
+    
+    const rightDistance = window.innerWidth - buttonRect.right;
+    const bottomPosition = window.innerHeight - buttonRect.top + verticalGap;
 
-    const left = Math.min(
-      Math.max(horizontalPadding, buttonRect.right - pickerWidth),
-      window.innerWidth - pickerWidth - horizontalPadding,
-    );
+    if (buttonRect.right < 230) {
+      return {
+        left: `${Math.max(8, buttonRect.left)}px`,
+        right: "auto",
+        bottom: bottomPosition,
+      };
+    }
 
-    const bottom = window.innerHeight - buttonRect.top + verticalGap;
-
-    return { left, bottom };
+    return {
+      left: "auto",
+      right: `${Math.max(0, rightDistance)}px`,
+      bottom: bottomPosition,
+    };
   };
 
-  // Floating Picker Logic
-  // When the picker is open, we calculate its position based on the button's location and the viewport size to ensure it stays within the screen bounds.
-  // We also add event listeners to handle clicks outside the picker (to close it) and to update the picker's position on window resize or scroll.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -175,18 +153,6 @@ export default function KuartersUnitDatePicker({
     };
   }, [isOpen]);
 
-  // --- Date Restriction Logic ---
-  // 1) Collect blocked dates from the selected unit's completed occupancy ranges.
-  //
-  // 2) For Tarikh Keluar, build [minDate, maxDate] constraints:
-  //    - minDate = Selected Tarikh Masuk.
-  //                It prevents selecting a Tarikh Keluar that is earlier than Tarikh Masuk. (Red)
-  //    - maxDate = Day before the earliest blocked date after Tarikh Masuk.
-  //                It ensures between Tarikh Masuk and Tarikh Keluar there is no occupied date to avoid selecting a Tarikh Keluar that overlaps with occupied dates. (Orange)
-  //                Example: Tarikh Masuk = 1, disabled = [5, 6, 7] → maxDate = 4.
-  //
-  // 3) Pass visual metadata so calendar can color and explain each disabled rule via tooltip.
-
   const UNIT_OCCUPIED_NOTE = "Tarikh ini unit sudah didiami penghuni lain.";
   const MOVE_OUT_MIN_NOTE = "Tarikh Keluar mesti selepas Tarikh Masuk.";
   const MOVE_OUT_RANGE_NOTE = "Julat Tarikh Masuk hingga Tarikh Keluar tidak boleh merangkumi tarikh berpenghuni.";
@@ -196,97 +162,60 @@ export default function KuartersUnitDatePicker({
   );
   const unitOccupiedDates = getOccupiedDates(relevantOccupancyHistory);
   const nextMoveInDate = (() => {
-    if (fieldType !== "moveOutDate" || !moveInDate) {
-      return undefined;
-    }
-
+    if (fieldType !== "moveOutDate" || !moveInDate) return undefined;
     return relevantOccupancyHistory
       .map((record) => record.moveInDate.slice(0, 10))
       .filter((date) => date > moveInDate)
       .sort()[0];
   })();
 
-  // Tarikh Masuk Blocking: Grouped disabled rules with distinct colors and notes.
   const moveInDisabledDateGroups: DisabledDateGroup[] = [
     {
       dates: unitOccupiedDates,
       note: UNIT_OCCUPIED_NOTE,
-      textColor: "#854d0e", // Dark Yellow
-      backgroundColor: "#fef9c3", // Light Yellow
+      textColor: "#854d0e",
+      backgroundColor: "#fef9c3",
     },
   ].filter((group) => group.dates.length > 0);
 
-  // Tarikh Masuk Blocking Dates Array
   const moveInDisabledDates = Array.from(
     new Set(moveInDisabledDateGroups.flatMap((group) => group.dates)),
   );
 
   const minDate = (() => {
-    if (fieldType !== "moveOutDate" || !moveInDate) {
-      return undefined;
-    }
-
+    if (fieldType !== "moveOutDate" || !moveInDate) return undefined;
     const dayAfterMoveIn = parseDateInput(moveInDate);
-
-    if (!dayAfterMoveIn) {
-      return undefined;
-    }
-
+    if (!dayAfterMoveIn) return undefined;
     dayAfterMoveIn.setDate(dayAfterMoveIn.getDate() + 1);
     return formatDateToString(dayAfterMoveIn);
   })();
 
-  // Tarikh Keluar Blocking: Upper bound stops right before the next occupancy move-in.
   const maxDate = (() => {
-    if (fieldType !== "moveOutDate" || !moveInDate || !nextMoveInDate) {
-      return undefined;
-    }
-
-    // maxDate is the day before the first blocked date after Tarikh Masuk.
+    if (fieldType !== "moveOutDate" || !moveInDate || !nextMoveInDate) return undefined;
     const dayBeforeFirstBlocked = parseDateInput(nextMoveInDate);
-    if (!dayBeforeFirstBlocked)
-      return undefined;
-
-    // Subtract one day to get the maxDate. (Since the blocked date itself is not allowed, we need to step back one day.)
+    if (!dayBeforeFirstBlocked) return undefined;
     dayBeforeFirstBlocked.setDate(dayBeforeFirstBlocked.getDate() - 1);
     return formatDateToString(dayBeforeFirstBlocked);
   })();
 
-  // Tarikh Keluar Blocking: Visual hint for minDate rule (< Tarikh Masuk).
   const moveOutMinDateMeta: DisabledDateMeta | undefined =
     fieldType === "moveOutDate" && moveInDate
-      ? {
-          note: MOVE_OUT_MIN_NOTE,
-          textColor: "#991b1b", // Dark Red
-          backgroundColor: "#fee2e2", // Light Red
-        }
+      ? { note: MOVE_OUT_MIN_NOTE, textColor: "#991b1b", backgroundColor: "#fee2e2" }
       : undefined;
 
-  // Tarikh Keluar Blocking: Visual hint for maxDate rule. (Range must not include occupied dates.)
   const moveOutMaxDateMeta: DisabledDateMeta | undefined =
     fieldType === "moveOutDate" && maxDate
-      ? {
-          note: MOVE_OUT_RANGE_NOTE,
-          textColor: "#9a3412", // Dark Orange
-          backgroundColor: "#ffedd5", // Light Orange
-        }
+      ? { note: MOVE_OUT_RANGE_NOTE, textColor: "#9a3412", backgroundColor: "#ffedd5" }
       : undefined;
 
-  // Calendar Component Props: Disabled dates and groups are only relevant for Tarikh Masuk since Tarikh Keluar uses min/max date restrictions instead of discrete disabled dates.
   const calendarDisabledDates = fieldType === "moveInDate" ? moveInDisabledDates : [];
   const calendarDisabledDateGroups = fieldType === "moveInDate" ? moveInDisabledDateGroups : [];
 
-  // --- End of Date Restriction Logic ---
-
-  // Auto-clear the selected value if it falls on a disabled date or outside the valid range.
   useEffect(() => {
     if (!value) return;
-
-    const isDisabled =
-      fieldType === "moveInDate" && calendarDisabledDates.includes(value);
+    const isDisabled = fieldType === "moveInDate" && calendarDisabledDates.includes(value);
     const isBelowMin = minDate ? value < minDate : false;
     const isAboveMax = maxDate ? value > maxDate : false;
-
     if (isDisabled || isBelowMin || isAboveMax) {
       onChange("");
     }
@@ -311,13 +240,9 @@ export default function KuartersUnitDatePicker({
           setIsOpen((state) => !state);
         }}
       >
-        {/* Icon */}
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-xl bg-light-blue text-dark-blue">
           <Icon icon="calendar_month" size={16} />
         </span>
-
-        {/* Placeholder or Selected Date */}
-        {/* If value exists, format it for display. Otherwise, show placeholder text. */}
         <span className={`flex items-center justify-center w-full ${value ? "truncate" : "truncate text-grey"}`}>
           {value ? formatDatePickerLabel(value) : "Pilih Tarikh"}
         </span>
@@ -328,18 +253,17 @@ export default function KuartersUnitDatePicker({
         ? createPortal(
             <div
               data-kuarters-date-picker="true"
-              className="fixed z-50 rounded-3xl border border-light-grey/20 bg-white shadow-[0_18px_45px_rgba(13,47,86,0.16)]"
+              className="fixed z-50"
               style={{
-                left: `${pickerPosition.left}px`,
+                left: pickerPosition.left,
+                right: pickerPosition.right,
                 bottom: `${pickerPosition.bottom}px`,
-                width: "320px",
               }}
               role="dialog"
               aria-label="Pilih tarikh penghunian"
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Calendar Component */}
               <Calender
                 containerRef={containerRef}
                 isOpen={true}

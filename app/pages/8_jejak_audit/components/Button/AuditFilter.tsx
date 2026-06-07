@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import FilterOption from "@/app/components/FIlter/FilterOption";
+import FilterOption from "@/app/components/Filter/FilterOption";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import {
   buildAuditLogQueryString,

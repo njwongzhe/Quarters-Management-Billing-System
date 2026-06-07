@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
-import Calender from "@/app/components/Calender/Calender";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
-import { Topic } from "@/app/components/InputField";
+import { DateField, InputField, Topic } from "@/app/components/InputField";
 import type { BayaranDetail } from "@/lib/payments/bayaran-types";
 
 type AddPaymentOverlayProps = {
@@ -42,9 +41,6 @@ export default function AddPaymentOverlay({
   onSaved,
 }: AddPaymentOverlayProps) {
   const [drafts, setDrafts] = useState<PaymentDraft[]>([]);
-  const [activeDatePickerId, setActiveDatePickerId] = useState<string | null>(
-    null,
-  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const currentArrears = paymentDetails.payment.arrearsAmount ?? 0;
@@ -129,11 +125,11 @@ export default function AddPaymentOverlay({
 
   return (
     <div
-      className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-center justify-center bg-black/45 p-8 backdrop-blur-sm"
+      className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 p-12 backdrop-blur-md flex items-start justify-center"
       onClick={onClose}
     >
       <section
-        className="flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl"
+        className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full bg-light-blue"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-payment-title"
@@ -150,11 +146,11 @@ export default function AddPaymentOverlay({
           </div>
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/10 hover:text-white"
+            className="hover:scale-96 active:scale-92 text-white"
             aria-label="Tutup tambah bayaran"
             onClick={onClose}
           >
-            <Icon icon={commonIcons.close} size={22} />
+            <Icon icon="close" size={20} />
           </button>
         </header>
 
@@ -190,43 +186,51 @@ export default function AddPaymentOverlay({
                   {drafts.map((draft) => (
                     <PaymentDraftRow
                       key={draft.id}
-                      activeDatePickerId={activeDatePickerId}
                       draft={draft}
                       disabled={isSaving}
                       onChange={handleDraftChange}
                       onDelete={handleDeleteDraft}
-                      onDatePickerChange={setActiveDatePickerId}
                     />
                   ))}
                 </div>
               )}
             </section>
 
-            <section className="relative overflow-hidden rounded-lg bg-dark-blue p-6 text-white shadow-[0_24px_40px_rgba(23,31,111,0.18)]">
-              <div className="flex items-center justify-between gap-4 border-b border-white/15 pb-5">
-                <div className="text-xs font-bold uppercase text-light-grey">
-                  Tunggakan Semasa
+            <section className="flex flex-col gap-4">
+              <Topic content="MAKLUMAT BAYARAN" />
+              <div className="flex flex-col gap-3 relative overflow-hidden rounded-lg bg-dark-blue p-4 text-white shadow-[0_24px_40px_rgba(23,31,111,0.18)]">
+                {/* Arrears Currently */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-xs font-bold uppercase text-light-grey">TUNGGAKAN SEMASA</div>
+                  <div className="text-sm font-bold">RM {formatMoney(currentArrears)}</div>
                 </div>
-                <div className="text-sm font-bold">
-                  RM {formatMoney(currentArrears)}
+
+                <hr className="border-white/20" />
+
+                {/* Total Payment */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-xs font-bold uppercase text-light-grey">AMAUN BAYAR</div>
+                  <div className="text-sm font-bold">RM {formatMoney(totalPaid)}</div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between gap-4 border-b border-white/15 py-5">
-                <div className="text-xs font-bold uppercase text-light-grey">
-                  Amaun Bayar
+
+                <hr className="border-white/20" />
+
+                <div className="flex items-center justify-between">
+                  {/* Arrears Left */}
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs font-bold uppercase text-light-grey">BAKI TUNGGAKAN</div>
+                    <div className="text-2xl font-bold text-[#70A9FF]">{formatSignedMoney(remainingBalance)}</div>
+                  </div>
+
+                  {/* Icon */}
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10">
+                    <Icon
+                      icon={remainingBalance <= 0 ? "check_circle" : "priority_high"}
+                      size={40}
+                      filled
+                    />
+                  </div>
                 </div>
-                <div className="text-sm font-bold">RM {formatMoney(totalPaid)}</div>
-              </div>
-              <div className="pt-6">
-                <div className="mb-2 text-xs font-bold uppercase text-light-grey">
-                  Baki Tunggakan
-                </div>
-                <div className="text-lg font-bold text-[#70A9FF]">
-                  {formatSignedMoney(remainingBalance)}
-                </div>
-              </div>
-              <div className="absolute bottom-6 right-6 grid h-18 w-18 place-items-center rounded-2xl bg-white/10">
-                <Icon icon="priority_high" size={44} filled />
               </div>
             </section>
 
@@ -236,15 +240,15 @@ export default function AddPaymentOverlay({
               </div>
             ) : null}
 
-            <footer className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-xs text-grey">
-                <Icon icon="edit_note" size={18} />
-                <span>Sedang menambah bayaran rekod...</span>
+            <footer className="flex items-center justify-between">
+              <div className="flex flex-row gap-1 items-center justify-center text-grey/80">
+                <Icon icon="edit" size={13} className=""></Icon>
+                <div className="text-xs">Sedang menambah bayaran rekod...</div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex gap-3 w-xs">
                 <button
+                  className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-red px-5 py-3 rounded-md hover:bg-red/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   type="button"
-                  className="inline-flex min-h-11 min-w-32 items-center justify-center gap-2 rounded-md bg-red px-5 py-3 text-xs font-bold text-white transition hover:bg-red/90 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isSaving}
                   onClick={onClose}
                 >
@@ -252,8 +256,8 @@ export default function AddPaymentOverlay({
                   Batal
                 </button>
                 <button
+                  className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   type="button"
-                  className="inline-flex min-h-11 min-w-52 items-center justify-center gap-2 rounded-md bg-green px-5 py-3 text-xs font-bold text-white transition hover:bg-green/90 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={isSaving || drafts.length === 0}
                   onClick={handleSave}
                 >
@@ -270,14 +274,11 @@ export default function AddPaymentOverlay({
 }
 
 function PaymentDraftRow({
-  activeDatePickerId,
   disabled,
   draft,
   onChange,
-  onDatePickerChange,
   onDelete,
 }: {
-  activeDatePickerId: string | null;
   disabled: boolean;
   draft: PaymentDraft;
   onChange: (
@@ -285,74 +286,56 @@ function PaymentDraftRow({
     field: keyof Omit<PaymentDraft, "id">,
     value: string,
   ) => void;
-  onDatePickerChange: (draftId: string | null) => void;
   onDelete: (draftId: string) => void;
 }) {
-  const datePickerRef = useRef<HTMLDivElement | null>(null);
-  const isDatePickerOpen = activeDatePickerId === draft.id;
-
   return (
     <div className="grid grid-cols-[184px_226px_1fr_184px_36px] items-start gap-4">
-      <div ref={datePickerRef} className="relative">
-        <button
-          type="button"
-          className="flex min-h-12 w-full items-center justify-between rounded-md border border-light-grey/40 bg-white px-3 py-3 text-left text-sm font-semibold text-dark-grey outline-none transition-colors hover:border-dark-blue disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={disabled}
-          onClick={() => onDatePickerChange(isDatePickerOpen ? null : draft.id)}
-        >
-          <span className={draft.paymentDate ? "" : "text-light-grey"}>
-            {formatDateForDisplay(draft.paymentDate) || "Pilih Tarikh"}
-          </span>
-          <Icon icon={commonIcons.calendar} size={18} className="text-grey" />
-        </button>
-        <Calender
-          containerRef={datePickerRef}
-          isOpen={isDatePickerOpen}
+      <DateField
+          label="Tarikh"
+          showLabel={false}
           value={draft.paymentDate}
+          placeholder="Pilih Tarikh"
+          state={disabled ? "inactive" : "active"}
           onChange={(value) => onChange(draft.id, "paymentDate", value)}
-          onClose={() => onDatePickerChange(null)}
-          scale={0.95}
-        />
-      </div>
+      />
 
-      <input
-        type="text"
+      <InputField
+        label="No. Resit"
+        showLabel={false}
         value={draft.receiptNo}
-        disabled={disabled}
         placeholder="RES-"
-        className="min-h-12 rounded-md border border-light-grey/40 bg-white px-3 py-3 text-sm font-semibold text-dark-grey outline-none transition-colors placeholder:text-light-grey focus:border-dark-blue disabled:cursor-not-allowed disabled:opacity-50"
-        onChange={(event) =>
-          onChange(draft.id, "receiptNo", event.target.value)
-        }
+        state={disabled ? "inactive" : "active"}
+        onChange={(value) => onChange(draft.id, "receiptNo", value)}
       />
 
-      <input
-        type="text"
+      <InputField
+        label="Catatan"
+        showLabel={false}
         value={draft.description}
-        disabled={disabled}
         placeholder="bayaran"
-        className="min-h-12 rounded-md border border-light-grey/40 bg-white px-3 py-3 text-sm font-semibold text-dark-grey outline-none transition-colors placeholder:text-light-grey focus:border-dark-blue disabled:cursor-not-allowed disabled:opacity-50"
-        onChange={(event) =>
-          onChange(draft.id, "description", event.target.value)
-        }
+        state={disabled ? "inactive" : "active"}
+        onChange={(value) => onChange(draft.id, "description", value)}
       />
 
-      <input
-        type="text"
-        inputMode="decimal"
-        value={draft.amount}
-        disabled={disabled}
-        placeholder="0.00"
-        className="min-h-12 rounded-md border border-light-grey/40 bg-white px-3 py-3 text-right text-sm font-semibold text-dark-grey outline-none transition-colors placeholder:text-light-grey focus:border-dark-blue disabled:cursor-not-allowed disabled:opacity-50"
-        onChange={(event) => onChange(draft.id, "amount", event.target.value)}
-        onBlur={() => {
+      <div
+        onBlurCapture={() => {
           const parsedAmount = parseAmount(draft.amount);
 
           if (parsedAmount !== null) {
             onChange(draft.id, "amount", parsedAmount.toFixed(2));
           }
         }}
-      />
+      >
+        <InputField
+          label="Amaun"
+          showLabel={false}
+          value={draft.amount}
+          placeholder="0.00"
+          state={disabled ? "inactive" : "active"}
+          textAlign="right"
+          onChange={(value) => onChange(draft.id, "amount", value)}
+        />
+      </div>
 
       <button
         type="button"
@@ -411,24 +394,6 @@ function formatSignedMoney(value: number) {
   const prefix = value < 0 ? "- RM " : "RM ";
 
   return `${prefix}${formatMoney(Math.abs(value))}`;
-}
-
-function formatDateForDisplay(value: string) {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("ms-MY", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
 }
 
 function createClientId() {

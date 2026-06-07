@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
-import FilterDate from "@/app/components/FIlter/FilterDate";
+import FilterDate from "@/app/components/Filter/FilterDate";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import type { TransactionRecord } from "./PenghuniDetailHistory";
 
@@ -80,6 +80,7 @@ export function usePenghuniDetailHistoryFilter(
     }
 
     const isActive = Boolean(dateFilter.startDate || dateFilter.endDate);
+    const isButtonActive = isActive || isOpen;
 
     const filteredHistory = isActive
         ? records.filter((record) => {
@@ -140,7 +141,7 @@ export function usePenghuniDetailHistoryFilter(
                 <ToolbarIconButton
                     icon={commonIcons.calendar}
                     label="Tapis mengikut tarikh"
-                    isActive={isActive}
+                    isActive={isButtonActive}
                     onClick={handleToggle}
                 />
             </div>

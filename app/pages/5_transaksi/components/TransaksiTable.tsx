@@ -1,6 +1,7 @@
 "use client";
 
-import Icon from "../../../components/Icon";
+import Icon from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 
 type TransactionRow = {
   id: string;
@@ -25,43 +26,58 @@ type TransactionRow = {
 interface TransaksiTableProps {
   transactions: TransactionRow[];
   isLoading: boolean;
+  isFetching?: boolean;
   onView: (tx: TransactionRow) => void;
   onReverse: (tx: TransactionRow) => void;
   onAdjust: (tx: TransactionRow) => void;
 }
 
-export default function TransaksiTable({ transactions, isLoading, onView, onReverse, onAdjust }: TransaksiTableProps) {
-  
-  const formatRM = (amount: number | string) => {
-    return Number(amount).toLocaleString("ms-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+function formatRM(amount: number | string) {
+  return Number(amount).toLocaleString("ms-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case "NORMAL": return <span className="bg-teal-50 text-teal-700 px-2 py-1 rounded text-[10px] font-bold uppercase border border-teal-100">NORMAL</span>;
-      case "DIBALIKAN": return <span className="bg-red-50 text-red-700 px-2 py-1 rounded text-[10px] font-bold uppercase border border-red-100">DIBALIKAN</span>;
-      case "DILARASKAN": return <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded text-[10px] font-bold uppercase border border-yellow-100">DILARASKAN</span>;
-      case "PEMBALIKAN": return <span className="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold uppercase">PEMBALIKAN</span>;
-      case "PELARASAN": return <span className="bg-yellow-500 text-white px-2 py-1 rounded text-[10px] font-bold uppercase">PELARASAN</span>;
-      default: return <span className="px-2 py-1 rounded text-[10px] font-bold uppercase">{status}</span>;
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-12 text-center text-gray-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-dark-blue mx-auto mb-4"></div>
-        <p>Sedang memuat turun data transaksi...</p>
-      </div>
-    );
+function formatShortTransactionId(value?: string | null) {
+  if (!value) {
+    return "N/A";
   }
 
-  const sortedTransactions = [...transactions].sort((a, b) => {
-    // Susun mengikut waktu dicipta (Terkini sentiasa di atas)
+  return value.includes("-") ? `${value.split("-")[0]}...` : value;
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case "NORMAL":
+      return <span className="bg-normal px-2 py-0.5 text-[10px] font-bold uppercase text-[#0E7490]">Normal</span>;
+    case "DIBALIKAN":
+      return <span className="rounded-[5px] bg-red px-2 py-0.5 text-[10px] font-bold uppercase text-white">Dibalikkan</span>;
+    case "DILARASKAN":
+      return <span className="rounded-[5px] bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold uppercase text-[#92400E]">Dilaraskan</span>;
+    case "PEMBALIKAN":
+      return <span className="rounded-[5px] bg-red/50 px-2 py-0.5 text-[10px] font-bold uppercase text-white/80">Pembalikan</span>;
+    case "PELARASAN":
+      return <span className="rounded-[5px] bg-[#FEF3C7]/50 px-2 py-0.5 text-[10px] font-bold uppercase text-[#92400E]/50">Pelarasan</span>;
+    default:
+      return <span className="rounded-[5px] bg-light-blue px-2 py-0.5 text-[10px] font-bold uppercase text-grey">{status}</span>;
+  }
+}
+
+export default function TransaksiTable({
+  transactions,
+  isLoading,
+  isFetching = false,
+  onView,
+  onReverse,
+  onAdjust,
+}: TransaksiTableProps) {
+  const displayTransactions = [...transactions].sort((a, b) => {
     const timeA = new Date(a.createdAt || a.transactionDate).getTime();
     const timeB = new Date(b.createdAt || b.transactionDate).getTime();
+
     if (timeB !== timeA) return timeB - timeA;
-    // Jika masa sama, susun mengikut ID (descending)
+
     return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
   });
 
@@ -71,212 +87,229 @@ export default function TransaksiTable({ transactions, isLoading, onView, onReve
       .sort((a, b) => {
         const timeA = new Date(a.createdAt || a.transactionDate).getTime();
         const timeB = new Date(b.createdAt || b.transactionDate).getTime();
+
         if (timeB !== timeA) return timeB - timeA;
+
         return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
       });
   };
 
-  const newestRelatedChildByParentId = new Map<string, string>();
-
-  sortedTransactions.forEach((tx) => {
-    const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
-    if (!isRelatedChild || !tx.relatedTransactionId) return;
-
-    if (!newestRelatedChildByParentId.has(tx.relatedTransactionId)) {
-      newestRelatedChildByParentId.set(tx.relatedTransactionId, tx.id);
-    }
-  });
-
-  const displayTransactions = sortedTransactions.filter((tx) => {
-    const isRelatedChild = ["PELARASAN", "PEMBALIKAN"].includes(tx.status) && tx.relatedTransactionId;
-    if (!isRelatedChild) return true;
-
-    const relatedChildren = getRelatedChildren(tx);
-    if (relatedChildren.length > 0) {
-      return relatedChildren[0].id === tx.id;
-    }
-
-    return !!tx.relatedTransactionId && newestRelatedChildByParentId.get(tx.relatedTransactionId) === tx.id;
-  });
-
-  if (displayTransactions.length === 0) {
-    return <div className="p-12 text-center text-gray-500 font-medium">Tiada rekod transaksi dijumpai.</div>;
-  }
-
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left">
-        <thead className="text-[10px] text-gray-500 uppercase bg-gray-50 border-y border-gray-100">
+    <div className="overflow-x-auto overflow-y-auto" aria-busy={isLoading || isFetching}>
+      <table className="w-full min-w-290 text-left">
+        <thead className="bg-background text-xs font-bold text-grey">
           <tr>
-            <th className="px-6 py-4 font-bold">Tarikh</th>
-            <th className="px-6 py-4 font-bold">ID Transaksi</th>
-            <th className="px-6 py-4 font-bold">Kategori</th>
-            <th className="px-6 py-4 font-bold">Status</th>
-            <th className="px-6 py-4 font-bold text-gray-400">ID Berkaitan</th>
-            <th className="px-6 py-4 font-bold">Penghuni</th>
-            <th className="px-6 py-4 font-bold">No. Resit</th>
-            <th className="px-6 py-4 font-bold">Catatan</th>
-            <th className="px-6 py-4 font-bold text-right">Debit (RM)</th>
-            <th className="px-6 py-4 font-bold text-right">Kredit (RM)</th>
-            <th className="px-6 py-4 font-bold text-center">Tindakan</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">Tarikh</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">ID Transaksi</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">Kategori</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">Status</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">ID Berkaitan</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">Penghuni</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">No. Resit</th>
+            <th className="w-min whitespace-nowrap p-3 text-left">Catatan</th>
+            <th className="w-min whitespace-nowrap p-3 text-right">Debit (RM)</th>
+            <th className="w-min whitespace-nowrap p-3 text-right">Kredit (RM)</th>
+            <th className="w-[0%] whitespace-nowrap p-3 text-center">Tindakan</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
-          {displayTransactions.map((tx) => {
-            
-            // 1. Define Boolean States
-            const isMuted = ["DIBALIKAN", "PEMBALIKAN", "PELARASAN"].includes(tx.status);
-            const isDilaraskan = tx.status === "DILARASKAN";
-            const canAction = ["NORMAL", "DILARASKAN"].includes(tx.status); // Includes BAKI_AWAL because it's NORMAL
 
-            // 2. Calculate DILARASKAN Adjusted Amount
-            let finalDebit = Number(tx.debitAmount);
-            let finalCredit = Number(tx.creditAmount);
-            
-            if (isDilaraskan && (tx.childTransactions?.length ?? 0) > 0) {
-                const pelarasanTxs = (tx.childTransactions ?? []).filter((c) => c.status === "PELARASAN");
-                const totalDeltaDebit = pelarasanTxs.reduce((sum, c) => sum + Number(c.debitAmount), 0);
-                const totalDeltaCredit = pelarasanTxs.reduce((sum, c) => sum + Number(c.creditAmount), 0);
-                
+        <tbody className="bg-white">
+          {isLoading || isFetching ? (
+            loadingTableRows({
+              mode: "loading",
+              columnCount: 11,
+              rowCount: 10,
+            })
+          ) : displayTransactions.length === 0 ? (
+            loadingTableRows({
+              mode: "message",
+              columnCount: 11,
+              rowCount: 1,
+              message: "Tiada rekod transaksi ditemui.",
+            })
+          ) : (
+            displayTransactions.map((tx) => {
+              const isMuted = ["PEMBALIKAN", "PELARASAN"].includes(tx.status);
+              const isDilaraskan = tx.status === "DILARASKAN";
+              const isDibalikan = tx.status === "DIBALIKAN";
+              const isNormal = tx.status === "NORMAL";
+              const canAction = ["NORMAL", "DILARASKAN"].includes(tx.status);
+              const keepStrongColor = isNormal || isDilaraskan || isDibalikan;
+
+              let finalDebit = Number(tx.debitAmount);
+              let finalCredit = Number(tx.creditAmount);
+
+              if (isDilaraskan && (tx.childTransactions?.length ?? 0) > 0) {
+                const pelarasanTxs = (tx.childTransactions ?? []).filter((child) => child.status === "PELARASAN");
+                const totalDeltaDebit = pelarasanTxs.reduce((sum, child) => sum + Number(child.debitAmount), 0);
+                const totalDeltaCredit = pelarasanTxs.reduce((sum, child) => sum + Number(child.creditAmount), 0);
+
                 if (finalDebit > 0) finalDebit = finalDebit + totalDeltaDebit - totalDeltaCredit;
                 if (finalCredit > 0) finalCredit = finalCredit + totalDeltaCredit - totalDeltaDebit;
-            }
+              }
 
-            // 3. Find Related ID and Collapse Count
-            let displayRelatedId = 'N/A';
-            let extraRelatedCount = 0;
+              let displayRelatedId = "N/A";
+              let extraRelatedCount = 0;
 
-            if (isDilaraskan || tx.status === "DIBALIKAN") {
-                // Find the newest child fixing this transaction
+              if (isDilaraskan || isDibalikan) {
                 const fixes = getRelatedChildren(tx);
-                
+
                 if (fixes.length > 0) {
-                    displayRelatedId = fixes[0].transactionNo || fixes[0].id.split('-')[0] + '...';
-                    extraRelatedCount = fixes.length - 1;
+                  displayRelatedId = fixes[0].transactionNo || formatShortTransactionId(fixes[0].id);
+                  extraRelatedCount = fixes.length - 1;
                 }
-            } else if (tx.relatedTransaction) {
-                // Child rows point to their parent transaction, but do not show the hidden-related count.
-                displayRelatedId = tx.relatedTransaction.transactionNo || tx.relatedTransaction.id.split('-')[0] + '...';
-            }
+              } else if (tx.relatedTransaction) {
+                displayRelatedId = tx.relatedTransaction.transactionNo || formatShortTransactionId(tx.relatedTransaction.id);
+              }
 
-            return (
-              <tr key={tx.id} className="hover:bg-blue-50/50 transition-colors bg-white">
-                {/* Tarikh */}
-                <td className={`px-6 py-4 whitespace-nowrap text-gray-600 ${isMuted ? 'opacity-50' : ''}`}>
-                  {new Date(tx.transactionDate).toLocaleDateString("en-GB")}
-                </td>
+              return (
+                <tr key={tx.id} className="border-b border-light-grey/20 text-sm transition-colors hover:bg-background/60">
+                  {/* Date */}
+                  <td className={`w-min whitespace-nowrap p-3 text-dark-grey ${isMuted ? "opacity-50" : ""}`}>
+                    {new Date(tx.transactionDate).toLocaleDateString("en-GB")}
+                  </td>
 
-                {/* ID Transaksi (Uses the new Custom ID!) */}
-                <td className={`px-6 py-4 whitespace-nowrap font-bold text-dark-blue ${isMuted ? 'opacity-50' : ''}`}>
-                  {tx.transactionNo || tx.id.split('-')[0] + '...'}
-                </td>
+                  {/* Transaction ID */}
+                  <td className={`w-min whitespace-nowrap p-3 font-bold ${isMuted ? "opacity-50" : ""}`}>
+                    {tx.transactionNo || formatShortTransactionId(tx.id)}
+                  </td>
 
-                {/* Kategori */}
-                <td className={`px-6 py-4 text-gray-600 capitalize ${isMuted ? 'opacity-50' : ''}`}>
-                  {tx.category.replace(/_/g, ' ')}
-                </td>
+                  {/* Category */}
+                  <td className={`w-min whitespace-nowrap p-3 capitalize text-dark-grey ${isMuted ? "opacity-50" : ""}`}>
+                    {tx.category.replace(/_/g, " ")}
+                  </td>
 
-                {/* Status Badge */}
-                <td className={`px-6 py-4 whitespace-nowrap ${isMuted ? 'opacity-60' : ''}`}>
-                  {getStatusBadge(tx.status)}
-                </td>
+                  {/* Status */}
+                  <td className={`w-min whitespace-nowrap p-3 ${isMuted ? "opacity-70" : ""}`}>
+                    {getStatusBadge(tx.status)}
+                  </td>
 
-                {/* ID Berkaitan & Collapse Text */}
-                <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium text-xs">
-                  <div className="flex flex-col">
-                    <span>{displayRelatedId}</span>
-                    {extraRelatedCount > 0 && (
-                      <span className="text-[10px] italic text-gray-400 mt-0.5">{extraRelatedCount} Id Lagi Berkaitan</span>
+                  {/* Related Transaction ID */}
+                  <td className="w-min whitespace-nowrap p-3 text-xs font-medium text-grey">
+                    <div className="flex flex-col">
+                      <span>{displayRelatedId}</span>
+                      {extraRelatedCount > 0 ? (
+                        <span className="mt-0.5 text-[10px] italic text-light-grey">
+                          {extraRelatedCount} ID Lagi Berkaitan
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
+
+                  {/* Resident */}
+                  <td className={`w-min whitespace-nowrap p-3 ${isMuted ? "opacity-50" : ""}`}>
+                    <p className="max-w-50 truncate font-bold text-dark-grey">{tx.resident?.fullName || "Tiada"}</p>
+                    <p className="text-xs text-grey">
+                      {tx.resident?.icNumber && tx.resident.icNumber.length === 12
+                      ? tx.resident.icNumber.replace(/(\d{6})(\d{2})(\d{4})/, "$1-$2-$3")
+                      : tx.resident?.icNumber || "-"}
+                    </p>
+                  </td>
+
+                  {/* Receipt No */}
+                  <td className={`w-min whitespace-nowrap p-3 text-grey ${isMuted ? "opacity-50" : ""}`}>
+                    {tx.receiptNo || "N/A"}
+                  </td>
+
+                  {/* Description */}
+                  <td
+                    className={`w-min max-w-55 truncate whitespace-nowrap p-3 text-grey ${isMuted ? "opacity-50 line-through" : ""}`}
+                    title={tx.description ?? undefined}
+                  >
+                    {tx.description || "-"}
+                  </td>
+
+                  {/* Debit Amount */}
+                  <td className="w-min whitespace-nowrap p-3 text-right font-bold">
+                    {Number(tx.debitAmount) > 0 ? (
+                      isDilaraskan ? (
+                        <div className="flex flex-col items-end">
+                          <span className="mb-0.5 text-xs font-normal text-light-grey line-through">
+                            {formatRM(tx.debitAmount)}
+                          </span>
+                          <span className="text-red">{formatRM(finalDebit)}</span>
+                        </div>
+                      ) : (
+                        <span className={isMuted ? "text-light-grey line-through" : "text-red"}>
+                          {formatRM(tx.debitAmount)}
+                        </span>
+                      )
+                    ) : (
+                      <span className={keepStrongColor ? "text-dark-grey font-normal" : "font-normal text-light-grey"}>-</span>
                     )}
-                  </div>
-                </td>
+                  </td>
 
-                {/* Penghuni */}
-                <td className={`px-6 py-4 ${isMuted ? 'opacity-50' : ''}`}>
-                  <p className="font-bold text-dark-blue truncate max-w-37.5">{tx.resident?.fullName || 'Tiada'}</p>
-                  <p className="text-xs text-gray-400">{tx.resident?.icNumber}</p>
-                </td>
-
-                {/* No Resit */}
-                <td className={`px-6 py-4 text-gray-500 ${isMuted ? 'opacity-50' : ''}`}>{tx.receiptNo || 'N/A'}</td>
-
-                {/* Catatan (Strike-through if muted) */}
-                <td className={`px-6 py-4 text-gray-500 truncate max-w-37.5 ${isMuted ? 'opacity-50 line-through' : ''}`} title={tx.description ?? undefined}>
-                  {tx.description}
-                  {/* Small helper text like Figma */}
-                  {["PEMBALIKAN", "PELARASAN"].includes(tx.status) && (
-                    <span className="block text-[10px] text-gray-400 mt-0.5 capitalize">({tx.status.toLowerCase()})</span>
-                  )}
-                </td>
-                
-                {/* Debit (Merah) */}
-                <td className="px-6 py-4 text-right font-bold whitespace-nowrap">
-                  {Number(tx.debitAmount) > 0 ? (
-                    isDilaraskan ? (
-                      <div className="flex flex-col items-end">
-                        <span className="line-through text-gray-400 opacity-60 text-xs font-normal mb-0.5">{formatRM(tx.debitAmount)}</span>
-                        <span className="text-(--color-red)">{formatRM(finalDebit)}</span>
-                      </div>
+                  {/* Credit Amount */}
+                  <td className="w-min whitespace-nowrap p-3 text-right font-bold">
+                    {Number(tx.creditAmount) > 0 ? (
+                      isDilaraskan ? (
+                        <div className="flex flex-col items-end">
+                          <span className="mb-0.5 text-xs font-normal text-light-grey line-through">
+                            {formatRM(tx.creditAmount)}
+                          </span>
+                          <span className="text-green">{formatRM(finalCredit)}</span>
+                        </div>
+                      ) : (
+                        <span className={isMuted ? "text-light-grey line-through" : "text-green"}>
+                          {formatRM(tx.creditAmount)}
+                        </span>
+                      )
                     ) : (
-                      <span className={isMuted ? "opacity-40 line-through text-gray-400" : "text-(--color-red)"}>
-                        {formatRM(tx.debitAmount)}
-                      </span>
-                    )
-                  ) : (
-                    <span className="text-gray-400 font-normal">0.00</span>
-                  )}
-                </td>
-                
-                {/* Kredit (Hijau) */}
-                <td className="px-6 py-4 text-right font-bold whitespace-nowrap">
-                  {Number(tx.creditAmount) > 0 ? (
-                    isDilaraskan ? (
-                      <div className="flex flex-col items-end">
-                        <span className="line-through text-gray-400 opacity-60 text-xs font-normal mb-0.5">{formatRM(tx.creditAmount)}</span>
-                        <span className="text-(--color-green)">{formatRM(finalCredit)}</span>
-                      </div>
-                    ) : (
-                      <span className={isMuted ? "opacity-40 line-through text-gray-400" : "text-(--color-green)"}>
-                        {formatRM(tx.creditAmount)}
-                      </span>
-                    )
-                  ) : (
-                    <span className="text-gray-400 font-normal">0.00</span>
-                  )}
-                </td>
+                      <span className={keepStrongColor ? "text-dark-grey font-normal" : "font-normal text-light-grey"}>-</span>
+                    )}
+                  </td>
 
-                {/* Tindakan (Icons with disabled state logic) */}
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-center gap-2">
-                    {/* View - Always active */}
-                    <button onClick={() => onView(tx)} className="text-gray-400 hover:text-dark-blue p-1 transition-colors" title="Lihat Butiran">
-                      <Icon icon="visibility" size={18} />
-                    </button>
-                    
-                    {/* Reverse - Active only if canAction is true */}
-                    <button 
-                      onClick={() => canAction && onReverse(tx)} 
-                      className={`p-1 transition-colors ${canAction ? 'text-gray-400 hover:text-(--color-red)' : 'text-gray-300 opacity-40 cursor-not-allowed'}`} 
-                      title={canAction ? "Pembalikan" : "Tidak Dibenarkan"}
-                      disabled={!canAction}
-                    >
-                      <Icon icon="undo" size={18} />
-                    </button>
-                    
-                    {/* Adjust - Active only if canAction is true */}
-                    <button 
-                      onClick={() => canAction && onAdjust(tx)} 
-                      className={`p-1 transition-colors ${canAction ? 'text-gray-400 hover:text-yellow-600' : 'text-gray-300 opacity-40 cursor-not-allowed'}`} 
-                      title={canAction ? "Pelarasan" : "Tidak Dibenarkan"}
-                      disabled={!canAction}
-                    >
-                      <Icon icon="edit" size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
+                  {/* Actions */}
+                  <td className="w-min whitespace-nowrap p-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {/* View Button - Always Enabled */}
+                      <button
+                        type="button"
+                        onClick={() => onView(tx)}
+                        className="inline-grid h-8 w-8 place-items-center rounded-lg text-grey transition-colors hover:bg-background hover:text-dark-blue"
+                        title="Lihat butiran"
+                        aria-label="Lihat butiran"
+                      >
+                        <Icon icon="eye" size={18} />
+                      </button>
+
+                      {/* Reverse Button - Enabled for NORMAL and DILARASKAN statuses */}
+                      <button
+                        type="button"
+                        onClick={() => canAction && onReverse(tx)}
+                        className={`inline-grid h-8 w-8 place-items-center rounded-lg transition-colors ${
+                          canAction
+                            ? "text-grey hover:bg-background hover:text-red"
+                            : "cursor-not-allowed text-light-grey opacity-50"
+                        }`}
+                        title={canAction ? "Pembalikan" : "Tidak dibenarkan"}
+                        disabled={!canAction}
+                        aria-label="Pembalikan"
+                      >
+                        <Icon icon="undo" size={18} />
+                      </button>
+
+                      {/* Adjust Button - Enabled for NORMAL and DILARASKAN statuses */}
+                      <button
+                        type="button"
+                        onClick={() => canAction && onAdjust(tx)}
+                        className={`inline-grid h-8 w-8 place-items-center rounded-lg transition-colors ${
+                          canAction
+                            ? "text-grey hover:bg-background hover:text-dark-blue"
+                            : "cursor-not-allowed text-light-grey opacity-50"
+                        }`}
+                        title={canAction ? "Pelarasan" : "Tidak dibenarkan"}
+                        disabled={!canAction}
+                        aria-label="Pelarasan"
+                      >
+                        <Icon icon="tune" size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </div>

@@ -33,7 +33,7 @@ export default function AuditLogDetailOverlay({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-sm">
+    <div className="fixed top-0 left-55 right-0 bottom-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-md">
       <section
         className="relative flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl"
         role="dialog"
@@ -60,18 +60,22 @@ export default function AuditLogDetailOverlay({
         </header>
 
         {isLoading ? (
-          <SearchingDetailDataOverlay
-            mode="loading"
-            loadingMessage="Mendapatkan Butiran Jejak Audit..."
-          />
+          <div className="h-full">
+            <SearchingDetailDataOverlay
+              mode="loading"
+              loadingMessage="Mendapatkan Butiran Jejak Audit..."
+            />
+          </div>
         ) : errorMessage ? (
-          <SearchingDetailDataOverlay
-            mode="warning"
-            title="Maklumat Tidak Dapat Dipaparkan"
-            message={errorMessage}
-            onRetry={onRetry}
-            retryLabel="Cuba Lagi"
-          />
+          <div className="h-full">
+            <SearchingDetailDataOverlay
+              mode="warning"
+              title="Maklumat Tidak Dapat Dipaparkan"
+              message={errorMessage}
+              onRetry={onRetry}
+              retryLabel="Cuba Lagi"
+            />
+          </div>
         ) : auditLog ? (
           <div className="overflow-y-auto bg-light-blue p-6">
             <div className="flex flex-col gap-8">

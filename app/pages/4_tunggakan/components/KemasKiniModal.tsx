@@ -1,13 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Icon from "../../../components/Icon/Icon";
+import { useEffect, useMemo, useState } from "react";
+
+import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { DateField, InputField, Topic } from "@/app/components/InputField";
 
 type RowItem = {
-  id: string; // Unique ID for React rendering
+  id: string;
   tarikh: string;
   catatan: string;
   amaun: string;
+};
+
+type FeedbackState = {
+  type: "success" | "error";
+  message: string;
 };
 
 type KemasKiniModalProps = {
@@ -19,14 +26,173 @@ type KemasKiniModalProps = {
   selectedIds: string[];
 };
 
-export default function KemasKiniModal({ isOpen, onClose, onSaved, chargeMonth, selectedCount, selectedIds }: KemasKiniModalProps) {
+function createClientId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createEmptyRow() {
+  return {
+    id: createClientId(),
+    tarikh: "",
+    catatan: "",
+    amaun: "",
+  };
+}
+
+function parseAmount(value: string) {
+  const normalizedValue = value.replace(/,/g, "").trim();
+
+  if (!/^\d+(\.\d{0,2})?$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const amount = Number(normalizedValue);
+
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("ms-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function normalizeRowsForPayload(rows: RowItem[]) {
+  return rows
+    .filter((row) => row.tarikh || row.catatan.trim() || row.amaun.trim())
+    .map((row) => ({
+      tarikh: row.tarikh,
+      catatan: row.catatan,
+      amaun: row.amaun,
+    }));
+}
+
+function RowEditor({
+  title,
+  rows,
+  disabled,
+  addButtonLabel,
+  amountToneClass,
+  onAdd,
+  onRemove,
+  onChange,
+}: {
+  title: string;
+  rows: RowItem[];
+  disabled: boolean;
+  addButtonLabel: string;
+  amountToneClass: string;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  onChange: (id: string, field: keyof Omit<RowItem, "id">, value: string) => void;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <Topic content={title} />
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#E5ECFA] px-4 py-2 text-xs font-bold uppercase text-dark-blue transition hover:bg-dark-blue hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={onAdd}
+        >
+          <Icon icon="add" size={17} />
+          {addButtonLabel}
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-light-grey/50 bg-white/70 px-5 py-8 text-center text-sm font-semibold text-grey">
+          Tiada rekod ditambah.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-[184px_1fr_184px_36px] gap-4 px-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            <div>Tarikh</div>
+            <div>Catatan</div>
+            <div className="text-right">Amaun (RM)</div>
+            <div />
+          </div>
+
+          {rows.map((row) => (
+            <div key={row.id} className="grid grid-cols-[184px_1fr_184px_36px] items-start gap-4">
+              <DateField
+                label="Tarikh"
+                showLabel={false}
+                value={row.tarikh}
+                placeholder="Pilih Tarikh"
+                state={disabled ? "inactive" : "active"}
+                onChange={(value) => onChange(row.id, "tarikh", value)}
+              />
+
+              <InputField
+                label="Catatan"
+                showLabel={false}
+                value={row.catatan}
+                placeholder="Catatan"
+                state={disabled ? "inactive" : "active"}
+                onChange={(value) => onChange(row.id, "catatan", value)}
+              />
+
+              <div
+                onBlurCapture={() => {
+                  const parsedAmount = parseAmount(row.amaun);
+
+                  if (parsedAmount !== null) {
+                    onChange(row.id, "amaun", parsedAmount.toFixed(2));
+                  }
+                }}
+              >
+                <InputField
+                  label="Amaun"
+                  showLabel={false}
+                  value={row.amaun}
+                  placeholder="0.00"
+                  state={disabled ? "inactive" : "active"}
+                  textAlign="right"
+                  activeBackgroundClass={`bg-white ${amountToneClass}`}
+                  inactiveBackgroundClass={`bg-[#EEF4FF] ${amountToneClass}`}
+                  onChange={(value) => onChange(row.id, "amaun", value)}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-lg text-red transition-colors hover:bg-red/10 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Padam rekod"
+                title="Padam rekod"
+                disabled={disabled}
+                onClick={() => onRemove(row.id)}
+              >
+                <Icon icon={commonIcons.delete} size={18} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function KemasKiniModal({
+  isOpen,
+  onClose,
+  onSaved,
+  chargeMonth,
+  selectedCount,
+  selectedIds,
+}: KemasKiniModalProps) {
   const [cajSenggaraEnabled, setCajSenggaraEnabled] = useState(false);
   const [cajTambahan, setCajTambahan] = useState<RowItem[]>([]);
   const [rebat, setRebat] = useState<RowItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
-  // Reset form states when modal is closed or selection changes
   useEffect(() => {
     if (!isOpen) {
       setCajSenggaraEnabled(false);
@@ -37,35 +203,33 @@ export default function KemasKiniModal({ isOpen, onClose, onSaved, chargeMonth, 
     }
   }, [isOpen, selectedIds]);
 
-  if (!isOpen) return null;
+  const totalTambahan = useMemo(
+    () => cajTambahan.reduce((sum, row) => sum + (parseAmount(row.amaun) ?? 0), 0),
+    [cajTambahan],
+  );
+  const totalRebat = useMemo(
+    () => rebat.reduce((sum, row) => sum + (parseAmount(row.amaun) ?? 0), 0),
+    [rebat],
+  );
+  const netCharge = totalTambahan - totalRebat;
 
-  // --- HANDLERS ---
-  const handleAddTambahan = () => {
-    setCajTambahan([...cajTambahan, { id: crypto.randomUUID(), tarikh: "", catatan: "", amaun: "" }]);
-  };
+  if (!isOpen) {
+    return null;
+  }
 
-  const handleRemoveTambahan = (id: string) => {
-    setCajTambahan(cajTambahan.filter(item => item.id !== id));
-  };
-
-  const handleAddRebat = () => {
-    setRebat([...rebat, { id: crypto.randomUUID(), tarikh: "", catatan: "", amaun: "" }]);
-  };
-
-  const handleRemoveRebat = (id: string) => {
-    setRebat(rebat.filter(item => item.id !== id));
-  };
-
-  const handleUpdateRow = (
-    setState: React.Dispatch<React.SetStateAction<RowItem[]>>,
+  function handleUpdateRow(
+    setter: React.Dispatch<React.SetStateAction<RowItem[]>>,
     id: string,
-    field: keyof RowItem,
-    value: string
-  ) => {
-    setState(prev => prev.map(item => (item.id === id ? { ...item, [field]: value } : item)));
-  };
+    field: keyof Omit<RowItem, "id">,
+    value: string,
+  ) {
+    setter((previousRows) =>
+      previousRows.map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+    );
+    setFeedback(null);
+  }
 
-  const handleSave = async () => {
+  async function handleSave() {
     setIsSaving(true);
     setFeedback(null);
 
@@ -77,253 +241,226 @@ export default function KemasKiniModal({ isOpen, onClose, onSaved, chargeMonth, 
           residentIds: selectedIds,
           chargeMonth,
           cajSenggaraEnabled,
-          cajTambahan,
-          rebat,
+          cajTambahan: normalizeRowsForPayload(cajTambahan),
+          rebat: normalizeRowsForPayload(rebat),
         }),
       });
 
-      const data = await response.json();
+      const payload = (await response.json().catch(() => null)) as
+        | { ok: boolean; message?: string }
+        | null;
 
-      if (!data.ok) {
-        setFeedback({ type: "error", message: data.message });
+      if (!response.ok || !payload?.ok) {
+        setFeedback({
+          type: "error",
+          message: payload?.message ?? "Ralat semasa menyimpan kemas kini tunggakan.",
+        });
         return;
       }
 
-      setFeedback({ type: "success", message: data.message });
+      setFeedback({
+        type: "success",
+        message: payload.message ?? "Kemas kini berjaya disimpan.",
+      });
+
       await onSaved?.();
       setTimeout(() => {
         onClose();
-      }, 1800);
-
+      }, 1200);
     } catch {
-      setFeedback({ type: "error", message: "Ralat tidak dijangka berlaku. Sila cuba lagi." });
+      setFeedback({
+        type: "error",
+        message: "Ralat tidak dijangka berlaku. Sila cuba lagi.",
+      });
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      {/* Modal Container */}
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-        
-        {/* --- MODAL HEADER --- */}
-        <div className="bg-dark-blue px-8 py-6 flex justify-between items-start text-white">
+    <div
+      className="fixed bottom-0 left-55 right-0 top-0 z-50 flex items-start justify-center bg-black/40 p-12 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <section
+        className="flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-light-blue shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="arrears-update-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center justify-between bg-dark-blue p-6 text-white">
           <div>
-            <h2 className="text-xl font-bold uppercase tracking-wide">Kemas Kini Tunggakan</h2>
-            <p className="text-xs font-semibold text-blue-200 mt-1 uppercase tracking-widest">
-              Sedang Menyunting {selectedCount} Rekod
+            <h2 id="arrears-update-title" className="text-lg font-bold">
+              KEMAS KINI TUNGGAKAN
+            </h2>
+            <p className="text-xs font-extralight text-light-grey">
+              SUNTING REKOD TUNGGAKAN UNTUK {selectedCount} PENGHUNI
             </p>
           </div>
-          <button onClick={onClose} className="hover:bg-white/10 p-1 rounded transition-colors">
-            <Icon icon="close" size={24} />
+          <button
+            type="button"
+            className="hover:scale-96 active:scale-92 text-white"
+            aria-label="Tutup kemas kini tunggakan"
+            onClick={onClose}
+          >
+            <Icon icon="close" size={20} />
           </button>
-        </div>
+        </header>
 
-        {/* --- MODAL BODY --- */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-10">
-          {selectedCount === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mb-4">
-                <Icon icon="warning" size={32} className="text-amber-500" />
-              </div>
-              <h3 className="text-lg font-bold text-dark-blue mb-1">Sila Pilih Penghuni</h3>
-              <p className="text-sm text-grey max-w-sm">Anda perlu memilih sekurang-kurangnya seorang penghuni dari senarai untuk dikemas kini.</p>
+        {selectedCount === 0 ? (
+          <div className="flex min-h-96 items-center justify-center h-full">
+            <div className="flex-1 w-full max-w-md h-full rounded-xl border border-red/20 bg-white p-6 text-center">
+              <h3 className="text-lg font-extrabold text-dark-grey">Tiada Rekod Dipilih</h3>
+              <p className="mt-2 text-sm leading-6 text-grey">
+                Pilih sekurang-kurangnya satu penghuni pada jadual sebelum kemas kini tunggakan.
+              </p>
             </div>
-          ) : (
-            <>
-              {/* Feedback Banner */}
-              {feedback && (
-                <div className={`flex items-start gap-3 px-4 py-3 rounded-lg border text-sm font-medium ${
+          </div>
+        ) : (
+          <div className="flex flex-col gap-8 overflow-y-auto bg-light-blue p-6">
+            {feedback ? (
+              <div
+                className={`rounded-lg border px-4 py-3 text-sm font-semibold ${
                   feedback.type === "success"
-                    ? "bg-green-50 border-green-200 text-green-800"
-                    : "bg-red-50 border-red-200 text-red-800"
-                }`}>
-                  <Icon
-                    icon={feedback.type === "success" ? "save" : "close"}
-                    size={18}
-                    className="shrink-0 mt-0.5"
-                  />
-                  <span>{feedback.message}</span>
-                </div>
-              )}
-              
-              {/* Perincian Kewangan */}
-              <section>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-1 h-5 bg-dark-blue rounded-full"></div>
-                  <h3 className="font-bold text-dark-blue text-sm uppercase tracking-wider">Perincian Kewangan</h3>
-                </div>
-                <div className="flex items-center gap-4 pl-4">
-                  <button 
-                    type="button"
-                    onClick={() => setCajSenggaraEnabled(!cajSenggaraEnabled)}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${cajSenggaraEnabled ? 'bg-dark-blue' : 'bg-gray-300'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${cajSenggaraEnabled ? 'left-7' : 'left-1'}`}></div>
-                  </button>
-                  <span className="text-sm font-bold text-dark-grey uppercase">Caj Penyelenggaraan</span>
-                </div>
-              </section>
-
-              {/* Caj Tambahan */}
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 h-5 bg-dark-blue rounded-full"></div>
-                    <h3 className="font-bold text-dark-blue text-sm uppercase tracking-wider">Caj Tambahan</h3>
-                  </div>
-                  <button 
-                    onClick={handleAddTambahan}
-                    className="flex items-center gap-2 bg-light-blue text-dark-blue px-4 py-2 rounded font-bold text-xs uppercase hover:bg-blue-100 transition-colors"
-                  >
-                    <span>+</span> Tambah Caj Baru
-                  </button>
-                </div>
-                
-                <div className="pl-4">
-                  {cajTambahan.length > 0 && (
-                    <div className="grid grid-cols-[1fr_2fr_1fr_auto] gap-4 mb-2 text-xs font-bold text-grey uppercase px-2">
-                      <div>Tarikh</div>
-                      <div>Catatan / Perincian</div>
-                      <div>Amaun (RM)</div>
-                      <div className="w-8"></div>
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    {cajTambahan.map((row) => (
-                      <div key={row.id} className="grid grid-cols-[1fr_2fr_1fr_auto] gap-4 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                        <input 
-                          type="date" 
-                          value={row.tarikh}
-                          onChange={(e) => handleUpdateRow(setCajTambahan, row.id, "tarikh", e.target.value)}
-                          className="border border-gray-300 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-                        />
-                        <input 
-                          type="text" 
-                          placeholder="Contoh: Kerosakan Pintu Utama" 
-                          value={row.catatan}
-                          onChange={(e) => handleUpdateRow(setCajTambahan, row.id, "catatan", e.target.value)}
-                          className="border border-gray-300 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-                        />
-                        <input 
-                          type="number" 
-                          placeholder="0.00" 
-                          value={row.amaun}
-                          onChange={(e) => handleUpdateRow(setCajTambahan, row.id, "amaun", e.target.value)}
-                          className="border border-gray-300 rounded p-2.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-dark-blue"
-                        />
-                        <button 
-                          onClick={() => handleRemoveTambahan(row.id)}
-                          className="text-(--color-red) hover:bg-red-50 p-2 rounded transition-colors"
-                        >
-                          <Icon icon="delete" size={20} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              {/* Rebat */}
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 h-5 bg-dark-blue rounded-full"></div>
-                    <h3 className="font-bold text-dark-blue text-sm uppercase tracking-wider">Rebat</h3>
-                  </div>
-                  <button 
-                    onClick={handleAddRebat}
-                    className="flex items-center gap-2 bg-light-blue text-dark-blue px-4 py-2 rounded font-bold text-xs uppercase hover:bg-blue-100 transition-colors"
-                  >
-                    <span>+</span> Tambah Rebat Baru
-                  </button>
-                </div>
-
-                <div className="pl-4">
-                  {rebat.length > 0 && (
-                    <div className="grid grid-cols-[1fr_2fr_1fr_auto] gap-4 mb-2 text-xs font-bold text-grey uppercase px-2">
-                      <div>Tarikh</div>
-                      <div>Catatan / Perincian</div>
-                      <div>Amaun (RM)</div>
-                      <div className="w-8"></div>
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    {rebat.map((row) => (
-                      <div key={row.id} className="grid grid-cols-[1fr_2fr_1fr_auto] gap-4 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                        <input 
-                          type="date" 
-                          value={row.tarikh}
-                          onChange={(e) => handleUpdateRow(setRebat, row.id, "tarikh", e.target.value)}
-                          className="border border-gray-300 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-                        />
-                        <input 
-                          type="text" 
-                          placeholder="Contoh: Insentif Pembayaran Awal" 
-                          value={row.catatan}
-                          onChange={(e) => handleUpdateRow(setRebat, row.id, "catatan", e.target.value)}
-                          className="border border-gray-300 rounded p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-dark-blue"
-                        />
-                        <input 
-                          type="number" 
-                          placeholder="0.00" 
-                          value={row.amaun}
-                          onChange={(e) => handleUpdateRow(setRebat, row.id, "amaun", e.target.value)}
-                          className="border border-gray-300 rounded p-2.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-dark-blue"
-                        />
-                        <button 
-                          onClick={() => handleRemoveRebat(row.id)}
-                          className="text-(--color-red) hover:bg-red-50 p-2 rounded transition-colors"
-                        >
-                          <Icon icon="delete" size={20} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            </>
-          )}
-        </div>
-
-        {/* --- MODAL FOOTER --- */}
-        <div className="bg-[#F8FAFC] border-t border-gray-200 px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-grey text-sm">
-            <Icon icon="edit" size={16} />
-            <span>Sedang menyunting rekod ini...</span>
-          </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={onClose}
-              className="flex items-center gap-2 bg-(--color-red) hover:bg-red-800 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors"
-            >
-              <Icon icon="close" size={20} />
-              Batal
-            </button>
-            {selectedCount > 0 && (
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex items-center gap-2 bg-(--color-green) hover:bg-green-800 text-white px-6 py-2.5 rounded shadow-sm font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed min-w-37.5 justify-center"
+                    ? "border-green/20 bg-white text-green"
+                    : "border-red/20 bg-white text-red"
+                }`}
               >
-                {isSaving ? (
-                  <>
-                    <Icon icon="progress_activity" size={20} className="animate-spin" />
-                    Menyimpan...
-                  </>
-                ) : (
-                  <>
-                    <Icon icon="save" size={20} />
-                    Simpan Rekod
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
+                {feedback.message}
+              </div>
+            ) : null}
 
-      </div>
+            <section className="flex flex-col gap-4">
+              <Topic content="PERINCIAN KEWANGAN" />
+              <div className="rounded-lg border border-light-grey/30 bg-white p-4">
+                <label className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    aria-label="Togol caj penyelenggaraan"
+                    aria-pressed={cajSenggaraEnabled}
+                    className={`relative h-6 w-12 rounded-full transition-colors ${
+                      cajSenggaraEnabled ? "bg-dark-blue" : "bg-gray-300"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    onClick={() => setCajSenggaraEnabled((value) => !value)}
+                  >
+                    <span
+                      className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${
+                        cajSenggaraEnabled ? "left-7" : "left-1"
+                      }`}
+                    />
+                  </button>
+                  <span className="text-sm font-bold uppercase tracking-wide text-dark-grey">
+                    Caj Penyelenggaraan
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <RowEditor
+              title="CAJ TAMBAHAN DITAMBAH"
+              rows={cajTambahan}
+              disabled={isSaving}
+              addButtonLabel="Tambah Caj Baru"
+              amountToneClass="text-red"
+              onAdd={() => {
+                setCajTambahan((currentRows) => [...currentRows, createEmptyRow()]);
+                setFeedback(null);
+              }}
+              onRemove={(id) => {
+                setCajTambahan((currentRows) => currentRows.filter((row) => row.id !== id));
+                setFeedback(null);
+              }}
+              onChange={(id, field, value) => handleUpdateRow(setCajTambahan, id, field, value)}
+            />
+
+            <RowEditor
+              title="REBAT DITAMBAH"
+              rows={rebat}
+              disabled={isSaving}
+              addButtonLabel="Tambah Rebat Baru"
+              amountToneClass="text-green"
+              onAdd={() => {
+                setRebat((currentRows) => [...currentRows, createEmptyRow()]);
+                setFeedback(null);
+              }}
+              onRemove={(id) => {
+                setRebat((currentRows) => currentRows.filter((row) => row.id !== id));
+                setFeedback(null);
+              }}
+              onChange={(id, field, value) => handleUpdateRow(setRebat, id, field, value)}
+            />
+
+            <section className="flex flex-col gap-4">
+              <Topic content="RINGKASAN KEMAS KINI" />
+              <div className="flex flex-col gap-3 overflow-hidden rounded-lg bg-dark-blue p-4 text-white shadow-[0_24px_40px_rgba(23,31,111,0.18)]">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-xs font-bold uppercase text-light-grey">JUMLAH CAJ TAMBAHAN</div>
+                  <div className="text-sm font-bold text-red">RM {formatMoney(totalTambahan)}</div>
+                </div>
+
+                <hr className="border-white/20" />
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-xs font-bold uppercase text-light-grey">JUMLAH REBAT</div>
+                  <div className="text-sm font-bold text-green">RM {formatMoney(totalRebat)}</div>
+                </div>
+
+                <hr className="border-white/20" />
+
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <div className="text-xs font-bold uppercase text-light-grey">KESAN BERSIH</div>
+                    <div className={`text-2xl font-bold ${netCharge > 0 ? "text-red" : "text-green"}`}>
+                      RM {formatMoney(Math.abs(netCharge))}
+                    </div>
+                  </div>
+
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10">
+                    <Icon
+                      icon={netCharge > 0 ? "trending_up" : "check_circle"}
+                      size={40}
+                      filled
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <footer className="flex items-center justify-between">
+              <div className="flex flex-row items-center justify-center gap-1 text-grey/80">
+                <Icon icon="edit" size={13} />
+                <div className="text-xs">Sedang menyunting rekod tunggakan...</div>
+              </div>
+              <div className="flex w-xs gap-3">
+                <button
+                  className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-red px-5 py-3 text-xs font-bold text-white hover:bg-red/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={onClose}
+                >
+                  <Icon icon={commonIcons.close} size={16} />
+                  Batal
+                </button>
+                <button
+                  className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-green px-5 py-3 text-xs font-bold text-white hover:bg-green/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={handleSave}
+                >
+                  <Icon
+                    icon={isSaving ? "progress_activity" : commonIcons.save}
+                    size={16}
+                    className={isSaving ? "animate-spin" : ""}
+                  />
+                  {isSaving ? "Sedang Simpan..." : "Simpan Rekod"}
+                </button>
+              </div>
+            </footer>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

@@ -28,21 +28,53 @@ function formatCurrency(value: number) {
 export default function TransaksiViewRelated({ records, transactionNo }: TransaksiViewRelatedProps) {
   const { filteredRecords, FilterButton } = useTransaksiViewRelatedFilter(records);
 
-  const getStatusBadge = (status: string) => {
-    const baseClass = "text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider text-center inline-block";
-    const displayStatus = status === "DIBALIKAN" ? "DIBALIKKAN" : status;
+  const formatShortTransactionId = (value?: string | null) => {
+    if (!value) {
+      return "N/A";
+    }
+
+    return value.includes("-") ? `${value.split("-")[0]}...` : value;
+  };
+
+  const formatDisplayDate = (value: string | Date | null | undefined) => {
+    if (!value) {
+      return "N/A";
+    }
+
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "N/A";
+    }
+
+    return parsedDate.toLocaleDateString("en-GB");
+  };
+
+  const formatStatusLabel = (status: string | null | undefined) => {
+    const normalizedStatus = status?.trim().toUpperCase();
+    if (!normalizedStatus) {
+      return "N/A";
+    }
+
+    return normalizedStatus === "DIBALIKAN" ? "DIBALIKKAN" : normalizedStatus;
+  };
+
+  const getStatusBadge = (status: string | null | undefined) => {
+    const baseClass = "rounded-[5px] px-2 py-0.5 text-[10px] font-bold uppercase";
+    const displayStatus = formatStatusLabel(status);
     
-    switch (status) {
+    switch (displayStatus) {
       case "NORMAL":
-        return <span className={`bg-normal text-[#0E7490] ${baseClass}`}>NORMAL</span>;
+        return <span className={`bg-normal text-[#0E7490] ${baseClass}`}>Normal</span>;
       case "DIBALIKAN":
-      case "PEMBALIKAN":
-        return <span className={`bg-[#DC2626] text-white ${baseClass}`}>{displayStatus}</span>;
+        return <span className={`bg-red text-white ${baseClass}`}>Dibalikkan</span>;
       case "DILARASKAN":
+        return <span className={`bg-[#FEF3C7] text-[#92400E] ${baseClass}`}>Dilaraskan</span>;
+      case "PEMBALIKAN":
+        return <span className={`bg-red text-white ${baseClass}`}>Pembalikan</span>;
       case "PELARASAN":
-        return <span className={`bg-[#FEF3C7] text-[#92400E] ${baseClass}`}>{displayStatus}</span>;
+        return <span className={`bg-[#FEF3C7] text-[#92400E] ${baseClass}`}>Pelarasan</span>;
       default:
-        return <span className={`bg-gray-500 text-white ${baseClass}`}>{displayStatus}</span>;
+        return <span className={`bg-light-blue text-grey ${baseClass}`}>{displayStatus}</span>;
     }
   };
 
@@ -65,46 +97,56 @@ export default function TransaksiViewRelated({ records, transactionNo }: Transak
       </div>
 
       {/* Table */}
-      <div className="rounded-lg overflow-hidden border border-light-grey/20 bg-white">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="font-bold text-xs text-grey bg-light-blue border-b border-light-grey/20">
-              <th className="text-left px-4 py-3 uppercase tracking-wider">Tarikh</th>
-              <th className="text-left px-4 py-3 uppercase tracking-wider">ID</th>
-              <th className="text-left px-4 py-3 uppercase tracking-wider">Status</th>
-              <th className="text-left px-4 py-3 uppercase tracking-wider">Catatan</th>
-              <th className="text-right px-4 py-3 uppercase tracking-wider text-red">Debit (RM)</th>
-              <th className="text-right px-4 py-3 uppercase tracking-wider text-green">Kredit (RM)</th>
+      <div className="overflow-x-auto overflow-y-auto rounded-lg border border-light-grey/20 bg-white">
+        <table className="w-full min-w-220 text-left">
+          <thead className="bg-background text-xs font-bold text-grey">
+            <tr>
+              <th className="w-min whitespace-nowrap p-3 text-left">Tarikh</th>
+              <th className="w-min whitespace-nowrap p-3 text-left">ID Transaksi</th>
+              <th className="w-min whitespace-nowrap p-3 text-left">Status</th>
+              <th className="w-full p-3 text-left">Catatan</th>
+              <th className="w-min whitespace-nowrap p-3 text-right">Debit (RM)</th>
+              <th className="w-min whitespace-nowrap p-3 text-right">Kredit (RM)</th>
             </tr>
           </thead>
           <tbody className="bg-white">
             {filteredRecords.length === 0 ? (
-              <tr className="text-sm">
-                <td className="px-4 py-8 text-center text-grey" colSpan={6}>
+              <tr className="border-b border-light-grey/20 text-sm">
+                <td className="p-4 text-center font-medium text-grey" colSpan={6}>
                   Tiada rekod transaksi berkaitan dijumpai.
                 </td>
               </tr>
             ) : (
               filteredRecords.map((row) => {
-                const d = new Date(row.transactionDate);
-                const formattedDate = isNaN(d.getTime())
-                  ? String(row.transactionDate)
-                  : d.toLocaleDateString("en-GB");
+                const formattedDate = formatDisplayDate(row.transactionDate);
                 
                 const debitVal = Number(row.debitAmount || 0);
                 const creditVal = Number(row.creditAmount || 0);
 
+                const isCurrentRecord = Boolean(transactionNo && row.transactionNo === transactionNo);
+
                 return (
-                  <tr key={row.id} className="text-sm border-b border-light-grey/20 transition-colors hover:bg-gray-50">
-                    <td className="px-4 py-3 text-left text-slate-700">{formattedDate}</td>
-                    <td className="px-4 py-3 text-left font-bold text-dark-blue">{row.transactionNo || row.id}</td>
-                    <td className="px-4 py-3 text-left">{getStatusBadge(row.status)}</td>
-                    <td className="px-4 py-3 text-left text-slate-600">{row.description || "-"}</td>
-                    <td className={`px-4 py-3 text-right ${debitVal > 0 ? "font-bold text-[#BA1A1A]" : "text-slate-400"}`}>
-                      {debitVal > 0 ? formatCurrency(debitVal) : "0.00"}
+                  <tr key={row.id} className="border-b border-light-grey/20 text-sm transition-colors">
+                    <td className={`w-min whitespace-nowrap p-3 text-dark-grey ${
+                      isCurrentRecord 
+                        ? "border-l-4 border-dark-blue" // Highlight untuk rekod semasa
+                        : null
+                    }`}>
+                      {formattedDate}
                     </td>
-                    <td className={`px-4 py-3 text-right ${creditVal > 0 ? "font-bold text-[#15803D]" : "text-slate-400"}`}>
-                      {creditVal > 0 ? formatCurrency(creditVal) : "0.00"}
+
+                    <td className="w-min whitespace-nowrap p-3 font-bold">
+                      {row.transactionNo || formatShortTransactionId(row.id)}
+                    </td>
+                    <td className="w-min whitespace-nowrap p-3">{getStatusBadge(row.status)}</td>
+                    <td className="max-w-80 truncate p-3 text-grey" title={row.description ?? undefined}>
+                      {row.description?.trim() || "-"}
+                    </td>
+                    <td className={`w-min whitespace-nowrap p-3 text-right ${debitVal > 0 ? "font-bold text-red" : "font-normal"}`}>
+                      {debitVal > 0 ? formatCurrency(debitVal) : "-"}
+                    </td>
+                    <td className={`w-min whitespace-nowrap p-3 text-right ${creditVal > 0 ? "font-bold text-green" : "font-normal"}`}>
+                      {creditVal > 0 ? formatCurrency(creditVal) : "-"}
                     </td>
                   </tr>
                 );
@@ -113,14 +155,14 @@ export default function TransaksiViewRelated({ records, transactionNo }: Transak
             
             {/* Total Row */}
             {filteredRecords.length > 0 && (
-              <tr className="text-sm font-bold bg-[#F9FBFF] border-b border-light-grey/20">
-                <td className="px-4 py-3 text-left text-dark-blue" colSpan={4}>
+              <tr className="border-b border-light-grey/20 bg-background text-sm font-bold">
+                <td className="p-3 text-left text-dark-blue" colSpan={4}>
                   JUMLAH
                 </td>
-                <td className="px-4 py-3 text-right text-[#BA1A1A]">
+                <td className="p-3 text-right text-red">
                   {formatCurrency(totalDebit)}
                 </td>
-                <td className="px-4 py-3 text-right text-[#15803D]">
+                <td className="p-3 text-right text-green">
                   {formatCurrency(totalCredit)}
                 </td>
               </tr>
@@ -128,12 +170,12 @@ export default function TransaksiViewRelated({ records, transactionNo }: Transak
           </tbody>
         </table>
 
-        {/* Clean Footer Amaun Bersih Bar */}
-        <div className="bg-dark-blue px-6 py-4 flex justify-between items-center text-white">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-slate-300">
+        {/* Footer Amaun Bersih */}
+        <div className="flex items-center justify-between bg-dark-blue px-4 py-3 text-white">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-light-grey">
             Amaun Bersih
           </span>
-          <span className="text-sm font-mono font-bold">
+          <span className="text-sm font-bold">
             RM {formatCurrency(netAmount)}
           </span>
         </div>

@@ -12,11 +12,13 @@ import type { HistoryData } from "./ButiranTunggakanModal";
 type ButiranTunggakanHistoryDownloadProps = {
     records: Array<HistoryData & { baki: number }>;
     residentId?: string | null;
+    disabled?: boolean;
 };
 
 export default function ButiranTunggakanHistoryDownload({
     records,
     residentId,
+    disabled = false,
 }: ButiranTunggakanHistoryDownloadProps) {
     function handleDownload() {
         const headers: XlsxCell[] = [
@@ -66,6 +68,7 @@ export default function ButiranTunggakanHistoryDownload({
         <ToolbarIconButton
             icon={commonIcons.download}
             label="Muat turun sejarah tunggakan"
+            disabled={disabled}
             onClick={handleDownload}
         />
     );

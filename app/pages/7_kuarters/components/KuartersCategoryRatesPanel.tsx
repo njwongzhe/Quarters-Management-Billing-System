@@ -7,6 +7,7 @@ import {
   TableInputField,
 } from "@/app/components/InputField";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { PaginationControls, usePaginationLogic } from "@/app/components/Pagination/Pagination";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadQuarterCategoryRates } from "@/app/pages/7_kuarters/hooks/kuartersDownloads";
@@ -92,7 +93,6 @@ export default function KuartersCategoryRatesPanel({
     startIndex,
     endIndex,
     handlePageChange,
-    paginationItems,
   } = usePaginationLogic(rates.length, itemsPerPage);
   const paginatedRates = rates.slice(startIndex, endIndex);
 
@@ -230,6 +230,7 @@ export default function KuartersCategoryRatesPanel({
           />
           <ToolbarButton
             icon={commonIcons.download}
+            disabled={isLoading}
             label="Muat turun data kategori kuarters"
             onClick={() => downloadQuarterCategoryRates(exportRates)}
           />
@@ -294,6 +295,14 @@ export default function KuartersCategoryRatesPanel({
               </tr>
             </thead>
             <tbody className="bg-white">
+              {isLoading
+                ? loadingTableRows({
+                    mode: "loading",
+                    columnCount: 6,
+                    rowCount: 10,
+                  })
+                : null}
+
               {isCreateRowVisible ? (
                 <tr
                   ref={editor?.mode === "create" ? editingRowRef : null}
@@ -358,20 +367,16 @@ export default function KuartersCategoryRatesPanel({
               ) : null}
 
               {rates.length === 0 && !isCreateRowVisible ? (
-                <tr className="border-t border-light-grey/20">
-                  <td
-                    colSpan={6}
-                    className="px-3 py-4 text-center text-sm font-medium text-grey"
-                  >
-                    {isLoading ? (
-                      "Sedang membaca data kategori kuarters..."
-                    ) : hasActiveFilters ? (
-                      "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
-                    ) : (
-                      "Tiada kategori kuarters untuk dipaparkan buat masa ini."
-                    )}
-                  </td>
-                </tr>
+                isLoading
+                  ? null
+                  : loadingTableRows({
+                      mode: "message",
+                      columnCount: 6,
+                      rowCount: 1,
+                      message: hasActiveFilters
+                        ? "Tiada kategori kuarters yang sepadan dengan tapisan semasa."
+                        : "Tiada kategori kuarters untuk dipaparkan buat masa ini.",
+                    })
               ) : null}
 
               {!isLoading && paginatedRates.map((rate) => {
@@ -382,7 +387,7 @@ export default function KuartersCategoryRatesPanel({
                   <tr
                     key={rate.id}
                     ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 ${isEditing ? "bg-dark-blue/3" : ""}`}
+                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60"}`}
                   >
                     <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
@@ -500,7 +505,6 @@ export default function KuartersCategoryRatesPanel({
             startIndex={startIndex}
             endIndex={endIndex}
             totalRecords={rates.length}
-            paginationItems={paginationItems}
             onPageChange={handlePageChange}
           />
         </div>

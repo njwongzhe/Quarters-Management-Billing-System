@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
-import FilterDate from "@/app/components/FIlter/FilterDate";
+import FilterDate from "@/app/components/Filter/FilterDate";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
 

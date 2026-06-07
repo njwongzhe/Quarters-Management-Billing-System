@@ -201,7 +201,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
             />
 
             {/* Overlay Window */}
-            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 backdrop-blur-sm p-12 flex items-start justify-center">
+            <div className="fixed top-0 left-55 right-0 bottom-0 z-50 bg-black/40 p-12 backdrop-blur-md flex items-start justify-center">
                 <div className="relative w-full rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-full">
                     {/* Header */}
                     <div className="bg-dark-blue p-6 flex items-center justify-between">
@@ -388,7 +388,7 @@ export default function PenghuniDetail(props?: PenghuniDetailWithCloseProps) {
                                                 Batal
                                             </button>
                                             <button 
-                                                className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-dark-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap font-bold text-xs text-white bg-green px-5 py-3 rounded-md hover:bg-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 type="button"
                                                 onClick={validateAndSave}
                                                 disabled={isSaving || !isFormValid}

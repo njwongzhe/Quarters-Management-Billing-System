@@ -27,6 +27,8 @@ export type QuarterCategoryRecord = {
   maintenancePrice: number;
   penaltyPrice: number;
   unitCount: number;
+  occupiedUnitCount: number;
+  vacantUnitCount: number;
   canDelete: boolean;
   updatedAt: string;
 };

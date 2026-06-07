@@ -1,5 +1,4 @@
 import {
-  buildPaginationItems,
   PaginationControls,
 } from "@/app/components/Pagination/Pagination";
 
@@ -30,27 +29,7 @@ export default function AuditLogPagination({
         startIndex={startIndex}
         endIndex={endIndex}
         totalRecords={pagination.totalRecords}
-        paginationItems={buildPaginationItems(
-          pagination.currentPage,
-          pagination.totalPages,
-        )}
-        onPageChange={(action, pageNum) => {
-          if (action === "prev") {
-            onPageChange(Math.max(1, pagination.currentPage - 1));
-            return;
-          }
-
-          if (action === "next") {
-            onPageChange(
-              Math.min(pagination.totalPages, pagination.currentPage + 1),
-            );
-            return;
-          }
-
-          if (pageNum) {
-            onPageChange(pageNum);
-          }
-        }}
+        onPageChange={onPageChange}
       />
     </footer>
   );

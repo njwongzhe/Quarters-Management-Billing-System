@@ -4,7 +4,7 @@ import ToolbarButton from "@/app/components/ToolbarIconButton";
 import { downloadXlsxFile } from "@/lib/download/xlsx-export";
 import type { TunggakanListItem } from "@/lib/arrears/arrears";
 
-type TunggakanDownloadProps = {
+type ArrearsDownloadProps = {
   isLoading: boolean;
   data: TunggakanListItem[];
   filteredData: TunggakanListItem[];
@@ -12,13 +12,13 @@ type TunggakanDownloadProps = {
   selectedChargeMonthLabel: string;
 };
 
-export default function TunggakanDownload({
+export default function ArrearsDownload({
   isLoading,
   data,
   filteredData,
   activeFilterCount,
   selectedChargeMonthLabel,
-}: TunggakanDownloadProps) {
+}: ArrearsDownloadProps) {
   const handleExport = () => {
     const exportData = activeFilterCount > 0 ? filteredData : data;
     const filename = activeFilterCount > 0
@@ -34,19 +34,18 @@ export default function TunggakanDownload({
         {
           name: "Senarai Tunggakan",
           columns: [
-            { width: 28 }, // Nama
-            { width: 18 }, // IC
-            { width: 16 }, // Kelas
-            { width: 36 }, // Unit
-            { width: 16 }, // Sewa
-            { width: 16 }, // Senggara
-            { width: 16 }, // Penalti
-            { width: 16 }, // Tambahan
-            { width: 16 }, // Rebat
-            { width: 14 }, // Tunggakan
+            { width: 28 },
+            { width: 18 },
+            { width: 16 },
+            { width: 36 },
+            { width: 16 },
+            { width: 16 },
+            { width: 16 },
+            { width: 16 },
+            { width: 16 },
+            { width: 14 },
           ],
           rows: [
-            // Header row
             [
               { value: "NAMA PENGHUNI", style: "header" },
               { value: "NO. KAD PENGENALAN", style: "header" },
@@ -59,7 +58,6 @@ export default function TunggakanDownload({
               { value: `REBAT ${selectedChargeMonthLabel} (RM)`, style: "header", align: "right" },
               { value: "TUNGGAKAN (RM)", style: "header", align: "right" },
             ],
-            // Data rows
             ...exportData.map((row) => [
               { value: row.fullName },
               { value: row.icNumber },
