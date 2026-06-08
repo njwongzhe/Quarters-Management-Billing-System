@@ -101,12 +101,12 @@ export async function verifyTunggakanDrafts(
       return {
         transactionNo: transactionNos[index],
         residentId: row.residentId,
-        transactionDate: new Date(),
+        transactionDate: row.draft.lastUpdatedMonth ?? new Date(),
         chargeMonth,
         category: "BAKI_AWAL",
         description: "Baki awal daripada muat naik tunggakan.",
-        debitAmount: amount < 0 ? Math.abs(amount) : 0,
-        creditAmount: amount >= 0 ? amount : 0,
+        debitAmount: amount >= 0 ? amount : 0,
+        creditAmount: amount < 0 ? Math.abs(amount) : 0,
       };
     }),
   });
