@@ -38,18 +38,13 @@ export default function StatCards({
             <p className="text-xs font-semibold text-grey/70">
               {stat.label}
             </p>
-            <p
-              className={[
-                "text-3xl font-bold text-dark-grey",
-              ].join(" ")}
-            >
+            <p className="text-3xl font-bold text-dark-grey">
               {displayValue}
             </p>
             <div
               className={[
                 "flex items-center gap-1 text-xs font-bold",
                 stat.tone === "green" ? "text-green" : "text-dark-blue",
-                isLoading ? "opacity-50" : "",
               ].join(" ")}
             >
               <Icon

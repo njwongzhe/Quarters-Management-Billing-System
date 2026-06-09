@@ -3,10 +3,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
-  InputField as SharedInputField,
   TableInputField,
   TablePickerField,
 } from "@/app/components/InputField";
+import SearchBar, { SearchBarToggleButton, useSearchBarLogic } from "@/app/components/SearchBar";
 import FilterOption, {
   areAllFilterOptionsSelected,
   normalizeSelectedValuesForOptions,
@@ -173,13 +173,17 @@ export default function KuartersUnitsPanel({
   const [unitOccupancyHistory, setUnitOccupancyHistory] =
     useState<UnitOccupancyHistoryState>(null);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
-  const searchInputRef = useRef<HTMLDivElement | null>(null);
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(
-    filterQuery.trim().length > 0,
-  );
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const isSearchFilterActive = filterQuery.trim().length > 0;
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive: isSearchFilterActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: filterQuery, onChange: onFilterQueryChange });
+
   const isStatusFilterActive = !areAllFilterOptionsSelected(
     statusFilterOptions,
     statusFilter,
@@ -286,11 +290,6 @@ export default function KuartersUnitsPanel({
     };
   }, [isFilterMenuOpen]);
 
-  useEffect(() => {
-    if (isSearchOpen) {
-      searchInputRef.current?.querySelector("input")?.focus();
-    }
-  }, [isSearchOpen]);
 
   useEffect(() => {
     if (!targetUnitId || isLoading) {
@@ -379,20 +378,7 @@ export default function KuartersUnitsPanel({
     setIsFilterMenuOpen((currentState) => !currentState);
   }
 
-  function handleToggleSearch() {
-    if (isSearchOpen) {
-      onFilterQueryChange("");
-      setIsSearchOpen(false);
-      return;
-    }
-
-    setIsSearchOpen(true);
-  }
-
-  function handleClearSearch() {
-    onFilterQueryChange("");
-    setIsSearchOpen(false);
-  }
+  // Search toggle/clear handlers are managed by useSearchBarLogic hook
 
   function handlePaginationChange(nextPage: number) {
     if (pendingAction) {
@@ -432,102 +418,71 @@ export default function KuartersUnitsPanel({
         />
       ) : null}
 
-      <div className="flex flex-row justify-between px-3 pt-3">
-        <div>
-          <div className="text-lg font-bold text-dark-grey">
-            Senarai Unit Kuarters
+      <div className="flex flex-col gap-3 px-3">
+        <div className="flex flex-row justify-between pt-3">
+          <div>
+            <div className="text-lg font-bold text-dark-grey">
+              Senarai Unit Kuarters
+            </div>
+            <div className="text-xs text-grey">
+              Klik pada ikon kemaskini untuk mengubah maklumat unit dan penghuni.
+            </div>
           </div>
-          <div className="text-xs text-grey">
-            Klik pada ikon kemaskini untuk mengubah maklumat unit dan penghuni.
-          </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          <ToolbarButton
-            icon={commonIcons.search}
-            label="Cari unit kuarters"
-            isActive={isSearchOpen}
-            onClick={handleToggleSearch}
-          />
-          <div ref={filterMenuRef} className="relative">
-            <ToolbarButton
-              icon={commonIcons.filter}
-              label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
-              isActive={isFilterButtonActive}
-              hasPopup="menu"
-              isExpanded={isFilterMenuOpen}
-              onClick={handleToggleFilterMenu}
+          <div className="flex items-center gap-4">
+            <SearchBarToggleButton
+              label="Cari unit kuarters"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
             />
-
-            {isFilterMenuOpen && !isLoading ? (
-              <FilterOption
-                ariaLabel="Tapisan status unit"
-                defaultLabel="Semua Status"
-                optionSets={[
-                  {
-                    title: "Status Unit",
-                    options: statusFilterOptions,
-                    selectedValues: statusFilter,
-                  },
-                ]}
-                onChange={(sets) => {
-                  // Only one set, so update parent with its selectedValues
-                  handleSelectStatusFilter(sets[0]?.selectedValues ?? []);
-                }}
+            <div ref={filterMenuRef} className="relative">
+              <ToolbarButton
+                icon={commonIcons.filter}
+                label={`Tapis status unit: ${getStatusFilterLabel(statusFilter)}`}
+                isActive={isFilterButtonActive}
+                hasPopup="menu"
+                isExpanded={isFilterMenuOpen}
+                onClick={handleToggleFilterMenu}
               />
-            ) : null}
+
+              {isFilterMenuOpen && !isLoading ? (
+                <FilterOption
+                  ariaLabel="Tapisan status unit"
+                  defaultLabel="Semua Status"
+                  optionSets={[
+                    {
+                      title: "Status Unit",
+                      options: statusFilterOptions,
+                      selectedValues: statusFilter,
+                    },
+                  ]}
+                  onChange={(sets) => {
+                    // Only one set, so update parent with its selectedValues
+                    handleSelectStatusFilter(sets[0]?.selectedValues ?? []);
+                  }}
+                />
+              ) : null}
+            </div>
+            <ToolbarButton
+              icon={commonIcons.download}
+              disabled={isLoading}
+              label="Muat turun senarai unit"
+              onClick={handleDownloadUnits}
+            />
           </div>
-          <ToolbarButton
-            icon={commonIcons.download}
-            disabled={isLoading}
-            label="Muat turun senarai unit"
-            onClick={handleDownloadUnits}
+        </div>
+
+        {isSearchOpen ? (
+          <SearchBar
+            value={filterQuery}
+            onChange={onFilterQueryChange}
+            onClear={handleClearSearch}
+            label="CARIAN MENGIKUT UNIT ATAU PENGHUNI"
+            placeholder="Contoh: A-01-02 atau Ahmad"
+            inputRef={searchInputRef}
           />
-        </div>
+        ) : null}
       </div>
-
-      {isSearchOpen ? (
-      <div className="px-3">
-      <div className="rounded-lg bg-white p-4 shadow">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div ref={searchInputRef} className="flex-1">
-              <SharedInputField
-                label="CARIAN MENGIKUT UNIT ATAU PENGHUNI"
-                value={filterQuery}
-                state="active"
-                onChange={onFilterQueryChange}
-                placeholder="Contoh: A-01-02 atau Ahmad"
-                showLabel
-                leadingIcon={(
-                  <Icon
-                    icon={commonIcons.search}
-                    size={18}
-                    className="text-light-grey"
-                  />
-                )}
-                className="w-full"
-                activeBackgroundClass="bg-light-blue"
-                inputFontSize={12}
-                inputMinHeight={40}
-              />
-            </div>
-
-            <div className="flex items-center gap-3 self-start lg:self-end">
-              <button
-                type="button"
-                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={!isSearchFilterActive}
-                onClick={handleClearSearch}
-              >
-                Kosongkan
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
-      ) : null}
 
       <div className="rounded-lg overflow-x-auto overflow-y-auto">
         <div className="overflow-x-auto overflow-y-auto">

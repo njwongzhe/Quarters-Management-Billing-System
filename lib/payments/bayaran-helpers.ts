@@ -121,21 +121,31 @@ export function mapPaymentExportRow(
   };
 }
 
+import { searchRecords } from "@/app/components/SearchBar";
+
 export function filterBayaranRecords<
   T extends {
+    name: string;
+    ic: string;
+    quarters: string;
+    unit: string;
     paymentStatus: BayaranStatusFilter;
-    searchText: string;
   },
 >(records: T[], filters: BayaranFilters) {
-  const normalizedQuery = normalizeSearchText(filters.query);
+  const searched = searchRecords(
+    records,
+    filters.query,
+    (row) => [
+      row.name,
+      row.ic,
+      row.quarters,
+      row.unit,
+      "status" in row ? (row as any).status as string : null,
+    ],
+    { icSearch: true },
+  );
 
-  return records.filter((record) => {
-    const matchesQuery =
-      normalizedQuery.length === 0 || record.searchText.includes(normalizedQuery);
-    const matchesStatus = filters.statuses.includes(record.paymentStatus);
-
-    return matchesQuery && matchesStatus;
-  });
+  return searched.filter((row) => filters.statuses.includes(row.paymentStatus));
 }
 
 export function rowBorder(tone: string) {

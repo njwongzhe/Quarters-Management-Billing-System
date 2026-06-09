@@ -1,18 +1,21 @@
 "use client";
 
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useEffect, useRef, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
-import { InputField as SharedInputField } from "@/app/components/InputField";
 import {
   PaginationControls,
   usePaginationLogic,
 } from "@/app/components/Pagination/Pagination";
 import { Topic } from "@/app/components/InputField";
+import SearchBar, {
+  SearchBarToggleButton,
+  searchRecords,
+  useSearchBarLogic,
+} from "@/app/components/SearchBar";
 import HistoryDownload from "./KuartersUnitHistoryTabComponents/HistoryDownload";
 import { useHistoryFilterDate } from "./KuartersUnitHistoryTabComponents/HistoryFilterDate";
 import { useHistoryFilter } from "./KuartersUnitHistoryTabComponents/HistoryFilter";
-import { useHistorySearch } from "./KuartersUnitHistoryTabComponents/HistorySearch";
 import KuartersFeedbackBanner from "../../components/KuartersFeedbackBanner";
 import KuartersResidentPickerModal from "./KuartersResidentPickerModal";
 import KuartersUnitDatePicker from "./KuartersUnitDatePicker";
@@ -119,17 +122,26 @@ export default function KuartersUnitDetailsHistoryTab({
     dateFilterKey,
     DateFilterControl,
   } = useHistoryFilterDate(statusFilteredRecords);
+  const [searchQuery, setSearchQuery] = useState("");
   const {
-    filteredRecords: historyRecords,
-    searchKey,
+    isOpen: isSearchOpen,
+    isSearchActive: isSearchFilterActive,
     searchInputRef,
-    searchQuery,
-    isSearchOpen,
-    isSearchActive,
-    setSearchQuery,
+    handleToggleSearch,
     handleClearSearch,
-    SearchButton,
-  } = useHistorySearch(dateFilteredRecords);
+  } = useSearchBarLogic({
+    value: searchQuery,
+    onChange: setSearchQuery,
+  });
+
+  const historyRecords = useMemo(() => {
+    return searchRecords(
+      dateFilteredRecords,
+      searchQuery,
+      (record) => [record.occupantName, record.occupantIcNumber],
+      { icSearch: true },
+    );
+  }, [dateFilteredRecords, searchQuery]);
 
   const {
     currentPage,
@@ -143,7 +155,7 @@ export default function KuartersUnitDetailsHistoryTab({
 
   useEffect(() => {
     handlePageChange(1);
-  }, [dateFilterKey, searchKey, statusFilterKey, unitDetails.id]);
+  }, [dateFilterKey, searchQuery, statusFilterKey, unitDetails.id]);
 
   useEffect(() => {
     if (!residentPicker.isOpen) {
@@ -453,7 +465,11 @@ export default function KuartersUnitDetailsHistoryTab({
         <Topic content="SEJARAH PENGHUNIAN" />
 
         <div className="flex flex-row gap-4 items-center">
-          {SearchButton}
+          <SearchBarToggleButton
+            label="Cari sejarah penghunian"
+            isOpen={isSearchOpen}
+            onToggle={handleToggleSearch}
+          />
           {DateFilterControl}
           {FilterControl}
           <HistoryDownload unitCode={unitDetails.unitCode} records={historyRecords} />
@@ -461,46 +477,14 @@ export default function KuartersUnitDetailsHistoryTab({
       </div>
 
       {isSearchOpen ? (
-        <div className="w-full px-3">
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div ref={searchInputRef} className="flex-1">
-                <SharedInputField
-                  label="CARIAN MENGIKUT NAMA ATAU NO. KP"
-                  value={searchQuery}
-                  state="active"
-                  onChange={(value) => {
-                    setSearchQuery(value);
-                  }}
-                  placeholder="Contoh: Ahmad atau 880101-14-5678"
-                  showLabel
-                  leadingIcon={(
-                    <Icon
-                      icon={commonIcons.search}
-                      size={18}
-                      className="text-light-grey"
-                    />
-                  )}
-                  className="w-full"
-                  activeBackgroundClass="bg-light-blue"
-                  inputFontSize={12}
-                  inputMinHeight={40}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 self-start lg:self-end">
-                <button
-                  type="button"
-                  className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={!isSearchActive}
-                  onClick={handleClearSearch}
-                >
-                  Kosongkan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          onClear={handleClearSearch}
+          label="CARIAN MENGIKUT NAMA ATAU NO. KP"
+          placeholder="Contoh: Ahmad atau 880101-14-5678"
+          inputRef={searchInputRef}
+        />
       ) : null}
 
       <KuartersFeedbackBanner

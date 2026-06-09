@@ -4,12 +4,12 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import Icon from "@/app/components/Icon/Icon";
-import { InputField as SharedInputField } from "@/app/components/InputField";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import AuditDownload from "./Button/AuditDownload";
 import AuditFilter from "./Button/AuditFilter";
 import AuditLogPagination from "./AuditLogPagination";
-import AuditSearch, { useAuditSearchController } from "./Button/AuditSearch";
+import { useAuditSearchController } from "./Button/AuditSearch";
+import SearchBar, { SearchBarToggleButton } from "@/app/components/SearchBar";
 import type { AuditLogFilters, AuditLogListItem } from "./auditLogClient";
 import AuditFilterDate from "./Button/AuditFilterDate";
 import { getAuditActionBadgeColor } from "./auditLogActionColor";
@@ -146,74 +146,48 @@ export default function AuditLogTablePanel({
   }
 
   return (
-    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
-      <div className="flex items-start justify-between gap-4 px-3 pt-3">
-        <div>
-          <h2 className="text-lg font-bold text-dark-grey">
-            Senarai Aktiviti Sistem
-          </h2>
-          <p className="text-xs text-grey/70">
-            Rekod terperinci bagi setiap aktiviti sistem.
-          </p>
-        </div>
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1 flex flex-col gap-3">
+      <div className="flex flex-col gap-3 pt-3 px-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-dark-grey">
+              Senarai Aktiviti Sistem
+            </h2>
+            <p className="text-xs text-grey/70">
+              Rekod terperinci bagi setiap aktiviti sistem.
+            </p>
+          </div>
 
-        <div className="flex items-center gap-4 text-[#607083]">
-          <AuditSearch
-            filters={filters}
-            isOpen={isSearchOpen}
-            onToggle={handleToggleSearch}
-          />
-          <AuditFilterDate filters={filters} onBeforeOpen={() => {}} />
-          <AuditFilter filters={filters} options={filterOptions} />
-          <AuditDownload
-            disabled={isToolbarDisabled}
-            exportHref={`/api/audit-logs/export${buildAuditLogQueryString(
-              filters,
-            )}`}
-          />
-        </div>
-      </div>
-
-      {isSearchOpen ? (
-        <div className="mt-3 px-3">
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div ref={searchInputRef} className="flex-1">
-                <SharedInputField
-                  label="CARIAN KATA KUNCI MERENTASI SEMUA MEDAN REKOD AUDIT"
-                  value={searchQuery}
-                  state="active"
-                  onChange={(value) => {
-                    setSearchQuery(value);
-                  }}
-                  placeholder="Contoh: Ahmad, Tunggakan atau UPDATE"
-                  showLabel
-                  leadingIcon={(
-                    <Icon icon="search" size={18} className="text-light-grey" />
-                  )}
-                  className="w-full"
-                  activeBackgroundClass="bg-light-blue"
-                  inputFontSize={12}
-                  inputMinHeight={40}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 self-start lg:self-end">
-                <button
-                  type="button"
-                  className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={!searchQuery.trim().length && !filters.search?.trim()}
-                  onClick={handleClearSearch}
-                >
-                  Kosongkan
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center gap-4 text-[#607083]">
+            <SearchBarToggleButton
+              label="Cari rekod audit"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
+            />
+            <AuditFilterDate filters={filters} onBeforeOpen={() => {}} />
+            <AuditFilter filters={filters} options={filterOptions} />
+            <AuditDownload
+              disabled={isToolbarDisabled}
+              exportHref={`/api/audit-logs/export${buildAuditLogQueryString(
+                filters,
+              )}`}
+            />
           </div>
         </div>
-      ) : null}
 
-      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">
+        {isSearchOpen ? (
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onClear={handleClearSearch}
+            label="CARIAN KATA KUNCI MERENTASI SEMUA MEDAN REKOD AUDIT"
+            placeholder="Contoh: Ahmad, Tunggakan atau UPDATE"
+            inputRef={searchInputRef}
+          />
+        ) : null}
+      </div>
+
+      <div className="overflow-hidden rounded-lg bg-white shadow">
         {bootstrapError ? (
           <div className="border-b border-light-grey/20 bg-[#FFF4F4] px-4 py-3 text-sm font-semibold text-[#B42318]">
             {bootstrapError}

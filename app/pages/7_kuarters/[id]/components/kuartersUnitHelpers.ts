@@ -1,3 +1,5 @@
+import { searchRecords } from "@/app/components/SearchBar";
+
 import type { UnitStatus } from "@prisma/client";
 import type { QuarterCategorySummary } from "@/lib/quarters/quarter-categories";
 import type {
@@ -171,29 +173,16 @@ export function filterQuarterUnits(
   units: QuarterUnitRecord[],
   filters: QuarterUnitFilters,
 ) {
-  const normalizedQuery = normalizeSearchValue(filters.query);
+  const statusFiltered = units.filter((unit) =>
+    filters.status.includes(unit.status as QuarterUnitStatusFilter),
+  );
 
-  return units.filter((unit) => {
-    const matchesStatus = filters.status.includes(unit.status as QuarterUnitStatusFilter);
-
-    if (!matchesStatus) {
-      return false;
-    }
-
-    if (normalizedQuery.length === 0) {
-      return true;
-    }
-
-    const searchableValues = [
-      unit.unitCode,
-      unit.occupantIcNumber ?? "",
-      unit.occupantName ?? "",
-    ];
-
-    return searchableValues.some((value) =>
-      normalizeSearchValue(value).includes(normalizedQuery),
-    );
-  });
+  return searchRecords(
+    statusFiltered,
+    filters.query,
+    (unit) => [unit.unitCode, unit.occupantIcNumber, unit.occupantName],
+    { icSearch: true },
+  );
 }
 
 export function buildQuarterUnitPagination(
@@ -290,6 +279,3 @@ function buildPageItems(
   ];
 }
 
-function normalizeSearchValue(value: string) {
-  return value.trim().toLocaleLowerCase("ms");
-}

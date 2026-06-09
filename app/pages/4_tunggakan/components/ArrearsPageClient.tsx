@@ -6,10 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { areAllFilterOptionsSelected } from "@/app/components/Filter/FilterOption";
 import { defaultFilter, type TunggakanFilter } from "@/lib/arrears/arrears";
 import Icon from "@/app/components/Icon/Icon";
-import { InputField } from "@/app/components/InputField";
 import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears/arrears";
 import KemasKiniModal from "@/app/pages/4_tunggakan/components/KemasKiniModal";
 import ButiranTunggakanModal from "@/app/pages/4_tunggakan/components/ButiranTunggakan/ButiranTunggakanModal";
+import SearchBar, { SearchBarToggleButton, searchRecords, useSearchBarLogic } from "@/app/components/SearchBar";
 
 // New Split Components
 import TunggakanSummaryCards from "./TunggakanList/TunggakanSummaryCards";
@@ -65,23 +65,14 @@ export default function TunggakanPageClient() {
   const selectedChargeMonthLabel = useMemo(() => formatMonthLabel(selectedChargeMonth), [selectedChargeMonth]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const isSearchActive = searchQuery.trim().length > 0;
-  const [isSearchOpen, setIsSearchOpen] = useState(isSearchActive);
 
-  // Synchronize searchQuery with panel open state
-  useEffect(() => {
-    if (!isSearchOpen) {
-      setSearchQuery("");
-    }
-  }, [isSearchOpen]);
-
-  const normalizeSearchValue = (value: string) => {
-    return value
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  };
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: searchQuery, onChange: setSearchQuery });
 
   const fetchBillingStatus = async () => {
     try {
@@ -160,22 +151,18 @@ export default function TunggakanPageClient() {
     let result = data;
 
     if (isSearchOpen) {
-      const normalizedQuery = normalizeSearchValue(searchQuery);
-      if (normalizedQuery.length > 0) {
-        result = result.filter((row) => {
-          const searchableFields = [
-            row.fullName,
-            row.icNumber,
-            row.quarterClass,
-            row.unitCode,
-            row.quarterAddress,
-          ].filter(Boolean) as string[];
-
-          return searchableFields.some((field) =>
-            normalizeSearchValue(field).includes(normalizedQuery)
-          );
-        });
-      }
+      result = searchRecords(
+        result,
+        searchQuery,
+        (row) => [
+          row.fullName,
+          row.icNumber,
+          row.quarterClass,
+          row.unitCode,
+          row.quarterAddress,
+        ],
+        { icSearch: true },
+      );
     }
 
     if (filters.kelasKuarters.length > 0)
@@ -373,7 +360,11 @@ export default function TunggakanPageClient() {
                 />
 
                 {/* Search Button */}
-                <ArrearsSearch value={searchQuery} isOpen={isSearchOpen} setIsOpen={setIsSearchOpen} />
+                <SearchBarToggleButton
+                  label="Cari penghuni tunggakan"
+                  isOpen={isSearchOpen}
+                  onToggle={handleToggleSearch}
+                />
 
                 {/* Filter Button */}
                 <ArrearsFilter filters={filters} onChange={setFilters} />
@@ -391,38 +382,14 @@ export default function TunggakanPageClient() {
           </div>
 
           {isSearchOpen ? (
-            <div className="w-full rounded-lg bg-white p-4 shadow border border-light-grey/10">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="flex-1">
-                  <InputField
-                    label="CARIAN MENGIKUT NAMA, IC, KUARTERS"
-                    value={searchQuery}
-                    state="active"
-                    onChange={setSearchQuery}
-                    placeholder="Cth: Ahmad, 123456-78-9012, atau blok B-04"
-                    showLabel
-                    leadingIcon={(
-                      <Icon icon="search" size={18} className="text-light-grey" />
-                    )}
-                    className="w-full"
-                    activeBackgroundClass="bg-light-blue"
-                    inputFontSize={12}
-                    inputMinHeight={40}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 self-start lg:self-end">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={!isSearchActive}
-                    onClick={() => setSearchQuery("")}
-                  >
-                    Kosongkan
-                  </button>
-                </div>
-              </div>
-            </div>
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onClear={handleClearSearch}
+              label="CARIAN MENGIKUT NAMA, IC, KUARTERS"
+              placeholder="Cth: Ahmad, 123456-78-9012, atau blok B-04"
+              inputRef={searchInputRef}
+            />
           ) : null}
         </div>
 

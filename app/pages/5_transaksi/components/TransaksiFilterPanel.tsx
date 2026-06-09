@@ -6,7 +6,7 @@ import type { FilterOptionSet } from "@/app/components/Filter/FilterOption";
 import TransaksiDownload from "./TableButton/TransaksiDownload";
 import TransaksiFilter from "./TableButton/TransaksiFilter";
 import TransaksiFilterDate from "./TableButton/TransaksiFilterDate";
-import TransaksiSearch, { TransaksiSearchPanel } from "./TableButton/TransaksiSearch";
+import SearchBar, { SearchBarToggleButton, useSearchBarLogic } from "@/app/components/SearchBar";
 
 type TransactionStatus = "NORMAL" | "DIBALIKAN" | "DILARASKAN" | "PEMBALIKAN" | "PELARASAN";
 type TransactionCategory = "BAYARAN" | "CAJ_SEWA" | "CAJ_PENYELENGGARAAN" | "CAJ_PENALTI" | "CAJ_TAMBAHAN" | "REBAT" | "BAKI_AWAL" | "LAIN_LAIN";
@@ -67,16 +67,22 @@ export default function TransaksiFilterPanel({
   // DOM element nodes tracker refs
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const datePanelRef = useRef<HTMLDivElement | null>(null);
-  const searchInputRef = useRef<HTMLDivElement | null>(null);
   const pendingFilterUpdateRef = useRef<number | null>(null);
 
   // Panel toggles states visibility mapping
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isDateOpen, setIsDateOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(filters.search.trim().length > 0);
   
   /** Un-debounced quick text-buffer sync for rapid type responsiveness */
   const [searchDraft, setSearchDraft] = useState(filters.search);
+
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: searchDraft, onChange: setSearchDraft });
 
   // Compute lookup tables structures metrics safely
   const allStatuses = useMemo(() => STATUS_OPTIONS.map((o) => o.value), []);
@@ -90,8 +96,6 @@ export default function TransaksiFilterPanel({
   ];
 
   // Derive visual indicator highlights properties safely
-  const isSearchActive = filters.search.trim().length > 0;
-  const isSearchPanelOpen = isSearchOpen || isSearchActive;
   const isDateActive = Boolean(filters.startDate || filters.endDate);
   const hasOptionFilterActive =
     filters.categories.length !== allCategories.length ||
@@ -103,13 +107,6 @@ export default function TransaksiFilterPanel({
     setSearchDraft(filters.search);
   }, [filters.search]);
 
-  // Focus utility management effect
-  useEffect(() => {
-    if (isSearchPanelOpen) {
-      searchInputRef.current?.querySelector("input")?.focus();
-    }
-  }, [isSearchPanelOpen]);
-
   // -------------------------------------------------------------------------
   // DEBOUNCER LOGIC ENGINE FOR TEXT FILTERING
   // -------------------------------------------------------------------------
@@ -118,6 +115,14 @@ export default function TransaksiFilterPanel({
     const normalizedActive = filters.search.trim();
 
     if (normalizedDraft === normalizedActive) return;
+
+    if (normalizedDraft === "") {
+      onFiltersChange({
+        ...filters,
+        search: "",
+      });
+      return;
+    }
 
     // Wait 300ms since user stopped typing before propagating down page layout filters
     const timeoutId = window.setTimeout(() => {
@@ -166,26 +171,7 @@ export default function TransaksiFilterPanel({
   // -------------------------------------------------------------------------
   // HANDLERS & CONTROL OPERATIONS
   // -------------------------------------------------------------------------
-  function handleToggleSearch() {
-    if (isSearchPanelOpen) {
-      setIsSearchOpen(false);
-      if (filters.search.trim().length > 0 || searchDraft.trim().length > 0) {
-        setSearchDraft("");
-        onFiltersChange({ ...filters, search: "" });
-      }
-      return;
-    }
-    setIsSearchOpen(true);
-  }
-
-  function handleClearSearch() {
-    if (pendingFilterUpdateRef.current !== null) {
-      window.clearTimeout(pendingFilterUpdateRef.current);
-    }
-    setSearchDraft("");
-    setIsSearchOpen(false);
-    onFiltersChange({ ...filters, search: "" });
-  }
+  // Debounce logic handles search updates automatically
 
   /** Schedules structural data operations safely with an incremental timing scheduler */
   function scheduleFiltersChange(nextFilters: FilterState) {
@@ -213,65 +199,73 @@ export default function TransaksiFilterPanel({
   }
 
   return (
-    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
-      <div className="flex items-start justify-between gap-4 px-3 pt-3">
-        <div>
-          <h2 className="text-lg font-bold text-dark-grey">Senarai Transaksi</h2>
-          <p className="text-xs text-grey/70">Rekod transaksi terkini.</p>
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1 flex flex-col gap-3">
+      <div className="flex flex-col gap-3 pt-3 px-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-dark-grey">Senarai Transaksi</h2>
+            <p className="text-xs text-grey/70">Rekod transaksi terkini.</p>
+          </div>
+
+          <div className="flex items-center gap-4 text-[#607083]">
+            <SearchBarToggleButton
+              label="Cari rekod transaksi"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
+            />
+
+            <TransaksiFilterDate
+              panelRef={datePanelRef}
+              isActive={isDateActive}
+              isOpen={isDateOpen}
+              startDate={filters.startDate}
+              endDate={filters.endDate}
+              onApply={(nextDate) => {
+                scheduleFiltersChange({
+                  ...filters,
+                  startDate: nextDate.startDate,
+                  endDate: nextDate.endDate,
+                });
+              }}
+              onClear={() => {
+                scheduleFiltersChange({ ...filters, startDate: "", endDate: "" });
+                setIsDateOpen(false);
+              }}
+              onToggle={() => {
+                setIsDateOpen((v) => !v);
+                setIsFilterOpen(false);
+              }}
+            />
+
+            <TransaksiFilter<FilterOptionValue>
+              panelRef={filterPanelRef}
+              isActive={hasOptionFilterActive}
+              isOpen={isFilterOpen}
+              optionSets={optionSets}
+              onChange={handleFilterChange}
+              onToggle={() => {
+                setIsFilterOpen((v) => !v);
+                setIsDateOpen(false);
+              }}
+            />
+
+            <TransaksiDownload disabled={isLoading || isExporting} isExporting={isExporting} onExport={onExport} />
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 text-[#607083]">
-          <TransaksiSearch isActive={isSearchPanelOpen} onToggle={handleToggleSearch} />
-
-          <TransaksiFilterDate
-            panelRef={datePanelRef}
-            isActive={isDateActive}
-            isOpen={isDateOpen}
-            startDate={filters.startDate}
-            endDate={filters.endDate}
-            onApply={(nextDate) => {
-              scheduleFiltersChange({
-                ...filters,
-                startDate: nextDate.startDate,
-                endDate: nextDate.endDate,
-              });
-            }}
-            onClear={() => {
-              scheduleFiltersChange({ ...filters, startDate: "", endDate: "" });
-              setIsDateOpen(false);
-            }}
-            onToggle={() => {
-              setIsDateOpen((v) => !v);
-              setIsFilterOpen(false);
-            }}
+        {isSearchOpen ? (
+          <SearchBar
+            value={searchDraft}
+            onChange={setSearchDraft}
+            onClear={handleClearSearch}
+            label="CARIAN REKOD TRANSAKSI"
+            placeholder="Contoh: T-2026, Ahmad, 850212-01-1234 atau RESIT-001"
+            inputRef={searchInputRef}
           />
-
-          <TransaksiFilter<FilterOptionValue>
-            panelRef={filterPanelRef}
-            isActive={hasOptionFilterActive}
-            isOpen={isFilterOpen}
-            optionSets={optionSets}
-            onChange={handleFilterChange}
-            onToggle={() => {
-              setIsFilterOpen((v) => !v);
-              setIsDateOpen(false);
-            }}
-          />
-
-          <TransaksiDownload disabled={isLoading || isExporting} isExporting={isExporting} onExport={onExport} />
-        </div>
+        ) : null}
       </div>
-
-      {isSearchPanelOpen ? (
-        <TransaksiSearchPanel
-          inputRef={searchInputRef}
-          searchDraft={searchDraft}
-          onChange={setSearchDraft}
-          onClear={handleClearSearch}
-        />
-      ) : null}
-
-      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">{children}</div>
+      
+      <div className="overflow-hidden rounded-lg bg-white shadow">{children}</div>
     </section>
   );
 }

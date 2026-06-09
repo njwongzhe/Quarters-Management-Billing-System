@@ -12,7 +12,6 @@ import { DateField } from "@/app/components/InputField";
 import UploadDropzone from "./components/UploadDropzone";
 import {
   categoryByDraftKind,
-  draftKindByCategory,
   reviewRoutes,
 } from "./components/constants";
 import {
@@ -75,23 +74,17 @@ function MuatNaikPageContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const today = startOfDay(new Date());
-  const activeDraftKind = draftKindByCategory[activeCategory];
+  // activeDraftKind resolves the current category to its API kind (e.g. "bayaran", "tunggakan")
+  const activeDraftKind = reviewRoutes[activeCategory];
+  // Only show drafts that match the active category kind
   const activeRows = useMemo(
-    () =>
-      activeDraftKind
-        ? processingDrafts.filter((draft) => draft.kind === activeDraftKind)
-        : [],
+    () => processingDrafts.filter((draft) => draft.kind === activeDraftKind),
     [activeDraftKind, processingDrafts],
   );
 
   // Load processing drafts when active category changes or on initial mount
   useEffect(() => {
     async function loadProcessingDrafts() {
-      if (!activeDraftKind) {
-        setProcessingDrafts([]);
-        return;
-      }
-
       setIsLoadingQueue(true);
 
       try {

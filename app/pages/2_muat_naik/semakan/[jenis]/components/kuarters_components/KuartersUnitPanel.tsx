@@ -123,11 +123,12 @@ export default function KuartersUnitPanel({
                 rowCount: 10,
               })
             ) : pageUnits.length === 0 ? (
-              <tr className="border-t border-light-grey/20">
-                <td colSpan={3} className="px-3 py-4 text-center text-sm text-grey bg-white">
-                  Tiada unit baharu.
-                </td>
-              </tr>
+              loadingTableRows({
+                mode: "message",
+                columnCount: 3,
+                rowCount: 1,
+                message: "Tiada unit baharu.",
+              })
             ) : (
               pageUnits.map((unit) => {
                 const unitKey = getUnitKey(unit);

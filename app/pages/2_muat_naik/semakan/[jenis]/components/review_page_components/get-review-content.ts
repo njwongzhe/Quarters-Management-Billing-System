@@ -11,19 +11,19 @@ const reviewContent: Record<ReviewKind, ReviewContentTemplate> = {
   bayaran: {
     stats: [
       {
-        label: "Tarikh Bayaran",
+        label: "TARIKH BAYARAN",
         helper: "Data Bulanan",
         icon: "calendar_month",
         tone: "blue",
       },
       {
-        label: "Jumlah Rekod",
+        label: "JUMLAH REKOD",
         helper: "Perlu Disemak",
         icon: "fact_check",
         tone: "green",
       },
       {
-        label: "Jumlah Bayaran (RM)",
+        label: "JUMLAH BAYARAN (RM)",
         helper: "Telah Dikumpul",
         icon: "payments",
         tone: "green",
@@ -33,19 +33,19 @@ const reviewContent: Record<ReviewKind, ReviewContentTemplate> = {
   tunggakan: {
     stats: [
       {
-        label: "Tarikh Tunggakan",
+        label: "TARIKH TUNGGAKAN",
         helper: "Data Bulanan",
         icon: "calendar_month",
         tone: "blue",
       },
       {
-        label: "Jumlah Rekod",
+        label: "JUMLAH REKOD",
         helper: "Perlu Disemak",
         icon: "fact_check",
         tone: "green",
       },
       {
-        label: "Jumlah Tunggakan (RM)",
+        label: "JUMLAH TUNGGAKAN (RM)",
         helper: "Telah Tertunggak",
         icon: "payments",
         tone: "green",
@@ -55,7 +55,7 @@ const reviewContent: Record<ReviewKind, ReviewContentTemplate> = {
   penghuni: {
     stats: [
       {
-        label: "Jumlah Rekod",
+        label: "JUMLAH REKOD",
         helper: "Perlu Disemak",
         icon: "fact_check",
         tone: "green",
@@ -65,16 +65,16 @@ const reviewContent: Record<ReviewKind, ReviewContentTemplate> = {
   kuarters: {
     stats: [
       {
-        label: "Total Kategori",
+        label: "TOTAL KATEGORI",
         helper: "Kategori Aktif",
         icon: "category",
-        tone: "blue",
+        tone: "green",
       },
       {
-        label: "Total Unit",
+        label: "TOTAL UNIT",
         helper: "Unit Berdaftar",
         icon: "apartment",
-        tone: "blue",
+        tone: "green",
       },
     ],
   },
@@ -85,6 +85,12 @@ type GetReviewContentInput = {
   extractResult: ExtractResult | null;
   uploadedFileName: string;
   bayaranEditedTotalAmount: string | null;
+  filteredStats?: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  } | null;
 };
 
 export function getReviewContent({
@@ -92,6 +98,7 @@ export function getReviewContent({
   extractResult,
   uploadedFileName,
   bayaranEditedTotalAmount,
+  filteredStats,
 }: GetReviewContentInput): ReviewContent {
   const baseContent = reviewContent[kind];
   const fileName = uploadedFileName || "Dokumen semakan";
@@ -116,16 +123,22 @@ export function getReviewContent({
     return {
       fileName,
       stats: baseContent.stats.map((stat) => {
-        if (stat.label === "Tarikh Bayaran") {
+        const labelUpper = stat.label.toUpperCase();
+        if (labelUpper === "TARIKH BAYARAN") {
           return { ...stat, value: formatReviewDate(bayaranExtract.paymentMonth) };
         }
 
-        if (stat.label === "Jumlah Rekod") {
-          return { ...stat, value: String(bayaranExtract.recordCount) };
+        if (labelUpper === "JUMLAH REKOD") {
+          const recordCount = filteredStats?.recordCount !== undefined
+            ? filteredStats.recordCount
+            : bayaranExtract.recordCount;
+          return { ...stat, value: String(recordCount) };
         }
 
-        if (stat.label === "Jumlah Bayaran (RM)") {
-          const totalAmount = bayaranEditedTotalAmount ?? bayaranExtract.totalAmount;
+        if (labelUpper === "JUMLAH BAYARAN (RM)") {
+          const totalAmount = filteredStats?.totalAmount !== undefined
+            ? filteredStats.totalAmount
+            : (bayaranEditedTotalAmount ?? bayaranExtract.totalAmount);
 
           return {
             ...stat,
@@ -145,12 +158,19 @@ export function getReviewContent({
     return {
       fileName,
       stats: baseContent.stats.map((stat) => {
-        if (stat.label === "Total Kategori") {
-          return { ...stat, value: String(kuartersExtract.recordCount) };
+        const labelUpper = stat.label.toUpperCase();
+        if (labelUpper === "TOTAL KATEGORI") {
+          const categoryCount = filteredStats?.categoryCount !== undefined
+            ? filteredStats.categoryCount
+            : kuartersExtract.recordCount;
+          return { ...stat, value: String(categoryCount) };
         }
 
-        if (stat.label === "Total Unit") {
-          return { ...stat, value: String(kuartersExtract.totalUnits) };
+        if (labelUpper === "TOTAL UNIT") {
+          const totalUnits = filteredStats?.totalUnits !== undefined
+            ? filteredStats.totalUnits
+            : kuartersExtract.totalUnits;
+          return { ...stat, value: String(totalUnits) };
         }
 
         return { ...stat, value: "-" };
@@ -169,21 +189,28 @@ export function getReviewContent({
     return {
       fileName,
       stats: baseContent.stats.map((stat) => {
-        if (stat.label === "Tarikh Tunggakan") {
+        const labelUpper = stat.label.toUpperCase();
+        if (labelUpper === "TARIKH TUNGGAKAN") {
           return {
             ...stat,
             value: formatReviewDate(tunggakanExtract.lastUpdatedMonth),
           };
         }
 
-        if (stat.label === "Jumlah Rekod") {
-          return { ...stat, value: String(tunggakanExtract.recordCount) };
+        if (labelUpper === "JUMLAH REKOD") {
+          const recordCount = filteredStats?.recordCount !== undefined
+            ? filteredStats.recordCount
+            : tunggakanExtract.recordCount;
+          return { ...stat, value: String(recordCount) };
         }
 
-        if (stat.label === "Jumlah Tunggakan (RM)") {
+        if (labelUpper === "JUMLAH TUNGGAKAN (RM)") {
+          const totalAmount = filteredStats?.totalAmount !== undefined
+            ? Number(filteredStats.totalAmount)
+            : tunggakanTotalAmount;
           return {
             ...stat,
-            value: `RM ${tunggakanTotalAmount.toLocaleString(
+            value: `RM ${totalAmount.toLocaleString(
               "ms-MY",
               {
                 minimumFractionDigits: 2,
@@ -201,11 +228,15 @@ export function getReviewContent({
   if (kind === "penghuni" && penghuniExtract) {
     return {
       fileName,
-      stats: baseContent.stats.map((stat) =>
-        stat.label === "Jumlah Rekod"
-          ? { ...stat, value: String(penghuniExtract.recordCount) }
-          : { ...stat, value: "-" },
-      ),
+      stats: baseContent.stats.map((stat) => {
+        if (stat.label.toUpperCase() === "JUMLAH REKOD") {
+          const recordCount = filteredStats?.recordCount !== undefined
+            ? filteredStats.recordCount
+            : penghuniExtract.recordCount;
+          return { ...stat, value: String(recordCount) };
+        }
+        return { ...stat, value: "-" };
+      }),
     };
   }
 
@@ -240,6 +271,14 @@ function getExtractResult<T extends ExtractResult>(
   return extractResult?.documentType === documentType ? (extractResult as T) : null;
 }
 
+/**
+ * Parses a signed monetary string (supports RM prefix, negative signs, and
+ * parenthesized negatives) into a numeric value.
+ *
+ * NOTE: This utility is also duplicated in ExtractReviewPage.tsx and
+ * TunggakanReviewTable.tsx. Consider extracting to a shared util if more
+ * sharing is needed in the future.
+ */
 function parseSignedAmount(value: string) {
   const normalizedValue = String(value ?? "").trim();
 

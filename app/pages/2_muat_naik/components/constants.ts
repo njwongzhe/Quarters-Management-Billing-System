@@ -8,6 +8,8 @@ export const categories: Category[] = [
   "Kuarters",
 ];
 
+// Maps each Category tab to its corresponding draft/API kind string.
+// Used for routing, API calls, and upload logic.
 export const reviewRoutes: Record<Category, ProcessingDraft["kind"]> = {
   Bayaran: "bayaran",
   Tunggakan: "tunggakan",
@@ -15,15 +17,7 @@ export const reviewRoutes: Record<Category, ProcessingDraft["kind"]> = {
   Kuarters: "kuarters",
 };
 
-export const draftKindByCategory: Partial<
-  Record<Category, ProcessingDraft["kind"]>
-> = {
-  Bayaran: "bayaran",
-  Tunggakan: "tunggakan",
-  Penghuni: "penghuni",
-  Kuarters: "kuarters",
-};
-
+// Reverse mapping: draft kind → Category tab label.
 export const categoryByDraftKind: Record<ProcessingDraft["kind"], Category> = {
   bayaran: "Bayaran",
   tunggakan: "Tunggakan",

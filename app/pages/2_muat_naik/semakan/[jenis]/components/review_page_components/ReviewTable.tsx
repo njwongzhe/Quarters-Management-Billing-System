@@ -54,6 +54,12 @@ type ReviewTableProps = {
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
   onNotice?: (tone: GlobalFixedNotice["tone"], message: string) => void;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 export default function ReviewTable({
@@ -77,6 +83,7 @@ export default function ReviewTable({
   selectedKeys,
   onSelectedKeysChange,
   onNotice,
+  onFilteredStatsChange,
 }: ReviewTableProps) {
   if (kind === "bayaran") {
     return (
@@ -94,6 +101,7 @@ export default function ReviewTable({
         selectedKeys={selectedKeys}
         onSelectedKeysChange={onSelectedKeysChange}
         isLoading={isLoading}
+        onFilteredStatsChange={onFilteredStatsChange}
       />
     );
   }
@@ -110,6 +118,7 @@ export default function ReviewTable({
         onSelectedKeysChange={onSelectedKeysChange}
         parsingMode={tunggakanParsingMode}
         isLoading={isLoading}
+        onFilteredStatsChange={onFilteredStatsChange}
       />
     );
   }
@@ -124,6 +133,7 @@ export default function ReviewTable({
         onSelectedKeysChange={onSelectedKeysChange}
         onNotice={onNotice}
         isLoading={isLoading}
+        onFilteredStatsChange={onFilteredStatsChange}
       />
     );
   }
@@ -140,6 +150,7 @@ export default function ReviewTable({
       selectedKeys={selectedKeys}
       onSelectedKeysChange={onSelectedKeysChange}
       isLoading={isLoading}
+      onFilteredStatsChange={onFilteredStatsChange}
     />
   );
 }

@@ -9,9 +9,7 @@ import FilterOption, {
   areAllFilterOptionsSelected,
   normalizeSelectedValuesForOptions,
 } from "@/app/components/Filter/FilterOption";
-import {
-  InputField as SharedInputField,
-} from "@/app/components/InputField";
+import SearchBar, { SearchBarToggleButton, searchRecords, useSearchBarLogic } from "@/app/components/SearchBar";
 import {
   PaginationControls,
   usePaginationLogic,
@@ -71,6 +69,12 @@ type PenghuniReviewTableProps = {
   onSelectedKeysChange?: (keys: string[]) => void;
   onNotice?: (tone: GlobalFixedNotice["tone"], message: string) => void;
   isLoading?: boolean;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 export default function PenghuniReviewTable({
@@ -81,6 +85,7 @@ export default function PenghuniReviewTable({
   onSelectedKeysChange,
   onNotice,
   isLoading = false,
+  onFilteredStatsChange,
 }: PenghuniReviewTableProps) {
   const [selectedResident, setSelectedResident] =
     useState<ExtractedPenghuniRecord | null>(null);
@@ -89,40 +94,40 @@ export default function PenghuniReviewTable({
   // Search & Filter State
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedFilters, setSelectedFilters] = useState<PenghuniFilter[]>(["VALID", "INVALID"]);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
 
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
-  const searchInputRef = useRef<HTMLDivElement | null>(null);
 
-  const isSearchFilterActive = filterQuery.trim().length > 0;
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive: isSearchFilterActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: filterQuery, onChange: setFilterQuery });
+
   const isStatusFilterActive = !areAllFilterOptionsSelected(filterOptions, selectedFilters);
   const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
 
   // Filtered rows
   const filteredRows = useMemo(() => {
-    return records.filter((row) => {
-      // 1. Search Query Filter
-      if (filterQuery.trim()) {
-        const query = filterQuery.toLowerCase().trim();
-        const namaMatch = (row.nama || "").toLowerCase().includes(query);
-        const icMatch = (row.noKadPengenalan || "").toLowerCase().includes(query);
-        const kuartersMatch = (row.kuarters || "").toLowerCase().includes(query);
-        const unitMatch = (row.unit || "").toLowerCase().includes(query);
-        if (!namaMatch && !icMatch && !kuartersMatch && !unitMatch) {
-          return false;
-        }
-      }
+    const searched = searchRecords(
+      records,
+      filterQuery,
+      (row) => [
+        row.nama,
+        row.noKadPengenalan,
+        row.kuarters,
+        row.unit,
+      ],
+      { icSearch: true }
+    );
 
-      // 2. Status Filter
-      if (isStatusFilterActive) {
-        const rowStatus: PenghuniFilter = row.isExisted ? "INVALID" : "VALID";
-        if (!selectedFilters.includes(rowStatus)) {
-          return false;
-        }
-      }
+    if (!isStatusFilterActive) return searched;
 
-      return true;
+    return searched.filter((row) => {
+      const rowStatus: PenghuniFilter = row.isExisted ? "INVALID" : "VALID";
+      return selectedFilters.includes(rowStatus);
     });
   }, [records, filterQuery, selectedFilters, isStatusFilterActive]);
 
@@ -176,12 +181,11 @@ export default function PenghuniReviewTable({
     };
   }, [isFilterMenuOpen]);
 
-  // Auto-focus search input when opened
   useEffect(() => {
-    if (isSearchOpen) {
-      searchInputRef.current?.querySelector("input")?.focus();
-    }
-  }, [isSearchOpen]);
+    onFilteredStatsChange?.({
+      recordCount: filteredRows.length,
+    });
+  }, [filteredRows, onFilteredStatsChange]);
 
   const showNotice = (tone: GlobalFixedNotice["tone"], message: string) => {
     if (!onNotice) {
@@ -189,20 +193,6 @@ export default function PenghuniReviewTable({
     }
     onNotice?.(tone, message);
   };
-
-  function handleToggleSearch() {
-    if (isSearchOpen) {
-      setFilterQuery("");
-      setIsSearchOpen(false);
-      return;
-    }
-    setIsSearchOpen(true);
-  }
-
-  function handleClearSearch() {
-    setFilterQuery("");
-    setIsSearchOpen(false);
-  }
 
   function handleToggleFilterMenu() {
     setIsFilterMenuOpen((currentState) => !currentState);
@@ -343,102 +333,72 @@ export default function PenghuniReviewTable({
 
   return (
     <section className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
-      <div className="flex flex-row justify-between px-3 pt-3">
-        {/* Header */}
-        <div>
-          <div className="text-lg font-bold text-dark-grey">Pratinjau Data Penghuni</div>
-          <div className="text-xs text-grey">Sila semak maklumat sebelum pengesahan.</div>
-        </div>
+      <div className="flex flex-col gap-3 px-3">
+        <div className="flex flex-row justify-between pt-3">
+          {/* Header */}
+          <div>
+            <div className="text-lg font-bold text-dark-grey">Pratinjau Data Penghuni</div>
+            <div className="text-xs text-grey">Sila semak maklumat sebelum pengesahan.</div>
+          </div>
 
-        <div className="flex items-center gap-4">
-          {/* Search Button */}
-          <ToolbarButton
-            icon={commonIcons.search}
-            label="Cari rekod penghuni"
-            isActive={isSearchOpen}
-            onClick={handleToggleSearch}
-          />
-
-          {/* Filter Button */}
-          <div ref={filterMenuRef} className="relative">
-            <ToolbarButton
-              icon={commonIcons.filter}
-              label={`Tapis status data: ${getStatusFilterLabel(selectedFilters)}`}
-              isActive={isFilterButtonActive}
-              hasPopup="menu"
-              isExpanded={isFilterMenuOpen}
-              onClick={handleToggleFilterMenu}
+          <div className="flex items-center gap-4">
+            {/* Search Button */}
+            <SearchBarToggleButton
+              label="Cari rekod penghuni"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
             />
 
-            {isFilterMenuOpen ? (
-              <FilterOption<PenghuniFilter>
-                ariaLabel="Tapisan status data"
-                defaultLabel="Semua Rekod"
-                optionSets={[
-                  {
-                    title: "Status Rekod",
-                    options: filterOptions,
-                    selectedValues: selectedFilters,
-                  },
-                ]}
-                onChange={(sets) => {
-                  handleSelectFilter(sets[0]?.selectedValues ?? []);
-                }}
+            {/* Filter Button */}
+            <div ref={filterMenuRef} className="relative">
+              <ToolbarButton
+                icon={commonIcons.filter}
+                label={`Tapis status data: ${getStatusFilterLabel(selectedFilters)}`}
+                isActive={isFilterButtonActive}
+                hasPopup="menu"
+                isExpanded={isFilterMenuOpen}
+                onClick={handleToggleFilterMenu}
               />
-            ) : null}
-          </div>
 
-          {/* Download Button */}
-          <ToolbarButton
-            icon={commonIcons.download}
-            label="Muat turun data penghuni"
-            onClick={handleDownload}
-          />
-        </div>
-      </div>
-
-      {isSearchOpen ? (
-        <div className="px-3">
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div ref={searchInputRef} className="flex-1">
-                  <SharedInputField
-                    label="CARIAN MENGIKUT NAMA, NO. KAD PENGENALAN, KUARTERS ATAU UNIT"
-                    value={filterQuery}
-                    state="active"
-                    onChange={setFilterQuery}
-                    placeholder="Contoh: Ahmad, 950101-14-1234, atau Unit A-01-05"
-                    showLabel
-                    leadingIcon={(
-                      <Icon
-                        icon={commonIcons.search}
-                        size={18}
-                        className="text-light-grey"
-                      />
-                    )}
-                    className="w-full"
-                    activeBackgroundClass="bg-light-blue"
-                    inputFontSize={12}
-                    inputMinHeight={40}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 self-start lg:self-end">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={!isSearchFilterActive}
-                    onClick={handleClearSearch}
-                  >
-                    Kosongkan
-                  </button>
-                </div>
-              </div>
+              {isFilterMenuOpen ? (
+                <FilterOption<PenghuniFilter>
+                  ariaLabel="Tapisan status data"
+                  defaultLabel="Semua Rekod"
+                  optionSets={[
+                    {
+                      title: "Status Rekod",
+                      options: filterOptions,
+                      selectedValues: selectedFilters,
+                    },
+                  ]}
+                  onChange={(sets) => {
+                    handleSelectFilter(sets[0]?.selectedValues ?? []);
+                  }}
+                />
+              ) : null}
             </div>
+
+            {/* Download Button */}
+            <ToolbarButton
+              icon={commonIcons.download}
+              label="Muat turun data penghuni"
+              disabled={isLoading}
+              onClick={handleDownload}
+            />
           </div>
         </div>
-      ) : null}
+
+        {isSearchOpen ? (
+          <SearchBar
+            value={filterQuery}
+            onChange={setFilterQuery}
+            onClear={handleClearSearch}
+            label="CARIAN MENGIKUT NAMA, NO. KAD PENGENALAN, KUARTERS ATAU UNIT"
+            placeholder="Contoh: Ahmad, 950101-14-1234, atau Unit A-01-05"
+            inputRef={searchInputRef}
+          />
+        ) : null}
+      </div>
 
       <div className="rounded-lg overflow-x-auto overflow-y-auto">
         <table className="w-full">
@@ -472,16 +432,14 @@ export default function PenghuniReviewTable({
                 rowCount: 10,
               })
             ) : paginatedRows.length === 0 ? (
-              <tr className="border-t border-light-grey/20">
-                <td
-                  colSpan={7}
-                  className="px-6 py-10 text-center text-sm font-medium text-grey"
-                >
-                  {isSearchFilterActive || isStatusFilterActive
-                    ? "Tiada rekod penghuni yang sepadan dengan tapisan semasa."
-                    : "Tiada rekod penghuni baharu ditemui."}
-                </td>
-              </tr>
+              loadingTableRows({
+                mode: "message",
+                columnCount: 7,
+                rowCount: 1,
+                message: isSearchFilterActive || isStatusFilterActive
+                  ? "Tiada rekod penghuni yang sepadan dengan tapisan semasa."
+                  : "Tiada rekod penghuni baharu ditemui.",
+              })
             ) : (
               paginatedRows.map((resident) => {
                 const recordKey = getPenghuniRecordKey(resident);

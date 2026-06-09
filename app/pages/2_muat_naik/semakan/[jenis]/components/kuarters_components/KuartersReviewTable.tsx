@@ -5,8 +5,8 @@ import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
 import type { GlobalFixedNotice } from "@/app/components/Message/GlobalFixedMessage";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarButton from "@/app/components/ToolbarIconButton";
-import { InputField as SharedInputField } from "@/app/components/InputField";
 import { downloadXlsxFile, type XlsxCell, type XlsxSheet } from "@/lib/download/xlsx-export";
+import SearchBar, { SearchBarToggleButton, searchRecords, useSearchBarLogic } from "@/app/components/SearchBar";
 
 import {
   type ExtractedQuarterRecord,
@@ -43,6 +43,12 @@ type KuartersReviewTableProps = {
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
   isLoading?: boolean;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 export default function KuartersReviewTable({
@@ -55,9 +61,9 @@ export default function KuartersReviewTable({
   selectedKeys = [],
   onSelectedKeysChange,
   isLoading = false,
+  onFilteredStatsChange,
 }: KuartersReviewTableProps) {
   const [savedRecords, setSavedRecords] = useState(records);
-  const categories = savedRecords;
 
   const [categoryDrafts, setCategoryDrafts] = useState<
     Record<string, KuartersCategoryDraft>
@@ -76,28 +82,26 @@ export default function KuartersReviewTable({
 
   // Search State
   const [filterQuery, setFilterQuery] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const searchInputRef = useRef<HTMLDivElement | null>(null);
-
-  const isSearchFilterActive = filterQuery.trim().length > 0;
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive: isSearchFilterActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: filterQuery, onChange: setFilterQuery });
 
   // Filtered Categories
   const filteredCategories = useMemo(() => {
-    return savedRecords.filter((category) => {
-      // 1. Search Query Filter
-      if (filterQuery.trim()) {
-        const query = filterQuery.toLowerCase().trim();
-        const nameMatch = (category.categoryName || "").toLowerCase().includes(query);
-        const addressMatch = (category.address || "").toLowerCase().includes(query);
-        const unitsMatch = category.units.some((u) => (u.unitCode || "").toLowerCase().includes(query));
-        if (!nameMatch && !addressMatch && !unitsMatch) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    return searchRecords(
+      savedRecords,
+      filterQuery,
+      (category) => [
+        category.categoryName,
+        category.address,
+        ...category.units.map((u) => u.unitCode),
+      ]
+    );
   }, [savedRecords, filterQuery]);
 
   // Filtered Units of Selected Category
@@ -111,20 +115,15 @@ export default function KuartersReviewTable({
       return [];
     }
 
-    return selectedCat.units.filter((unit) => {
-      // 1. Search Query Filter
-      if (filterQuery.trim()) {
-        const query = filterQuery.toLowerCase().trim();
-        const categoryNameMatch = (selectedCat.categoryName || "").toLowerCase().includes(query);
-        const addressMatch = (selectedCat.address || "").toLowerCase().includes(query);
-        const unitCodeMatch = (unit.unitCode || "").toLowerCase().includes(query);
-        if (!categoryNameMatch && !addressMatch && !unitCodeMatch) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    return searchRecords(
+      selectedCat.units,
+      filterQuery,
+      (unit) => [
+        selectedCat.categoryName,
+        selectedCat.address,
+        unit.unitCode,
+      ]
+    );
   }, [filteredCategories, selectedCategoryId, filterQuery]);
 
   const selectedCategory =
@@ -218,26 +217,25 @@ export default function KuartersReviewTable({
     };
   }, [editingCategoryId, editingUnitKey, isSaving]);
 
-  // Auto-focus search input when opened
   useEffect(() => {
-    if (isSearchOpen) {
-      searchInputRef.current?.querySelector("input")?.focus();
-    }
-  }, [isSearchOpen]);
+    const totalUnitsCount = filteredCategories.reduce((sum, cat) => {
+      const matchingUnits = searchRecords(
+        cat.units,
+        filterQuery,
+        (unit) => [
+          cat.categoryName,
+          cat.address,
+          unit.unitCode,
+        ]
+      );
+      return sum + matchingUnits.length;
+    }, 0);
 
-  function handleToggleSearch() {
-    if (isSearchOpen) {
-      setFilterQuery("");
-      setIsSearchOpen(false);
-      return;
-    }
-    setIsSearchOpen(true);
-  }
-
-  function handleClearSearch() {
-    setFilterQuery("");
-    setIsSearchOpen(false);
-  }
+    onFilteredStatsChange?.({
+      categoryCount: filteredCategories.length,
+      totalUnits: totalUnitsCount,
+    });
+  }, [filteredCategories, filterQuery, onFilteredStatsChange]);
 
   const handleDownload = () => {
     const headers: XlsxCell[] = [
@@ -450,14 +448,14 @@ export default function KuartersReviewTable({
     }
 
     const draft = categoryDrafts[categoryId];
-    const targetCategory = categories.find((category) => category.id === categoryId);
+    const targetCategory = savedRecords.find((category) => category.id === categoryId);
 
     if (!draft || !targetCategory) {
       setEditingCategoryId(null);
       return;
     }
 
-    const nextCategories = categories.map((category) =>
+    const nextCategories = savedRecords.map((category) =>
       category.id === categoryId ? { ...category, ...draft } : category,
     );
 
@@ -492,7 +490,7 @@ export default function KuartersReviewTable({
       return;
     }
 
-    const targetCategory = categories.find((category) => category.id === categoryId);
+    const targetCategory = savedRecords.find((category) => category.id === categoryId);
 
     if (!targetCategory) {
       setEditingCategoryId(null);
@@ -501,7 +499,7 @@ export default function KuartersReviewTable({
 
     const unitKeys = new Set(targetCategory.units.map(getUnitKey));
     const categoryKey = getKuartersRecordKey(targetCategory);
-    const nextCategories = categories.filter((category) => category.id !== categoryId);
+    const nextCategories = savedRecords.filter((category) => category.id !== categoryId);
 
     setSavingTarget(`category:${categoryId}`);
     try {
@@ -616,7 +614,7 @@ export default function KuartersReviewTable({
       return;
     }
 
-    const nextCategories = categories.map((category) => {
+    const nextCategories = savedRecords.map((category) => {
       if (category.id !== selectedCategory.id) {
         return category;
       }
@@ -657,77 +655,47 @@ export default function KuartersReviewTable({
 
   return (
     <section className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
-      <div className="flex flex-row justify-between px-3 pt-3">
-        {/* Header */}
-        <div>
-          <div className="text-lg font-bold text-dark-grey">Pratinjau Kategori & Unit Kuarters</div>
-          <div className="text-xs text-grey">Sila semak maklumat sebelum pengesahan.</div>
-        </div>
+      <div className="flex flex-col gap-3 px-3">
+        <div className="flex flex-row justify-between pt-3">
+          {/* Header */}
+          <div>
+            <div className="text-lg font-bold text-dark-grey">Pratinjau Kategori & Unit Kuarters</div>
+            <div className="text-xs text-grey">Sila semak maklumat sebelum pengesahan.</div>
+          </div>
 
-        <div className="flex items-center gap-4">
-          {/* Search Button */}
-          <ToolbarButton
-            icon={commonIcons.search}
-            label="Cari rekod kuarters"
-            isActive={isSearchOpen}
-            onClick={handleToggleSearch}
-          />
+          <div className="flex items-center gap-4">
+            {/* Search Button */}
+            <SearchBarToggleButton
+              label="Cari rekod kuarters"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
+            />
 
-          {/* Download Button */}
-          <ToolbarButton
-            icon={commonIcons.download}
-            label="Muat turun data kuarters"
-            onClick={handleDownload}
-          />
-        </div>
-      </div>
-
-      {isSearchOpen ? (
-        <div className="px-3">
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div ref={searchInputRef} className="flex-1">
-                  <SharedInputField
-                    label="CARIAN MENGIKUT KATEGORI, ALAMAT ATAU ID UNIT"
-                    value={filterQuery}
-                    state="active"
-                    onChange={setFilterQuery}
-                    placeholder="Contoh: Kuarters Kelas D atau Unit 102"
-                    showLabel
-                    leadingIcon={(
-                      <Icon
-                        icon={commonIcons.search}
-                        size={18}
-                        className="text-light-grey"
-                      />
-                    )}
-                    className="w-full"
-                    activeBackgroundClass="bg-light-blue"
-                    inputFontSize={12}
-                    inputMinHeight={40}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 self-start lg:self-end">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={!isSearchFilterActive}
-                    onClick={handleClearSearch}
-                  >
-                    Kosongkan
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* Download Button */}
+            <ToolbarButton
+              icon={commonIcons.download}
+              label="Muat turun data kuarters"
+              disabled={isLoading}
+              onClick={handleDownload}
+            />
           </div>
         </div>
-      ) : null}
+
+        {isSearchOpen ? (
+          <SearchBar
+            value={filterQuery}
+            onChange={setFilterQuery}
+            onClear={handleClearSearch}
+            label="CARIAN MENGIKUT KATEGORI, ALAMAT ATAU ID UNIT"
+            placeholder="Contoh: Kuarters Kelas D atau Unit 102"
+            inputRef={searchInputRef}
+          />
+        ) : null}
+      </div>
 
       <div className="grid overflow-hidden rounded-lg border border-light-grey/20 bg-white lg:grid-cols-[1fr_260px]">
         <KuartersCategoryTable
-          categories={categories}
+          categories={savedRecords}
           pageCategories={pageCategories}
           selectedCategoryId={resolvedSelectedCategoryId}
           selectedKeys={selectedKeySet}

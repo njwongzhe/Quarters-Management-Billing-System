@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query")?.trim() ?? "";
+    const strippedQuery = query.replace(/-/g, "");
 
     const residents = await prisma.resident.findMany({
       where: {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
                 },
                 {
                   icNumber: {
-                    contains: query,
+                    contains: strippedQuery,
                     mode: "insensitive",
                   },
                 },

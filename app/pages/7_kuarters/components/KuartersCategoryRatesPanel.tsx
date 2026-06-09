@@ -3,9 +3,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
-  InputField as SharedInputField,
   TableInputField,
 } from "@/app/components/InputField";
+import SearchBar, { SearchBarToggleButton, useSearchBarLogic } from "@/app/components/SearchBar";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import { PaginationControls, usePaginationLogic } from "@/app/components/Pagination/Pagination";
@@ -98,8 +98,14 @@ export default function KuartersCategoryRatesPanel({
 
   const isCreateRowVisible = editor?.mode === "create";
   const editingRowRef = useRef<HTMLTableRowElement | null>(null);
-  const searchInputRef = useRef<HTMLDivElement | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(hasActiveFilters);
+
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive: isSearchFilterActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: filterQuery, onChange: onFilterQueryChange });
 
   const handlePointerDownOutsideEditor = useEffectEvent((event: PointerEvent) => {
     if (!editor || pendingAction) {
@@ -134,26 +140,7 @@ export default function KuartersCategoryRatesPanel({
     };
   }, [editor, pendingAction]);
 
-  useEffect(() => {
-    if (isSearchOpen) {
-      searchInputRef.current?.querySelector("input")?.focus();
-    }
-  }, [isSearchOpen]);
-
-  function handleToggleSearch() {
-    if (isSearchOpen) {
-      onClearFilter();
-      setIsSearchOpen(false);
-      return;
-    }
-
-    setIsSearchOpen(true);
-  }
-
-  function handleClearSearch() {
-    onClearFilter();
-    setIsSearchOpen(false);
-  }
+  // Search logic is handled by useSearchBarLogic hook
 
   function renderActionCell(rowId: string, isEditing: boolean) {
     if (isEditing) {
@@ -211,74 +198,43 @@ export default function KuartersCategoryRatesPanel({
 
   return (
     <section className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
-      <div className="flex flex-row justify-between px-3 pt-3">
-        <div>
-          <div className="text-lg font-bold text-dark-grey">
-            Senarai Kategori Kuarters
-          </div>
-          <div className="text-xs text-grey">
-            Kemaskini maklumat yuran dan denda mengikut kategori kuarters.
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <ToolbarButton
-            icon={commonIcons.search}
-            label="Cari kategori kuarters"
-            isActive={isSearchOpen}
-            onClick={handleToggleSearch}
-          />
-          <ToolbarButton
-            icon={commonIcons.download}
-            disabled={isLoading}
-            label="Muat turun data kategori kuarters"
-            onClick={() => downloadQuarterCategoryRates(exportRates)}
-          />
-        </div>
-      </div>
-
-      {isSearchOpen ? (
-      <div className="px-3">
-      <div className="rounded-lg bg-white p-4 shadow">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div ref={searchInputRef} className="flex-1">
-              <SharedInputField
-                label="CARIAN MENGIKUT KATEGORI ATAU ALAMAT"
-                value={filterQuery}
-                state="active"
-                onChange={onFilterQueryChange}
-                placeholder="Contoh: Kategori A"
-                showLabel
-                leadingIcon={(
-                  <Icon
-                    icon={commonIcons.search}
-                    size={18}
-                    className="text-light-grey"
-                  />
-                )}
-                className="w-full"
-                activeBackgroundClass="bg-light-blue"
-                inputFontSize={12}
-                inputMinHeight={40}
-              />
+      <div className="flex flex-col gap-3 px-3">
+        <div className="flex flex-row justify-between pt-3">
+          <div>
+            <div className="text-lg font-bold text-dark-grey">
+              Senarai Kategori Kuarters
             </div>
-
-            <div className="flex items-center gap-3 self-start lg:self-end">
-              <button
-                type="button"
-                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={!hasActiveFilters}
-                onClick={handleClearSearch}
-              >
-                Kosongkan
-              </button>
+            <div className="text-xs text-grey">
+              Kemaskini maklumat yuran dan denda mengikut kategori kuarters.
             </div>
           </div>
+
+          <div className="flex items-center gap-4">
+            <SearchBarToggleButton
+              label="Cari kategori kuarters"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
+            />
+            <ToolbarButton
+              icon={commonIcons.download}
+              disabled={isLoading}
+              label="Muat turun data kategori kuarters"
+              onClick={() => downloadQuarterCategoryRates(exportRates)}
+            />
+          </div>
         </div>
+
+        {isSearchOpen ? (
+          <SearchBar
+            value={filterQuery}
+            onChange={onFilterQueryChange}
+            onClear={handleClearSearch}
+            label="CARIAN MENGIKUT KATEGORI ATAU ALAMAT"
+            placeholder="Contoh: Kategori A"
+            inputRef={searchInputRef}
+          />
+        ) : null}
       </div>
-      </div>
-      ) : null}
 
       <div className="rounded-lg overflow-x-auto overflow-y-auto">
         <div className="rounded-lg overflow-x-auto overflow-y-auto">

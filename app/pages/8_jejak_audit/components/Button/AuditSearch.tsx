@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { commonIcons } from "@/app/components/Icon/Icon";
-import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import {
   buildAuditLogQueryString,
   type AuditLogFilters,
@@ -97,21 +95,4 @@ export function useAuditSearchController({
     handleToggleSearch,
     handleClearSearch,
   };
-}
-
-type AuditSearchProps = {
-  filters: AuditLogFilters;
-  isOpen: boolean;
-  onToggle: () => void;
-};
-
-export default function AuditSearch({ filters, isOpen, onToggle }: AuditSearchProps) {
-  return (
-    <ToolbarIconButton
-      icon={commonIcons.search}
-      label="Cari rekod audit"
-      isActive={Boolean(filters.search?.trim()) || isOpen}
-      onClick={onToggle}
-    />
-  );
-}
+}

@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import FilterOption from "@/app/components/Filter/FilterOption";
-import { InputField as SharedInputField } from "@/app/components/InputField";
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
 import { bayaranStatusFilters } from "@/lib/payments/bayaran-constants";
 import type { BayaranStatusFilter } from "@/lib/payments/bayaran-types";
+import SearchBar, { SearchBarToggleButton, useSearchBarLogic } from "@/app/components/SearchBar";
 
 type BayaranFilterShellProps = {
   children: ReactNode;
@@ -35,21 +35,18 @@ export default function BayaranFilterShell({
   onStatusFilterChange,
 }: BayaranFilterShellProps) {
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
-  const searchInputRef = useRef<HTMLDivElement | null>(null);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(
-    filterQuery.trim().length > 0,
-  );
-  const isSearchFilterActive = filterQuery.trim().length > 0;
-  const isSearchPanelOpen = isSearchOpen || isSearchFilterActive;
+
+  const {
+    isOpen: isSearchOpen,
+    isSearchActive: isSearchFilterActive,
+    searchInputRef,
+    handleToggleSearch,
+    handleClearSearch,
+  } = useSearchBarLogic({ value: filterQuery, onChange: onFilterQueryChange });
+
   const isStatusFilterActive = statusFilter.length !== statusFilterOptions.length;
   const isFilterButtonActive = isFilterMenuOpen || isStatusFilterActive;
-
-  useEffect(() => {
-    if (isSearchPanelOpen) {
-      searchInputRef.current?.querySelector("input")?.focus();
-    }
-  }, [isSearchPanelOpen]);
 
   useEffect(() => {
     if (!isFilterMenuOpen) {
@@ -77,110 +74,68 @@ export default function BayaranFilterShell({
     };
   }, [isFilterMenuOpen]);
 
-  function handleToggleSearch() {
-    if (isSearchPanelOpen) {
-      onFilterQueryChange("");
-      setIsSearchOpen(false);
-      return;
-    }
-
-    setIsSearchOpen(true);
-  }
-
-  function handleClearSearch() {
-    onFilterQueryChange("");
-    setIsSearchOpen(false);
-  }
-
   return (
-    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1">
-      <div className="flex items-start justify-between gap-4 px-3 pt-3">
-        <div>
-          <h2 className="text-lg font-bold text-dark-grey">
-            Senarai Rekod Bayaran
-          </h2>
-          <p className="text-xs text-grey">
-            Rekod bayaran terkini.
-          </p>
-        </div>
-        <div className="flex items-center gap-4 text-[#607083]">
-          <ToolbarIconButton
-            icon={commonIcons.search}
-            label="Cari rekod bayaran"
-            isActive={isSearchPanelOpen}
-            onClick={handleToggleSearch}
-          />
-          <div ref={filterMenuRef} className="relative">
-            <ToolbarIconButton
-              icon={commonIcons.filter}
-              label={`Tapis status bayaran: ${getStatusFilterLabel(statusFilter)}`}
-              isActive={isFilterButtonActive}
-              hasPopup="menu"
-              isExpanded={isFilterMenuOpen}
-              onClick={() => {
-                setIsFilterMenuOpen((value) => !value);
-              }}
-            />
-
-            {isFilterMenuOpen ? (
-              <FilterOption
-                ariaLabel="Tapisan status bayaran"
-                defaultLabel="Semua Status"
-                optionSets={[
-                  {
-                    title: "Status Bayaran",
-                    options: statusFilterOptions,
-                    selectedValues: statusFilter,
-                  },
-                ]}
-                onChange={(sets) => onStatusFilterChange(sets[0]?.selectedValues ?? [])}
-              />
-            ) : null}
+    <section className="min-h-0 flex-1 rounded-lg bg-light-blue p-1 flex flex-col gap-3">
+      <div className="flex flex-col gap-3 pt-3 px-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-dark-grey">
+              Senarai Rekod Bayaran
+            </h2> 
+            <p className="text-xs text-grey">
+              Rekod bayaran terkini.
+            </p>
           </div>
-          {downloadButton}
+          <div className="flex items-center gap-4 text-[#607083]">
+            <SearchBarToggleButton
+              label="Cari rekod bayaran"
+              isOpen={isSearchOpen}
+              onToggle={handleToggleSearch}
+            />
+            <div ref={filterMenuRef} className="relative">
+              <ToolbarIconButton
+                icon={commonIcons.filter}
+                label={`Tapis status bayaran: ${getStatusFilterLabel(statusFilter)}`}
+                isActive={isFilterButtonActive}
+                hasPopup="menu"
+                isExpanded={isFilterMenuOpen}
+                onClick={() => {
+                  setIsFilterMenuOpen((value) => !value);
+                }}
+              />
+
+              {isFilterMenuOpen ? (
+                <FilterOption
+                  ariaLabel="Tapisan status bayaran"
+                  defaultLabel="Semua Status"
+                  optionSets={[
+                    {
+                      title: "Status Bayaran",
+                      options: statusFilterOptions,
+                      selectedValues: statusFilter,
+                    },
+                  ]}
+                  onChange={(sets) => onStatusFilterChange(sets[0]?.selectedValues ?? [])}
+                />
+              ) : null}
+            </div>
+            {downloadButton}
+          </div>
         </div>
+
+        {isSearchOpen ? (
+          <SearchBar
+            value={filterQuery}
+            onChange={onFilterQueryChange}
+            onClear={handleClearSearch}
+            label="CARIAN REKOD BAYARAN"
+            placeholder="Contoh: Ahmad, 850212-01-1234, Kelas A atau A-01-05"
+            inputRef={searchInputRef}
+          />
+        ) : null}
       </div>
 
-      {isSearchPanelOpen ? (
-        <div className="mt-3 px-3">
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div ref={searchInputRef} className="flex-1">
-                <SharedInputField
-                  label="CARIAN REKOD BAYARAN"
-                  value={filterQuery}
-                  state="active"
-                  onChange={onFilterQueryChange}
-                  placeholder="Contoh: Ahmad, 850212-01-1234, Kelas A atau A-01-05"
-                  showLabel
-                  leadingIcon={(
-                    <Icon
-                      icon={commonIcons.search}
-                      size={18}
-                      className="text-light-grey"
-                    />
-                  )}
-                  className="w-full"
-                  activeBackgroundClass="bg-light-blue"
-                  inputFontSize={12}
-                  inputMinHeight={40}
-                />
-              </div>
-
-              <button
-                type="button"
-                className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={!isSearchFilterActive}
-                onClick={handleClearSearch}
-              >
-                Kosongkan
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-3 overflow-hidden rounded-lg bg-white shadow">{children}</div>
+      <div className="overflow-hidden rounded-lg bg-white shadow">{children}</div>
     </section>
   );
 }

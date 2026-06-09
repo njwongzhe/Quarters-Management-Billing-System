@@ -5,20 +5,16 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
 import Icon from "@/app/components/Icon/Icon";
-import { InputField as SharedInputField } from "@/app/components/InputField";
+import SearchBar, { SearchBarToggleButton, searchRecords, useSearchBarLogic } from "@/app/components/SearchBar";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import SearchingDataOverlay from "@/app/components/Loading/SearchingDataOverlay";
 import { usePaginationLogic, PaginationControls } from "@/app/components/Pagination/Pagination";
 import PenghuniDetail from "./PenghuniDetail/PenghuniDetail";
 import PenghuniFilter, {
     DEFAULT_PENGHUNI_STATUS_FILTERS,
-        filterResidentsByStatus,
+    filterResidentsByStatus,
     type PenghuniStatusFilter,
 } from "./PenghuniFilter";
-import PenghuniSearchButton, {
-        searchResidents,
-        usePenghuniSearchLogic,
-} from "./PenghuniSearch";
 import PenghuniDownload from "./PenghuniDownload";
 import { PatternFormat } from "react-number-format";
 import type { ResidentRecord, PenghuniTableProps } from "../page";
@@ -76,7 +72,22 @@ export default function PenghuniTable({
     ]);
 
     const searchedResidents = useMemo(() => {
-        return searchResidents(residents, searchQuery);
+        return searchRecords(
+            residents,
+            searchQuery,
+            (resident) => [
+                resident.fullName,
+                resident.icNumber,
+                resident.phone,
+                resident.email,
+                resident.position,
+                resident.department,
+                resident.quarters?.unitCode,
+                resident.quarters?.quarterName,
+                resident.quarters?.address,
+            ],
+            { icSearch: true },
+        );
     }, [residents, searchQuery]);
 
     const filteredResidents = useMemo(() => {
@@ -122,18 +133,14 @@ export default function PenghuniTable({
 
     const {
         isOpen: isSearchOpen,
-        isSearchFilterActive,
+        isSearchActive: isSearchFilterActive,
         searchInputRef,
         handleToggleSearch,
         handleClearSearch,
-    } = usePenghuniSearchLogic({
+    } = useSearchBarLogic({
         value: searchQuery,
-        onChange: handleSearchQueryChange,
+        onChange: setSearchQuery,
     });
-
-    function handleSearchQueryChange(value: string) {
-        setSearchQuery(value);
-    }
 
     function handleStatusFilterChange(values: PenghuniStatusFilter[]) {
         setSelectedStatuses(values);
@@ -141,66 +148,40 @@ export default function PenghuniTable({
 
     return (
         <div className="flex flex-col gap-3 rounded-lg bg-light-blue p-1">
-            {/* Header of Table Section */}
-            <div className="flex flex-row justify-between px-3 pt-3">
-                <div>   
-                    <div className="text-lg font-bold text-dark-grey">Senarai Penghuni</div>
-                    <div className="text-xs text-grey">Menguruskan pangkalan data penghuni kuarters kerajaan.</div>
-                </div>
-                <div className="flex flex-row gap-4 items-center">
-                    <PenghuniSearchButton
-                        isOpen={isSearchOpen}
-                        onToggle={handleToggleSearch}
-                    />
-                    <PenghuniFilter
-                        selectedValues={selectedStatuses}
-                        onSelect={handleStatusFilterChange}
-                    />
-                    <PenghuniDownload disabled={isLoading} residents={filteredResidents} />
-                </div>
-            </div>
-
-            {/* Search Bar */}
-            {isSearchOpen ? (
-                <div className="px-3">
-                    <div className="rounded-lg bg-white p-4 shadow">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                            <div ref={searchInputRef} className="flex-1">
-                                <SharedInputField
-                                    label="CARIAN MENGIKUT NAMA, IC, EMAIL, TELEFON, KUARTERS"
-                                    value={searchQuery}
-                                    state="active"
-                                    onChange={handleSearchQueryChange}
-                                    placeholder="Cth: Ahmad, 123456-78-9012, atau unit A-01-05"
-                                    showLabel
-                                    leadingIcon={(
-                                        <Icon
-                                            icon="search"
-                                            size={18}
-                                            className="text-light-grey"
-                                        />
-                                    )}
-                                    className="w-full"
-                                    activeBackgroundClass="bg-light-blue"
-                                    inputFontSize={12}
-                                    inputMinHeight={40}
-                                />
-                            </div>
-                            <div className="flex items-center gap-3 self-start lg:self-end">
-                                <button
-                                    type="button"
-                                    className="inline-flex min-h-10 items-center rounded-xl border border-light-grey/25 bg-white px-4 py-2 text-sm font-semibold text-grey transition-colors hover:border-dark-blue hover:text-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
-                                    disabled={!isSearchFilterActive}
-                                    onClick={handleClearSearch}
-                                >
-                                    Kosongkan
-                                </button>
-                            </div>
-                        </div>
+            <div className="flex flex-col gap-3 px-3">
+                 {/* Header of Table Section */}
+                <div className="flex flex-row justify-between pt-3">
+                    <div>   
+                        <div className="text-lg font-bold text-dark-grey">Senarai Penghuni</div>
+                        <div className="text-xs text-grey">Menguruskan pangkalan data penghuni kuarters kerajaan.</div>
+                    </div>
+                    <div className="flex flex-row gap-4 items-center">
+                        <SearchBarToggleButton
+                            label="Cari penghuni"
+                            isOpen={isSearchOpen}
+                            onToggle={handleToggleSearch}
+                        />
+                        <PenghuniFilter
+                            selectedValues={selectedStatuses}
+                            onSelect={handleStatusFilterChange}
+                        />
+                        <PenghuniDownload disabled={isLoading} residents={filteredResidents} />
                     </div>
                 </div>
-            ) : null}
 
+                {/* Search Bar */}
+                {isSearchOpen ? (
+                    <SearchBar
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        onClear={handleClearSearch}
+                        label="CARIAN MENGIKUT NAMA, IC, EMAIL, TELEFON, KUARTERS"
+                        placeholder="Cth: Ahmad, 123456-78-9012, atau unit A-01-05"
+                        inputRef={searchInputRef}
+                    />
+                ) : null}
+            </div>
+           
             {/* Table */}
             <div className="rounded-lg overflow-x-auto overflow-y-auto">
                 <table className="w-full">

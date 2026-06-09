@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 
-import Icon, { commonIcons } from "@/app/components/Icon/Icon";
+import Icon from "@/app/components/Icon/Icon";
+import SearchBar from "@/app/components/SearchBar";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
 import {
   PaginationControls,
@@ -115,26 +116,14 @@ export default function KuartersResidentPickerModal({
         {/* Content Area */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-light-blue p-6">
           {/* Search Input */}
-          <div className="shrink-0 rounded-lg border border-light-grey/20 bg-white p-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <label className="block">
-              <span className="mb-2 block text-xs font-bold uppercase text-grey">
-                Carian Mengikut IC atau Nama
-              </span>
-              <div className="flex items-center gap-3 rounded-xl border border-light-grey/30 bg-background px-3 py-2 transition-colors focus-within:border-dark-blue focus-within:bg-white">
-                <Icon
-                  icon={commonIcons.search}
-                  size={18}
-                  className="text-light-grey"
-                />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => onSearchQueryChange(event.target.value)}
-                  placeholder="Contoh: 850101-01-5123 atau Ahmad"
-                  className="w-full border-none bg-transparent text-sm font-medium text-dark-grey outline-none placeholder:text-light-grey"
-                />
-              </div>
-            </label>
+          <div className="shrink-0 mb-4">
+            <SearchBar
+              value={searchQuery}
+              onChange={onSearchQueryChange}
+              onClear={() => onSearchQueryChange("")}
+              label="Carian Mengikut IC atau Nama"
+              placeholder="Contoh: 850101-01-5123 atau Ahmad"
+            />
           </div>
 
           {/* Error Message Banner */}
