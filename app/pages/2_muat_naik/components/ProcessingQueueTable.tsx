@@ -143,7 +143,7 @@ export default function ProcessingQueueTable({
             <div className="text-xs text-grey">Sila pilih document yang ingin disemak.</div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           {/* Search Toggle Button */}
           <ToolbarIconButton
             icon="search"
