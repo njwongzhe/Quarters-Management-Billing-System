@@ -158,7 +158,7 @@ export default function TunggakanTable({
                 {/* Kuarters (Quarters Info) */}
                 <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                   <div className={`font-bold ${mainTextSize} text-dark-grey`}>{row.quarterClass}</div>
-                  <div className={`font-extralight ${subTextSize} text-grey max-w-60 leading-snug whitespace-nowrap`}> {
+                  <div className={`font-extralight ${subTextSize} text-grey whitespace-nowrap`}> {
                       row.unitCode && row.quarterAddress ? `${row.unitCode}, ${row.quarterAddress}` : 
                       row.unitCode ? `${row.unitCode}` :
                       row.quarterAddress ? `${row.quarterAddress}` : "N/A"
