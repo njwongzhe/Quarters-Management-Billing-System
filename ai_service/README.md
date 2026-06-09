@@ -19,7 +19,7 @@ Steps:
    Just make sure to adjust the path to the Activate.ps1 file based on where it is located in your .venv directory.
 
 4. Install dependencies for first time setup:
-   .\.venv\Scripts\pip install -r requirements.txt
+   nts.tx.\.venv\Scripts\pip install -r requiremet
    Still same as above, if the Scripts directory does not exist, check for "bin" or other directories under .venv where pip is located and adjust the path accordingly:
    .\.venv\bin\pip install -r requirements.txt
 

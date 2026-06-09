@@ -73,7 +73,18 @@ export default function ExtractReviewPage({
     totalUnits?: number;
     categoryCount?: number;
   }) => {
-    setFilteredStats(stats);
+    setFilteredStats((prev) => {
+      if (
+        prev &&
+        prev.recordCount === stats.recordCount &&
+        prev.totalAmount === stats.totalAmount &&
+        prev.totalUnits === stats.totalUnits &&
+        prev.categoryCount === stats.categoryCount
+      ) {
+        return prev;
+      }
+      return stats;
+    });
   }, []);
 
   useEffect(() => {
