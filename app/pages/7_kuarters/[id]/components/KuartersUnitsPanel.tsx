@@ -90,7 +90,10 @@ function ActionButton({
       aria-label={label}
       disabled={disabled}
       title={label}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
     >
       <Icon icon={icon} size={18} />
     </button>
@@ -638,7 +641,12 @@ export default function KuartersUnitsPanel({
                         : isEditing
                           ? "bg-dark-blue/3"
                           : "hover:bg-background/60"
-                    } transition-colors`}
+                    } transition-colors cursor-pointer select-text`}
+                    onDoubleClick={() => {
+                      if (!isEditing && !pendingAction) {
+                        setSelectedUnitId(unit.id);
+                      }
+                    }}
                   >
                     <td
                       className={`overflow-hidden text-sm font-semibold text-dark-grey align-middle w-min whitespace-nowrap

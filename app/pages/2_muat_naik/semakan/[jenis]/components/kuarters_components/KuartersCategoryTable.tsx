@@ -182,7 +182,7 @@ export default function KuartersCategoryTable({
                     key={category.id}
                     data-kuarters-editor={isEditing ? "true" : undefined}
                     className={[
-                      "border-t border-light-grey/20 transition-colors cursor-pointer",
+                      "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
                       category.categoryIsExisted
                         ? "bg-amber-50"
                         : isSelected
@@ -190,6 +190,11 @@ export default function KuartersCategoryTable({
                           : "hover:bg-background/60",
                     ].join(" ")}
                     onClick={() => onSelectCategory(category.id)}
+                    onDoubleClick={() => {
+                      if (!isEditing && canEditCategory) {
+                        onStartEdit(category);
+                      }
+                    }}
                   >
                     <td className="w-10 whitespace-nowrap px-3 text-center">
                       <div className="flex items-center justify-center">
@@ -221,7 +226,7 @@ export default function KuartersCategoryTable({
                           ].join(" ")}
                         >
                           {isEditing ? (
-                            <div onClick={(event) => event.stopPropagation()}>
+                            <div onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
                               <TableInputField
                                 value={draftValue}
                                 placeholder={isMoneyField ? "0.00" : "Masukkan maklumat"}

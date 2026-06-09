@@ -229,7 +229,11 @@ export default function PenghuniTable({
                             })
                         ) : (
                             currentResidents.map((resident) => (
-                                <tr key={resident.id} className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60`}>
+                                <tr
+                                    key={resident.id}
+                                    className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text`}
+                                    onDoubleClick={() => setSelectedResident(resident)}
+                                >
                                     {/* Penghuni */}
                                     <td className="px-3 py-2 text-left w-min whitespace-nowrap">
                                         <div className={`font-bold ${mainTextSize}`}>{resident.fullName}</div>
@@ -286,7 +290,10 @@ export default function PenghuniTable({
                                                 type="button"
                                                 aria-label={`Lihat butiran ${resident.fullName}`}
                                                 title={`Lihat butiran ${resident.fullName}`}
-                                                onClick={() => setSelectedResident(resident)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedResident(resident);
+                                                }}
                                                 className="inline-flex items-center justify-center rounded-lg p-2 text-dark-blue transition-colors hover:bg-background"
                                             >
                                                 <Icon icon="eye" size={18} />

@@ -256,7 +256,8 @@ export default function ProcessingQueueTable({
               paginatedRows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-t border-light-grey/20 transition-colors hover:bg-background/60"
+                  className="border-t border-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text"
+                  onDoubleClick={() => onContinueDraft(row)}
                 >
                   <td className="overflow-hidden text-sm font-semibold text-dark-grey px-3 py-2 text-left">
                     <div className="flex min-w-0 items-center gap-3">
@@ -292,7 +293,10 @@ export default function ProcessingQueueTable({
                         type="button"
                         className="inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background text-dark-blue"
                         title="Lihat"
-                        onClick={() => onContinueDraft(row)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onContinueDraft(row);
+                        }}
                       >
                         <Icon icon="visibility" size={18} />
                       </button>
@@ -300,7 +304,10 @@ export default function ProcessingQueueTable({
                         type="button"
                         className="inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background text-red"
                         title="Padam"
-                        onClick={() => onDeleteDraft(row.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteDraft(row.id);
+                        }}
                       >
                         <Icon icon="delete" size={18} />
                       </button>

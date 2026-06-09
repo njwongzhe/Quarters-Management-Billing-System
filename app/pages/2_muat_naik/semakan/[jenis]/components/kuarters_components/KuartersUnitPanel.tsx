@@ -53,7 +53,8 @@ function ActionButton({
       title={label}
       disabled={disabled}
       className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background disabled:cursor-not-allowed disabled:opacity-35 ${textClass}`}
-      onClick={() => {
+      onClick={(e) => {
+        e.stopPropagation();
         if (!disabled) {
           onClick?.();
         }
@@ -141,9 +142,14 @@ export default function KuartersUnitPanel({
                     key={unitKey}
                     data-kuarters-editor={isEditing ? "true" : undefined}
                     className={[
-                      "border-t border-light-grey/20 transition-colors",
+                      "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
                       unit.isExisted ? "bg-amber-50" : "hover:bg-background/60",
                     ].join(" ")}
+                    onDoubleClick={() => {
+                      if (!isEditing) {
+                        onStartEdit(unitKey, unit.unitCode);
+                      }
+                    }}
                   >
                     <td className="w-10 whitespace-nowrap px-3 text-center">
                       <div className="flex items-center justify-center">
@@ -152,24 +158,27 @@ export default function KuartersUnitPanel({
                           checked={isSelectable && selectedKeys.has(unitKey)}
                           disabled={isSaving || !isSelectable}
                           className="h-4 w-4 accent-dark-blue"
+                          onClick={(event) => event.stopPropagation()}
                           onChange={(event) => onToggleUnit(unitKey, event.target.checked)}
                         />
                       </div>
                     </td>
                     <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
-                        <TableInputField
-                          value={unitDrafts[unitKey] ?? unit.unitCode}
-                          placeholder="Masukkan kod unit"
-                          align="start"
-                          disabled={isSaving}
-                          onChange={(value) =>
-                            onDraftsChange((currentDrafts) => ({
-                              ...currentDrafts,
-                              [unitKey]: value,
-                            }))
-                          }
-                        />
+                        <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                          <TableInputField
+                            value={unitDrafts[unitKey] ?? unit.unitCode}
+                            placeholder="Masukkan kod unit"
+                            align="start"
+                            disabled={isSaving}
+                            onChange={(value) =>
+                              onDraftsChange((currentDrafts) => ({
+                                ...currentDrafts,
+                                [unitKey]: value,
+                              }))
+                            }
+                          />
+                        </div>
                       ) : (
                         <span className="block truncate font-semibold text-dark-grey text-left">
                           {unit.unitCode}

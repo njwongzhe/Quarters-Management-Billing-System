@@ -449,11 +449,12 @@ export default function PenghuniReviewTable({
                   <tr
                     key={recordKey}
                     className={[
-                      "border-t border-light-grey/20 transition-colors",
+                      "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
                       resident.isExisted
                         ? "bg-amber-50"
                         : "hover:bg-background/60",
                     ].join(" ")}
+                    onDoubleClick={() => setSelectedResident(resident)}
                   >
                     {/* Checkbox */}
                     <td className="w-10 whitespace-nowrap px-3 text-center">
@@ -463,6 +464,7 @@ export default function PenghuniReviewTable({
                           checked={isSelectable && selectedKeySet.has(recordKey)}
                           disabled={!isSelectable}
                           className="h-4 w-4 accent-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+                          onClick={(event) => event.stopPropagation()}
                           onChange={(event) =>
                             isSelectable
                               ? toggleSelectedRow(recordKey, event.target.checked)
@@ -542,7 +544,10 @@ export default function PenghuniReviewTable({
                           aria-label={`Lihat butiran ${resident.nama}`}
                           title={`Lihat butiran ${resident.nama}`}
                           className="inline-flex items-center justify-center rounded-lg p-2 text-dark-blue transition-colors hover:bg-background"
-                          onClick={() => setSelectedResident(resident)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedResident(resident);
+                          }}
                         >
                           <Icon icon="eye" size={18} />
                         </button>

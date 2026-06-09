@@ -34,7 +34,10 @@ function ActionButton({
       aria-label={label}
       title={label}
       className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background ${textClass}`}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
     >
       <Icon icon={icon} size={18} />
     </button>
@@ -56,13 +59,18 @@ export default function TunggakanReviewRow({
     <tr
       data-tunggakan-editor={isEditing ? "true" : undefined}
       className={[
-        "border-t border-light-grey/20 transition-colors",
+        "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
         row.importStatus === "IGNORED"
           ? "bg-amber-50"
           : isEditing
             ? "bg-dark-blue/3"
             : "hover:bg-background/60",
       ].join(" ")}
+      onDoubleClick={() => {
+        if (!isEditing) {
+          onEdit();
+        }
+      }}
     >
       {/* Checkbox Column */}
       <td className="w-10 whitespace-nowrap px-3 text-center">
@@ -72,6 +80,7 @@ export default function TunggakanReviewRow({
             checked={isSelected}
             disabled={row.importStatus === "IGNORED"}
             className="h-4 w-4 accent-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={(e) => e.stopPropagation()}
             onChange={(event) => onSelectionChange(event.target.checked)}
           />
         </div>
@@ -80,12 +89,14 @@ export default function TunggakanReviewRow({
       {/* Name */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.nama}
-            placeholder="Masukkan Nama Penghuni"
-            align="start"
-            onChange={(value) => onDraftFieldChange("nama", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.nama}
+              placeholder="Masukkan Nama Penghuni"
+              align="start"
+              onChange={(value) => onDraftFieldChange("nama", value)}
+            />
+          </div>
         ) : (
           <span className="block truncate font-semibold text-dark-grey" title={row.nama}>
             {row.nama || "-"}
@@ -101,13 +112,15 @@ export default function TunggakanReviewRow({
       {/* No. Kad Pengenalan */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputFieldFormat
-            value={draft.noKadPengenalan}
-            placeholder="Masukkan No. Kad Pengenalan"
-            align="start"
-            format="######-##-####"
-            onChange={(value) => onDraftFieldChange("noKadPengenalan", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputFieldFormat
+              value={draft.noKadPengenalan}
+              placeholder="Masukkan No. Kad Pengenalan"
+              align="start"
+              format="######-##-####"
+              onChange={(value) => onDraftFieldChange("noKadPengenalan", value)}
+            />
+          </div>
         ) : (
           <span
             className="block truncate font-semibold text-dark-grey"
@@ -123,13 +136,15 @@ export default function TunggakanReviewRow({
       {/* Jumlah Tunggakan */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.jumlahTunggakan}
-            placeholder="0.00"
-            align="end" 
-            inputMode="decimal"
-            onChange={(value) => onDraftFieldChange("jumlahTunggakan", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.jumlahTunggakan}
+              placeholder="0.00"
+              align="end" 
+              inputMode="decimal"
+              onChange={(value) => onDraftFieldChange("jumlahTunggakan", value)}
+            />
+          </div>
         ) : (
           <span className="block text-right font-semibold text-dark-grey">
             {formatTunggakanAmount(row.jumlahTunggakan)}

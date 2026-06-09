@@ -163,7 +163,11 @@ export default function TransaksiTable({
               }
 
               return (
-                <tr key={tx.id} className="border-b border-light-grey/20 text-sm transition-colors hover:bg-background/60">
+                <tr
+                  key={tx.id}
+                  className="border-b border-light-grey/20 text-sm transition-colors hover:bg-background/60 cursor-pointer select-text"
+                  onDoubleClick={() => onView(tx)}
+                >
                   {/* Date */}
                   <td className={`w-min whitespace-nowrap p-3 text-dark-grey ${isMuted ? "opacity-50" : ""}`}>
                     {new Date(tx.transactionDate).toLocaleDateString("en-GB")}
@@ -265,7 +269,10 @@ export default function TransaksiTable({
                       {/* View Button - Always Enabled */}
                       <button
                         type="button"
-                        onClick={() => onView(tx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onView(tx);
+                        }}
                         className="inline-grid h-8 w-8 place-items-center rounded-lg text-grey transition-colors hover:bg-background hover:text-dark-blue"
                         title="Lihat butiran"
                         aria-label="Lihat butiran"
@@ -276,7 +283,10 @@ export default function TransaksiTable({
                       {/* Reverse Button - Enabled for NORMAL and DILARASKAN statuses */}
                       <button
                         type="button"
-                        onClick={() => canAction && onReverse(tx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (canAction) onReverse(tx);
+                        }}
                         className={`inline-grid h-8 w-8 place-items-center rounded-lg transition-colors ${
                           canAction
                             ? "text-grey hover:bg-background hover:text-red"
@@ -292,7 +302,10 @@ export default function TransaksiTable({
                       {/* Adjust Button - Enabled for NORMAL and DILARASKAN statuses */}
                       <button
                         type="button"
-                        onClick={() => canAction && onAdjust(tx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (canAction) onAdjust(tx);
+                        }}
                         className={`inline-grid h-8 w-8 place-items-center rounded-lg transition-colors ${
                           canAction
                             ? "text-grey hover:bg-background hover:text-dark-blue"

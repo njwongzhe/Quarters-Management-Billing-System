@@ -244,6 +244,15 @@ export default function JejakAuditPageClient({
     setDetailError(null);
   }
 
+  function handleRowDoubleClick(auditId: string) {
+    const detailUrl = `/pages/8_jejak_audit${buildAuditLogQueryString(filters, {
+      page: pagination.currentPage,
+      auditId,
+    })}`;
+    window.history.replaceState(null, "", detailUrl);
+    setOverlayAuditId(auditId);
+  }
+
   return (
     <main className="relative flex flex-col gap-4 text-[#0B1C30]">
       <AuditLogHeader />
@@ -260,6 +269,7 @@ export default function JejakAuditPageClient({
         pagination={pagination}
         isBootstrapping={isBootstrapping}
         bootstrapError={bootstrapError}
+        onRowDoubleClick={handleRowDoubleClick}
       />
 
       {overlayAuditId ? (

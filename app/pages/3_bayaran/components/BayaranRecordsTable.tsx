@@ -148,9 +148,10 @@ export default function BayaranRecordsTable({
             <tr
               key={row.id}
               className={[
-                "border-t border-light-grey/20 text-sm transition-colors hover:bg-background/60",
+                "border-t border-light-grey/20 text-sm transition-colors hover:bg-background/60 cursor-pointer select-text",
                 rowBorder(row.tone),
               ].join(" ")}
+              onDoubleClick={() => onViewPayment(row.id)}
             >
               {/* Penghuni Data */}
               <td className="w-min whitespace-nowrap px-3 py-2 text-left">

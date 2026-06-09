@@ -25,7 +25,10 @@ function ActionButton({
       className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background ${textClass}`}
       aria-label={label}
       title={label}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
     >
       <Icon icon={icon} size={18} />
     </button>

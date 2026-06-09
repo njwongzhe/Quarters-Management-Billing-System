@@ -41,7 +41,10 @@ function ActionButton({
       aria-label={label}
       title={label}
       className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background ${textClass}`}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
     >
       <Icon icon={icon} size={18} />
     </button>
@@ -63,13 +66,18 @@ export default function BayaranReviewRow({
     <tr
       data-bayaran-editor={isEditing ? "true" : undefined}
       className={[
-        "border-t border-light-grey/20 transition-colors",
+        "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
         row.isExisted
           ? "bg-amber-50"
           : isEditing
             ? "bg-dark-blue/3"
             : "hover:bg-background/60",
       ].join(" ")}
+      onDoubleClick={() => {
+        if (!isEditing) {
+          onEdit();
+        }
+      }}
     >
       {/* Checkbox Column */}
       <td className="w-10 whitespace-nowrap px-3 text-center">
@@ -79,6 +87,7 @@ export default function BayaranReviewRow({
             checked={isSelected}
             disabled={row.isExisted}
             className="h-4 w-4 accent-dark-blue disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={(e) => e.stopPropagation()}
             onChange={(event) => onSelectionChange(event.target.checked)}
           />
         </div>
@@ -87,12 +96,14 @@ export default function BayaranReviewRow({
       {/* Nama Penghuni */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.nama}
-            placeholder="Masukkan Nama Penghuni"
-            align="start"
-            onChange={(value) => onDraftChange("nama", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.nama}
+              placeholder="Masukkan Nama Penghuni"
+              align="start"
+              onChange={(value) => onDraftChange("nama", value)}
+            />
+          </div>
         ) : (
           <span className="block truncate font-semibold text-dark-grey" title={row.nama}>
             {row.nama || "-"}
@@ -108,13 +119,15 @@ export default function BayaranReviewRow({
       {/* No. Kad Pengenalan */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputFieldFormat
-            value={draft.noGajiNoKp}
-            placeholder="Masukkan No. Kad Pengenalan"
-            align="start"
-            format="######-##-####"
-            onChange={(value) => onDraftChange("noGajiNoKp", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputFieldFormat
+              value={draft.noGajiNoKp}
+              placeholder="Masukkan No. Kad Pengenalan"
+              align="start"
+              format="######-##-####"
+              onChange={(value) => onDraftChange("noGajiNoKp", value)}
+            />
+          </div>
         ) : (
           <span
             className="block truncate font-semibold text-dark-grey"
@@ -130,12 +143,14 @@ export default function BayaranReviewRow({
       {/* Nama Jabatan */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.jabatanName}
-            placeholder="Masukkan Nama Jabatan"
-            align="start"
-            onChange={(value) => onDraftChange("jabatanName", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.jabatanName}
+              placeholder="Masukkan Nama Jabatan"
+              align="start"
+              onChange={(value) => onDraftChange("jabatanName", value)}
+            />
+          </div>
         ) : (
           <span
             className="block truncate font-semibold text-dark-grey"
@@ -149,12 +164,14 @@ export default function BayaranReviewRow({
       {/* No. Rujukan */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.noRujukan}
-            placeholder="Masukkan No. Rujukan"
-            align="start"
-            onChange={(value) => onDraftChange("noRujukan", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.noRujukan}
+              placeholder="Masukkan No. Rujukan"
+              align="start"
+              onChange={(value) => onDraftChange("noRujukan", value)}
+            />
+          </div>
         ) : (
           <span
             className="block truncate font-semibold text-dark-grey"
@@ -168,12 +185,14 @@ export default function BayaranReviewRow({
       {/* Catatan */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.catatan}
-            placeholder="Tambah catatan..."
-            align="start"
-            onChange={(value) => onDraftChange("catatan", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.catatan}
+              placeholder="Tambah catatan..."
+              align="start"
+              onChange={(value) => onDraftChange("catatan", value)}
+            />
+          </div>
         ) : (
           <span
             className="block truncate font-semibold text-dark-grey"
@@ -187,13 +206,15 @@ export default function BayaranReviewRow({
       {/* Amaun Bayar (RM) */}
       <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
         {isEditing ? (
-          <TableInputField
-            value={draft.amaunRm}
-            placeholder="0.00"
-            align="end"
-            inputMode="decimal"
-            onChange={(value) => onDraftChange("amaunRm", value)}
-          />
+          <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+            <TableInputField
+              value={draft.amaunRm}
+              placeholder="0.00"
+              align="end"
+              inputMode="decimal"
+              onChange={(value) => onDraftChange("amaunRm", value)}
+            />
+          </div>
         ) : (
           <span className="block text-right font-semibold text-dark-grey">
             {formatBayaranAmount(row.amaunRm)}

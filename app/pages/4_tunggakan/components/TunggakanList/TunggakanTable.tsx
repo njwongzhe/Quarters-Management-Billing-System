@@ -133,7 +133,8 @@ export default function TunggakanTable({
             paginatedData.map((row) => (
               <tr
                 key={row.id}
-                className={`text-sm border-l-4 ${getArrearsBorderClass(row.jumlahTunggakan)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60`}
+                className={`text-sm border-l-4 ${getArrearsBorderClass(row.jumlahTunggakan)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text`}
+                onDoubleClick={() => onViewResident(row.id)}
               >
                 {/* Bulk Selection Checkbox */}
                 <td className="px-3 py-2 text-left w-min whitespace-nowrap">
@@ -141,6 +142,7 @@ export default function TunggakanTable({
                     type="checkbox"
                     className="w-4 h-4 rounded border-gray-300 text-dark-blue focus:ring-dark-blue accent-dark-blue"
                     checked={selectedIds.includes(row.id)}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={() => onSelectRow(row.id)}
                   />
                 </td>
@@ -201,7 +203,10 @@ export default function TunggakanTable({
                   <div className="flex items-center justify-center">
                     <button 
                       type="button"
-                      onClick={() => onViewResident(row.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewResident(row.id);
+                      }}
                       className="inline-flex items-center justify-center rounded-lg p-2 text-dark-blue transition-colors hover:bg-background"
                       aria-label={`Lihat butiran ${row.fullName}`}
                     >

@@ -43,6 +43,7 @@ export default function AuditLogTablePanel({
   pagination,
   isBootstrapping = false,
   bootstrapError = "",
+  onRowDoubleClick,
 }: {
   auditRows: AuditLogListItem[];
   dataKey: string;
@@ -63,6 +64,7 @@ export default function AuditLogTablePanel({
   pagination: AuditPagination;
   isBootstrapping?: boolean;
   bootstrapError?: string;
+  onRowDoubleClick?: (auditId: string) => void;
 }) {
   void hasActiveFilters;
 
@@ -236,7 +238,8 @@ export default function AuditLogTablePanel({
                 rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-t border-light-grey/20 transition-colors hover:bg-background/60"
+                    className="border-t border-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text"
+                    onDoubleClick={() => onRowDoubleClick?.(row.id)}
                   >
                     <AuditCell>{row.timestampLabel}</AuditCell>
                     <AuditCell strong>{row.actor}</AuditCell>

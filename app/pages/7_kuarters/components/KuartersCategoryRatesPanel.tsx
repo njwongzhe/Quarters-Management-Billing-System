@@ -59,7 +59,10 @@ function ActionButton({
       className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors hover:bg-background disabled:cursor-not-allowed disabled:opacity-40 ${textClass}`}
       aria-label={label}
       disabled={disabled}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       title={label}
     >
       <Icon icon={icon} size={18} />
@@ -343,7 +346,12 @@ export default function KuartersCategoryRatesPanel({
                   <tr
                     key={rate.id}
                     ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60"}`}
+                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60 cursor-pointer select-text"}`}
+                    onDoubleClick={() => {
+                      if (!isEditing && !pendingAction) {
+                        onViewRow(rate);
+                      }
+                    }}
                   >
                     <td className={`overflow-hidden text-sm font-semibold text-dark-grey w-min whitespace-nowrap ${isEditing ? "px-3 py-4" : "px-3 py-2"}`}>
                       {isEditing ? (
