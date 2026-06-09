@@ -264,11 +264,7 @@ npm run dev
 
 The app will start running on [http://localhost:3000](http://localhost:3000).
 
-<br />
-
 ---
-
-<br />
 
 ### 5. Setting Up the Python AI Service
 In another terminal instance, navigate to the `ai_service` folder and activate the Python virtual environment:
