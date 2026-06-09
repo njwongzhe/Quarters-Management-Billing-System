@@ -49,7 +49,6 @@ export default function StatCards({
               className={[
                 "flex items-center gap-1 text-xs font-bold",
                 stat.tone === "green" ? "text-green" : "text-dark-blue",
-                isLoading ? "opacity-50" : "",
               ].join(" ")}
             >
               <Icon

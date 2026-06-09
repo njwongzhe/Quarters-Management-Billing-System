@@ -71,6 +71,12 @@ type PenghuniReviewTableProps = {
   onSelectedKeysChange?: (keys: string[]) => void;
   onNotice?: (tone: GlobalFixedNotice["tone"], message: string) => void;
   isLoading?: boolean;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 export default function PenghuniReviewTable({
@@ -81,6 +87,7 @@ export default function PenghuniReviewTable({
   onSelectedKeysChange,
   onNotice,
   isLoading = false,
+  onFilteredStatsChange,
 }: PenghuniReviewTableProps) {
   const [selectedResident, setSelectedResident] =
     useState<ExtractedPenghuniRecord | null>(null);
@@ -176,12 +183,17 @@ export default function PenghuniReviewTable({
     };
   }, [isFilterMenuOpen]);
 
-  // Auto-focus search input when opened
   useEffect(() => {
     if (isSearchOpen) {
       searchInputRef.current?.querySelector("input")?.focus();
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    onFilteredStatsChange?.({
+      recordCount: filteredRows.length,
+    });
+  }, [filteredRows, onFilteredStatsChange]);
 
   const showNotice = (tone: GlobalFixedNotice["tone"], message: string) => {
     if (!onNotice) {
@@ -392,6 +404,7 @@ export default function PenghuniReviewTable({
           <ToolbarButton
             icon={commonIcons.download}
             label="Muat turun data penghuni"
+            disabled={isLoading}
             onClick={handleDownload}
           />
         </div>

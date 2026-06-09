@@ -57,6 +57,12 @@ type ReviewPreviewPanelProps = {
   selectedKeys: string[];
   onSelectedKeysChange: (keys: string[]) => void;
   onNotice?: (tone: GlobalFixedNotice["tone"], message: string) => void;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 export default function ReviewPreviewPanel(props: ReviewPreviewPanelProps) {

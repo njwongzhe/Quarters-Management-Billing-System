@@ -34,6 +34,12 @@ type TunggakanReviewTableProps = {
    onSelectedKeysChange?: (keys: string[]) => void;
    parsingMode?: "strict" | "assisted";
    isLoading?: boolean;
+   onFilteredStatsChange?: (stats: {
+     recordCount?: number;
+     totalAmount?: string;
+     totalUnits?: number;
+     categoryCount?: number;
+   }) => void;
  };
 
 type TunggakanFilter = "VALID" | "INVALID";
@@ -75,6 +81,7 @@ export default function TunggakanReviewTable({
    onSelectedKeysChange,
    parsingMode = "strict",
    isLoading = false,
+   onFilteredStatsChange,
  }: TunggakanReviewTableProps) {
   const [savedRows, setSavedRows] = useState(records);
   const [draftRows, setDraftRows] = useState(records);
@@ -201,12 +208,21 @@ export default function TunggakanReviewTable({
     };
   }, [isFilterMenuOpen]);
 
-  // Auto-focus search input when opened
   useEffect(() => {
     if (isSearchOpen) {
       searchInputRef.current?.querySelector("input")?.focus();
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    onFilteredStatsChange?.({
+      recordCount: filteredRows.length,
+      totalAmount: filteredRows
+        .filter((row) => row.importStatus !== "IGNORED")
+        .reduce((total, row) => total + parseSignedAmount(row.jumlahTunggakan), 0)
+        .toFixed(2),
+    });
+  }, [filteredRows, onFilteredStatsChange]);
 
   function handleToggleSearch() {
     if (isSearchOpen) {
@@ -429,6 +445,7 @@ export default function TunggakanReviewTable({
           <ToolbarButton
              icon={commonIcons.download}
              label="Muat turun data tunggakan"
+             disabled={isLoading}
              onClick={handleDownload}
            />
          </div>

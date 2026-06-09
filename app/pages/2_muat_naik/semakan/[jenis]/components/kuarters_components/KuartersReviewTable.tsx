@@ -43,6 +43,12 @@ type KuartersReviewTableProps = {
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
   isLoading?: boolean;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 export default function KuartersReviewTable({
@@ -55,6 +61,7 @@ export default function KuartersReviewTable({
   selectedKeys = [],
   onSelectedKeysChange,
   isLoading = false,
+  onFilteredStatsChange,
 }: KuartersReviewTableProps) {
   const [savedRecords, setSavedRecords] = useState(records);
   const categories = savedRecords;
@@ -218,12 +225,32 @@ export default function KuartersReviewTable({
     };
   }, [editingCategoryId, editingUnitKey, isSaving]);
 
-  // Auto-focus search input when opened
   useEffect(() => {
     if (isSearchOpen) {
       searchInputRef.current?.querySelector("input")?.focus();
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    const totalUnitsCount = filteredCategories.reduce((sum, cat) => {
+      const matchingUnitsCount = cat.units.filter((unit) => {
+        if (filterQuery.trim()) {
+          const query = filterQuery.toLowerCase().trim();
+          const categoryNameMatch = (cat.categoryName || "").toLowerCase().includes(query);
+          const addressMatch = (cat.address || "").toLowerCase().includes(query);
+          const unitCodeMatch = (unit.unitCode || "").toLowerCase().includes(query);
+          return categoryNameMatch || addressMatch || unitCodeMatch;
+        }
+        return true;
+      }).length;
+      return sum + matchingUnitsCount;
+    }, 0);
+
+    onFilteredStatsChange?.({
+      categoryCount: filteredCategories.length,
+      totalUnits: totalUnitsCount,
+    });
+  }, [filteredCategories, filterQuery, onFilteredStatsChange]);
 
   function handleToggleSearch() {
     if (isSearchOpen) {
@@ -677,6 +704,7 @@ export default function KuartersReviewTable({
           <ToolbarButton
             icon={commonIcons.download}
             label="Muat turun data kuarters"
+            disabled={isLoading}
             onClick={handleDownload}
           />
         </div>

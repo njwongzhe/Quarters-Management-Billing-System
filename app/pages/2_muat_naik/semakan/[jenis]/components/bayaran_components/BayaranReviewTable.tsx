@@ -35,6 +35,12 @@ type BayaranReviewTableProps = {
   selectedKeys?: string[];
   onSelectedKeysChange?: (keys: string[]) => void;
   isLoading?: boolean;
+  onFilteredStatsChange?: (stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => void;
 };
 
 type BayaranFilter = "VALID" | "INVALID";
@@ -76,6 +82,7 @@ export default function BayaranReviewTable({
   selectedKeys = [],
   onSelectedKeysChange,
   isLoading = false,
+  onFilteredStatsChange,
 }: BayaranReviewTableProps) {
   const initialRows = useMemo(
     () =>
@@ -290,6 +297,13 @@ export default function BayaranReviewTable({
   const calculateTotalAmount = (rows: BayaranReviewRowModel[]) =>
     rows.reduce((total, row) => total + (Number(row.amaunRm) || 0), 0).toFixed(2);
 
+  useEffect(() => {
+    onFilteredStatsChange?.({
+      recordCount: filteredRows.length,
+      totalAmount: calculateTotalAmount(filteredRows),
+    });
+  }, [filteredRows, onFilteredStatsChange]);
+
   const stripRowIds = (rows: BayaranReviewRowModel[]): ExtractedBayaranRecord[] =>
     rows.map((row) => ({
       paymentId: row.paymentId,
@@ -484,6 +498,7 @@ export default function BayaranReviewTable({
           <ToolbarButton
             icon={commonIcons.download}
             label="Muat turun data bayaran"
+            disabled={isLoading}
             onClick={handleDownload}
           />
         </div>

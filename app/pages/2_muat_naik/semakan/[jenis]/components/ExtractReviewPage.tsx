@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
 import type { GlobalFixedNotice } from "@/app/components/Message/GlobalFixedMessage";
@@ -60,6 +60,26 @@ export default function ExtractReviewPage({
   const [extractResult, setExtractResult] = useState<ExtractResult | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [filteredStats, setFilteredStats] = useState<{
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  } | null>(null);
+
+  const handleFilteredStatsChange = useCallback((stats: {
+    recordCount?: number;
+    totalAmount?: string;
+    totalUnits?: number;
+    categoryCount?: number;
+  }) => {
+    setFilteredStats(stats);
+  }, []);
+
+  useEffect(() => {
+    setFilteredStats(null);
+  }, [kind, draftId]);
+
   const uploadPageForKind = `${ROUTES.muatNaik}?kategori=${encodeURIComponent(kind)}`;
 
   const showVerificationNotice = (
@@ -770,8 +790,9 @@ export default function ExtractReviewPage({
         extractResult,
         uploadedFileName,
         bayaranEditedTotalAmount,
+        filteredStats,
       }),
-    [kind, extractResult, uploadedFileName, bayaranEditedTotalAmount],
+    [kind, extractResult, uploadedFileName, bayaranEditedTotalAmount, filteredStats],
   );
 
   return (
@@ -817,6 +838,7 @@ export default function ExtractReviewPage({
           selectedKeys={selectedRecordKeys}
           onSelectedKeysChange={setSelectedRecordKeys}
           onNotice={showVerificationNotice}
+          onFilteredStatsChange={handleFilteredStatsChange}
         />
 
         <ReviewActions
