@@ -1,7 +1,7 @@
 # How to Use These Migration:
 
 ```html
-1. In command line, run: `npx prisma migrate dev --name <name_of_migration>`. Replace `<name_of_migration>` with a descriptive name for the migration.
+1. In command line, run: `npx prisma migrate dev --create-only --name <name_of_migration>`. Replace `<name_of_migration>` with a descriptive name for the migration.
 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_<name_of_migration>/migration.sql` and replace its content with this code.
 3. To apply the migration, run: `npx prisma migrate deploy` again.
 

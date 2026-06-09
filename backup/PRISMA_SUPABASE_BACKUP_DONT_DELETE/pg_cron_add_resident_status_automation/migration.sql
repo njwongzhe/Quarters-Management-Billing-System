@@ -1,5 +1,5 @@
 -- How to Use This Migration:
--- 1. In command line, run: `npx prisma migrate dev --name pg_cron_add_resident_status_automation`.
+-- 1. In command line, run: `npx prisma migrate dev --create-only --name pg_cron_add_resident_status_automation`.
 -- 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_pg_cron_add_resident_status_automation/migration.sql` and replace its content with this code.
 -- 3. To apply the migration, run: `npx prisma migrate deploy` again.
 -- If any edited has been maded to this file, please make sure to do further steps to ensure the changes are applied correctly:

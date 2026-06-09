@@ -1,7 +1,4 @@
 -- CreateEnum
-CREATE TYPE "RecordStatus" AS ENUM ('PENDING', 'VERIFIED', 'REJECTED');
-
--- CreateEnum
 CREATE TYPE "ResidentStatus" AS ENUM ('AKTIF', 'TIDAK_LAYAK', 'PENCEN_MENDATANG', 'DATA_TIDAK_LENGKAP');
 
 -- CreateEnum
@@ -53,13 +50,8 @@ CREATE TABLE "Resident" (
     "serviceLevel" TEXT,
     "status" "ResidentStatus" NOT NULL DEFAULT 'AKTIF',
     "description" TEXT,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "uploadedDocumentId" UUID,
-    "createdById" UUID,
-    "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "Resident_pkey" PRIMARY KEY ("id")
 );
@@ -72,13 +64,8 @@ CREATE TABLE "QuarterCategory" (
     "rentalPrice" DECIMAL(12,2) NOT NULL,
     "maintenancePrice" DECIMAL(12,2) NOT NULL,
     "penaltyPrice" DECIMAL(12,2) NOT NULL,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "uploadedDocumentId" UUID,
-    "createdById" UUID,
-    "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "QuarterCategory_pkey" PRIMARY KEY ("id")
 );
@@ -88,14 +75,9 @@ CREATE TABLE "Unit" (
     "id" UUID NOT NULL,
     "unitCode" TEXT NOT NULL,
     "status" "UnitStatus" NOT NULL DEFAULT 'VACANT',
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "uploadedDocumentId" UUID,
     "categoryId" UUID NOT NULL,
-    "createdById" UUID,
-    "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "Unit_pkey" PRIMARY KEY ("id")
 );
@@ -122,13 +104,8 @@ CREATE TABLE "ArrearsSummary" (
     "totalArrearsAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "lastUpdatedMonth" TIMESTAMP(3),
     "description" TEXT,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "uploadedDocumentId" UUID,
-    "createdById" UUID,
-    "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "ArrearsSummary_pkey" PRIMARY KEY ("id")
 );
@@ -148,12 +125,8 @@ CREATE TABLE "MonthlyCharge" (
     "paymentReceived" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "balanceForMonth" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "description" TEXT,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "createdById" UUID,
-    "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "MonthlyCharge_pkey" PRIMARY KEY ("id")
 );
@@ -165,7 +138,6 @@ CREATE TABLE "AdditionalCharge" (
     "chargeDate" TIMESTAMP(3) NOT NULL,
     "description" TEXT NOT NULL,
     "amount" DECIMAL(12,2) NOT NULL,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -179,7 +151,6 @@ CREATE TABLE "Rebate" (
     "rebateDate" TIMESTAMP(3) NOT NULL,
     "description" TEXT NOT NULL,
     "amount" DECIMAL(12,2) NOT NULL,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -194,13 +165,8 @@ CREATE TABLE "Payment" (
     "receiptNo" TEXT,
     "amount" DECIMAL(12,2) NOT NULL,
     "description" TEXT,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'VERIFIED',
-    "uploadedDocumentId" UUID,
-    "createdById" UUID,
-    "verifiedById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
 );
@@ -212,6 +178,7 @@ CREATE TABLE "Transaction" (
     "residentId" UUID,
     "paymentId" UUID,
     "transactionDate" TIMESTAMP(3) NOT NULL,
+    "chargeMonth" TIMESTAMP(3),
     "category" "TransactionCategory" NOT NULL,
     "status" "TransactionStatus" NOT NULL DEFAULT 'NORMAL',
     "relatedTransactionId" UUID,
@@ -220,7 +187,6 @@ CREATE TABLE "Transaction" (
     "receiptNo" TEXT,
     "description" TEXT,
     "runningBalance" DECIMAL(12,2),
-    "createdById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -235,16 +201,104 @@ CREATE TABLE "UploadedDocument" (
     "fileType" TEXT NOT NULL,
     "fileSize" INTEGER NOT NULL,
     "category" "DocumentCategory" NOT NULL,
-    "recordStatus" "RecordStatus" NOT NULL DEFAULT 'PENDING',
     "uploadedById" UUID,
-    "verifiedById" UUID,
     "uploadedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
     "description" TEXT,
     "remark" TEXT,
 
     CONSTRAINT "UploadedDocument_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ResidentDraft" (
+    "id" UUID NOT NULL,
+    "fullName" TEXT NOT NULL,
+    "icNumber" TEXT NOT NULL,
+    "phone" TEXT,
+    "email" TEXT,
+    "position" TEXT,
+    "department" TEXT,
+    "serviceLevel" TEXT,
+    "status" "ResidentStatus" NOT NULL DEFAULT 'AKTIF',
+    "description" TEXT,
+    "quarterCategoryName" TEXT,
+    "quarterAddress" TEXT,
+    "unitCode" TEXT,
+    "moveInDate" TIMESTAMP(3),
+    "moveOutDate" TIMESTAMP(3),
+    "uploadedDocumentId" UUID NOT NULL,
+    "originalResidentId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ResidentDraft_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "QuarterCategoryDraft" (
+    "id" UUID NOT NULL,
+    "categoryName" TEXT NOT NULL,
+    "address" TEXT,
+    "rentalPrice" DECIMAL(12,2) NOT NULL,
+    "maintenancePrice" DECIMAL(12,2) NOT NULL,
+    "penaltyPrice" DECIMAL(12,2) NOT NULL,
+    "uploadedDocumentId" UUID NOT NULL,
+    "originalCategoryId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "QuarterCategoryDraft_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "UnitDraft" (
+    "id" UUID NOT NULL,
+    "unitCode" TEXT NOT NULL,
+    "status" "UnitStatus" NOT NULL DEFAULT 'VACANT',
+    "uploadedDocumentId" UUID NOT NULL,
+    "categoryDraftId" UUID,
+    "originalUnitId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "UnitDraft_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ArrearsSummaryDraft" (
+    "id" UUID NOT NULL,
+    "residentName" TEXT NOT NULL,
+    "residentIcNumber" TEXT NOT NULL,
+    "totalArrearsAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "lastUpdatedMonth" TIMESTAMP(3),
+    "description" TEXT,
+    "uploadedDocumentId" UUID NOT NULL,
+    "originalResidentId" UUID,
+    "originalSummaryId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ArrearsSummaryDraft_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PaymentDraft" (
+    "id" UUID NOT NULL,
+    "residentName" TEXT NOT NULL,
+    "residentIcNumber" TEXT NOT NULL,
+    "department" TEXT,
+    "paymentDate" TIMESTAMP(3) NOT NULL,
+    "receiptNo" TEXT,
+    "referenceNo" TEXT,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "description" TEXT,
+    "uploadedDocumentId" UUID NOT NULL,
+    "originalResidentId" UUID,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PaymentDraft_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -287,18 +341,6 @@ CREATE INDEX "Resident_fullName_idx" ON "Resident"("fullName");
 CREATE INDEX "Resident_status_idx" ON "Resident"("status");
 
 -- CreateIndex
-CREATE INDEX "Resident_recordStatus_idx" ON "Resident"("recordStatus");
-
--- CreateIndex
-CREATE INDEX "Resident_uploadedDocumentId_idx" ON "Resident"("uploadedDocumentId");
-
--- CreateIndex
-CREATE INDEX "QuarterCategory_recordStatus_idx" ON "QuarterCategory"("recordStatus");
-
--- CreateIndex
-CREATE INDEX "QuarterCategory_uploadedDocumentId_idx" ON "QuarterCategory"("uploadedDocumentId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "QuarterCategory_categoryName_address_key" ON "QuarterCategory"("categoryName", "address");
 
 -- CreateIndex
@@ -306,12 +348,6 @@ CREATE INDEX "Unit_categoryId_idx" ON "Unit"("categoryId");
 
 -- CreateIndex
 CREATE INDEX "Unit_status_idx" ON "Unit"("status");
-
--- CreateIndex
-CREATE INDEX "Unit_recordStatus_idx" ON "Unit"("recordStatus");
-
--- CreateIndex
-CREATE INDEX "Unit_uploadedDocumentId_idx" ON "Unit"("uploadedDocumentId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Unit_categoryId_unitCode_key" ON "Unit"("categoryId", "unitCode");
@@ -332,12 +368,6 @@ CREATE INDEX "UnitOccupancy_moveInDate_idx" ON "UnitOccupancy"("moveInDate");
 CREATE UNIQUE INDEX "ArrearsSummary_residentId_key" ON "ArrearsSummary"("residentId");
 
 -- CreateIndex
-CREATE INDEX "ArrearsSummary_recordStatus_idx" ON "ArrearsSummary"("recordStatus");
-
--- CreateIndex
-CREATE INDEX "ArrearsSummary_uploadedDocumentId_idx" ON "ArrearsSummary"("uploadedDocumentId");
-
--- CreateIndex
 CREATE INDEX "ArrearsSummary_lastUpdatedMonth_idx" ON "ArrearsSummary"("lastUpdatedMonth");
 
 -- CreateIndex
@@ -345,9 +375,6 @@ CREATE INDEX "MonthlyCharge_residentId_idx" ON "MonthlyCharge"("residentId");
 
 -- CreateIndex
 CREATE INDEX "MonthlyCharge_chargeMonth_idx" ON "MonthlyCharge"("chargeMonth");
-
--- CreateIndex
-CREATE INDEX "MonthlyCharge_recordStatus_idx" ON "MonthlyCharge"("recordStatus");
 
 -- CreateIndex
 CREATE INDEX "MonthlyCharge_unitId_idx" ON "MonthlyCharge"("unitId");
@@ -362,16 +389,10 @@ CREATE INDEX "AdditionalCharge_monthlyChargeId_idx" ON "AdditionalCharge"("month
 CREATE INDEX "AdditionalCharge_chargeDate_idx" ON "AdditionalCharge"("chargeDate");
 
 -- CreateIndex
-CREATE INDEX "AdditionalCharge_recordStatus_idx" ON "AdditionalCharge"("recordStatus");
-
--- CreateIndex
 CREATE INDEX "Rebate_monthlyChargeId_idx" ON "Rebate"("monthlyChargeId");
 
 -- CreateIndex
 CREATE INDEX "Rebate_rebateDate_idx" ON "Rebate"("rebateDate");
-
--- CreateIndex
-CREATE INDEX "Rebate_recordStatus_idx" ON "Rebate"("recordStatus");
 
 -- CreateIndex
 CREATE INDEX "Payment_residentId_idx" ON "Payment"("residentId");
@@ -381,12 +402,6 @@ CREATE INDEX "Payment_paymentDate_idx" ON "Payment"("paymentDate");
 
 -- CreateIndex
 CREATE INDEX "Payment_receiptNo_idx" ON "Payment"("receiptNo");
-
--- CreateIndex
-CREATE INDEX "Payment_recordStatus_idx" ON "Payment"("recordStatus");
-
--- CreateIndex
-CREATE INDEX "Payment_uploadedDocumentId_idx" ON "Payment"("uploadedDocumentId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Transaction_transactionNo_key" ON "Transaction"("transactionNo");
@@ -422,13 +437,37 @@ CREATE INDEX "Transaction_transactionNo_idx" ON "Transaction"("transactionNo");
 CREATE INDEX "UploadedDocument_category_idx" ON "UploadedDocument"("category");
 
 -- CreateIndex
-CREATE INDEX "UploadedDocument_recordStatus_idx" ON "UploadedDocument"("recordStatus");
-
--- CreateIndex
 CREATE INDEX "UploadedDocument_uploadedAt_idx" ON "UploadedDocument"("uploadedAt");
 
 -- CreateIndex
 CREATE INDEX "UploadedDocument_uploadedById_idx" ON "UploadedDocument"("uploadedById");
+
+-- CreateIndex
+CREATE INDEX "ResidentDraft_uploadedDocumentId_idx" ON "ResidentDraft"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE INDEX "ResidentDraft_icNumber_idx" ON "ResidentDraft"("icNumber");
+
+-- CreateIndex
+CREATE INDEX "QuarterCategoryDraft_uploadedDocumentId_idx" ON "QuarterCategoryDraft"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE INDEX "UnitDraft_uploadedDocumentId_idx" ON "UnitDraft"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE INDEX "UnitDraft_categoryDraftId_idx" ON "UnitDraft"("categoryDraftId");
+
+-- CreateIndex
+CREATE INDEX "ArrearsSummaryDraft_uploadedDocumentId_idx" ON "ArrearsSummaryDraft"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE INDEX "ArrearsSummaryDraft_residentIcNumber_idx" ON "ArrearsSummaryDraft"("residentIcNumber");
+
+-- CreateIndex
+CREATE INDEX "PaymentDraft_uploadedDocumentId_idx" ON "PaymentDraft"("uploadedDocumentId");
+
+-- CreateIndex
+CREATE INDEX "PaymentDraft_residentIcNumber_idx" ON "PaymentDraft"("residentIcNumber");
 
 -- CreateIndex
 CREATE INDEX "AuditLog_timestamp_idx" ON "AuditLog"("timestamp");
@@ -452,34 +491,7 @@ CREATE UNIQUE INDEX "BillingCycle_billingMonth_key" ON "BillingCycle"("billingMo
 CREATE INDEX "BillingCycle_billingMonth_idx" ON "BillingCycle"("billingMonth");
 
 -- AddForeignKey
-ALTER TABLE "Resident" ADD CONSTRAINT "Resident_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Resident" ADD CONSTRAINT "Resident_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Resident" ADD CONSTRAINT "Resident_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "QuarterCategory" ADD CONSTRAINT "QuarterCategory_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "QuarterCategory" ADD CONSTRAINT "QuarterCategory_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "QuarterCategory" ADD CONSTRAINT "QuarterCategory_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Unit" ADD CONSTRAINT "Unit_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "QuarterCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Unit" ADD CONSTRAINT "Unit_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Unit" ADD CONSTRAINT "Unit_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Unit" ADD CONSTRAINT "Unit_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "UnitOccupancy" ADD CONSTRAINT "UnitOccupancy_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -491,25 +503,10 @@ ALTER TABLE "UnitOccupancy" ADD CONSTRAINT "UnitOccupancy_unitId_fkey" FOREIGN K
 ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ArrearsSummary" ADD CONSTRAINT "ArrearsSummary_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "MonthlyCharge" ADD CONSTRAINT "MonthlyCharge_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MonthlyCharge" ADD CONSTRAINT "MonthlyCharge_unitId_fkey" FOREIGN KEY ("unitId") REFERENCES "Unit"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "MonthlyCharge" ADD CONSTRAINT "MonthlyCharge_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "MonthlyCharge" ADD CONSTRAINT "MonthlyCharge_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AdditionalCharge" ADD CONSTRAINT "AdditionalCharge_monthlyChargeId_fkey" FOREIGN KEY ("monthlyChargeId") REFERENCES "MonthlyCharge"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -521,15 +518,6 @@ ALTER TABLE "Rebate" ADD CONSTRAINT "Rebate_monthlyChargeId_fkey" FOREIGN KEY ("
 ALTER TABLE "Payment" ADD CONSTRAINT "Payment_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Payment" ADD CONSTRAINT "Payment_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Payment" ADD CONSTRAINT "Payment_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Payment" ADD CONSTRAINT "Payment_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_residentId_fkey" FOREIGN KEY ("residentId") REFERENCES "Resident"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -539,13 +527,25 @@ ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_paymentId_fkey" FOREIGN KE
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_relatedTransactionId_fkey" FOREIGN KEY ("relatedTransactionId") REFERENCES "Transaction"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "UploadedDocument" ADD CONSTRAINT "UploadedDocument_uploadedById_fkey" FOREIGN KEY ("uploadedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "UploadedDocument" ADD CONSTRAINT "UploadedDocument_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "ResidentDraft" ADD CONSTRAINT "ResidentDraft_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuarterCategoryDraft" ADD CONSTRAINT "QuarterCategoryDraft_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UnitDraft" ADD CONSTRAINT "UnitDraft_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "UnitDraft" ADD CONSTRAINT "UnitDraft_categoryDraftId_fkey" FOREIGN KEY ("categoryDraftId") REFERENCES "QuarterCategoryDraft"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ArrearsSummaryDraft" ADD CONSTRAINT "ArrearsSummaryDraft_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PaymentDraft" ADD CONSTRAINT "PaymentDraft_uploadedDocumentId_fkey" FOREIGN KEY ("uploadedDocumentId") REFERENCES "UploadedDocument"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "AdminProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;

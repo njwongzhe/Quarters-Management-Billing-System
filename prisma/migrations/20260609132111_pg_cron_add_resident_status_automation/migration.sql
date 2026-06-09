@@ -1,11 +1,11 @@
 -- How to Use This Migration:
--- 1. In command line, run: `npx prisma migrate dev --name add_status_automation`.
--- 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_add_status_automation/migration.sql` and replace its content with this code.
+-- 1. In command line, run: `npx prisma migrate dev --create-only --name pg_cron_add_resident_status_automation`.
+-- 2. Then, find the generated SQL file (migration.sql) in `prisma/migrations/<id>_pg_cron_add_resident_status_automation/migration.sql` and replace its content with this code.
 -- 3. To apply the migration, run: `npx prisma migrate deploy` again.
 -- If any edited has been maded to this file, please make sure to do further steps to ensure the changes are applied correctly:
 -- 1. Go to Supabase Sidebar > "SQL Editer" and run:
 --    DELETE FROM _prisma_migrations 
---    WHERE migration_name = '<id>_add_status_automation'; -- Replace <id> with the actual ID of the migration folder you just created.
+--    WHERE migration_name = '<id>_pg_cron_add_resident_status_automation'; -- Replace <id> with the actual ID of the migration folder you just created.
 -- 2. Then, re-run Step 1 to Step 3 above to ensure the migration is applied with the correct changes.
 
 -- Prerequisites:
@@ -185,4 +185,117 @@ BEGIN
         $cron$
       );
     END IF;
+END $$;
+
+
+-- ======================================================================
+-- 4. Quarter Unit Scheduled Check-In/Check-Out Status Automation
+-- ======================================================================
+-- Source of truth:
+-- - "UnitOccupancy"."moveInDate"
+-- - "UnitOccupancy"."moveOutDate"
+--
+-- Cached/derived fields updated:
+-- - "UnitOccupancy"."status"
+-- - "Unit"."status"
+--
+-- Schedule:
+-- - Runs daily at 00:05 Malaysia time.
+-- - pg_cron schedules use UTC, so 00:05 MYT is 16:05 UTC on the previous day.
+
+CREATE OR REPLACE FUNCTION public.sync_quarter_unit_occupancy_statuses(
+  p_reference_date date DEFAULT (timezone('Asia/Kuala_Lumpur', now())::date)
+)
+RETURNS TABLE (
+  updated_occupancies integer,
+  updated_units integer
+) AS $$
+DECLARE
+  v_reference_timestamp timestamp := p_reference_date::timestamp;
+BEGIN
+  WITH changed_occupancies AS (
+    UPDATE "UnitOccupancy" AS occupancy
+    SET
+      "status" = CASE
+        WHEN occupancy."moveOutDate" IS NOT NULL
+          AND occupancy."moveOutDate" < v_reference_timestamp
+        THEN 'PAST'::"OccupancyStatus"
+        ELSE 'CURRENT'::"OccupancyStatus"
+      END,
+      "updatedAt" = NOW()
+    WHERE occupancy."status" IS DISTINCT FROM CASE
+        WHEN occupancy."moveOutDate" IS NOT NULL
+          AND occupancy."moveOutDate" < v_reference_timestamp
+        THEN 'PAST'::"OccupancyStatus"
+        ELSE 'CURRENT'::"OccupancyStatus"
+      END
+    RETURNING 1
+  )
+  SELECT COUNT(*)::integer
+  INTO updated_occupancies
+  FROM changed_occupancies;
+
+  WITH next_unit_status AS (
+    SELECT
+      unit_row."id",
+      CASE
+        WHEN EXISTS (
+          SELECT 1
+          FROM "UnitOccupancy" AS occupancy
+          WHERE occupancy."unitId" = unit_row."id"
+            AND occupancy."moveInDate" <= v_reference_timestamp
+            AND (
+              occupancy."moveOutDate" IS NULL
+              OR occupancy."moveOutDate" >= v_reference_timestamp
+            )
+        )
+        THEN 'OCCUPIED'::"UnitStatus"
+        ELSE 'VACANT'::"UnitStatus"
+      END AS "nextStatus"
+    FROM "Unit" AS unit_row
+  ),
+  changed_units AS (
+    UPDATE "Unit" AS unit_row
+    SET
+      "status" = next_unit_status."nextStatus",
+      "updatedAt" = NOW()
+    FROM next_unit_status
+    WHERE unit_row."id" = next_unit_status."id"
+      AND unit_row."status" IS DISTINCT FROM next_unit_status."nextStatus"
+    RETURNING 1
+  )
+  SELECT COUNT(*)::integer
+  INTO updated_units
+  FROM changed_units;
+
+  RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Run once immediately so existing scheduled assignments are normalized.
+SELECT public.sync_quarter_unit_occupancy_statuses();
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+DO $$
+BEGIN
+  IF CURRENT_DATABASE() = 'postgres' THEN
+    CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+    IF EXISTS (
+      SELECT 1
+      FROM cron.job
+      WHERE jobname = 'daily-quarter-unit-occupancy-status-sync'
+    ) THEN
+      PERFORM cron.unschedule('daily-quarter-unit-occupancy-status-sync');
+    END IF;
+
+    PERFORM cron.schedule(
+      'daily-quarter-unit-occupancy-status-sync',
+      '5 16 * * *',
+      $cron$
+        SELECT public.sync_quarter_unit_occupancy_statuses();
+      $cron$
+    );
+  END IF;
 END $$;
