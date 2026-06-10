@@ -346,7 +346,7 @@ export default function KuartersCategoryRatesPanel({
                   <tr
                     key={rate.id}
                     ref={isEditing ? editingRowRef : null}
-                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60 cursor-pointer select-text"}`}
+                    className={`border-t border-light-grey/20 transition-colors ${isEditing ? "bg-dark-blue/3" : "hover:bg-background/60 cursor-auto select-text"}`}
                     onDoubleClick={() => {
                       if (!isEditing && !pendingAction) {
                         onViewRow(rate);

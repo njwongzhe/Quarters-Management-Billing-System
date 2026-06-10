@@ -231,7 +231,7 @@ export default function PenghuniTable({
                             currentResidents.map((resident) => (
                                 <tr
                                     key={resident.id}
-                                    className={`text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text`}
+                                    className={`cursor-auto text-sm border-l-4 ${getStatusBadgeColor(resident.status)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60 select-text`}
                                     onDoubleClick={() => setSelectedResident(resident)}
                                 >
                                     {/* Penghuni */}

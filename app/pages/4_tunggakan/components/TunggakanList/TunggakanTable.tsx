@@ -133,7 +133,7 @@ export default function TunggakanTable({
             paginatedData.map((row) => (
               <tr
                 key={row.id}
-                className={`text-sm border-l-4 ${getArrearsBorderClass(row.jumlahTunggakan)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text`}
+                className={`text-sm border-l-4 ${getArrearsBorderClass(row.jumlahTunggakan)} border-b border-b-light-grey/20 transition-colors hover:bg-background/60 cursor-auto select-text`}
                 onDoubleClick={() => onViewResident(row.id)}
               >
                 {/* Bulk Selection Checkbox */}

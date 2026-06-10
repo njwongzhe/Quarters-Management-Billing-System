@@ -148,7 +148,7 @@ export default function BayaranRecordsTable({
             <tr
               key={row.id}
               className={[
-                "border-t border-light-grey/20 text-sm transition-colors hover:bg-background/60 cursor-pointer select-text",
+                "border-t border-light-grey/20 text-sm transition-colors hover:bg-background/60 cursor-auto select-text",
                 rowBorder(row.tone),
               ].join(" ")}
               onDoubleClick={() => onViewPayment(row.id)}

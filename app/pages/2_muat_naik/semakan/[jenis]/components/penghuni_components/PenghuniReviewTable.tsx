@@ -449,7 +449,7 @@ export default function PenghuniReviewTable({
                   <tr
                     key={recordKey}
                     className={[
-                      "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
+                      "border-t border-light-grey/20 transition-colors cursor-auto select-text",
                       resident.isExisted
                         ? "bg-amber-50"
                         : "hover:bg-background/60",

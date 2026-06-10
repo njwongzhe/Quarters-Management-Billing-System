@@ -641,7 +641,7 @@ export default function KuartersUnitsPanel({
                         : isEditing
                           ? "bg-dark-blue/3"
                           : "hover:bg-background/60"
-                    } transition-colors cursor-pointer select-text`}
+                    } transition-colors cursor-auto select-text`}
                     onDoubleClick={() => {
                       if (!isEditing && !pendingAction) {
                         setSelectedUnitId(unit.id);

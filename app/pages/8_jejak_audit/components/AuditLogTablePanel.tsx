@@ -238,7 +238,7 @@ export default function AuditLogTablePanel({
                 rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-t border-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text"
+                    className="border-t border-light-grey/20 transition-colors hover:bg-background/60 cursor-auto select-text"
                     onDoubleClick={() => onRowDoubleClick?.(row.id)}
                   >
                     <AuditCell>{row.timestampLabel}</AuditCell>

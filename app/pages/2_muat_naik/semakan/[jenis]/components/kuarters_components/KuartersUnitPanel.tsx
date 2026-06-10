@@ -142,7 +142,7 @@ export default function KuartersUnitPanel({
                     key={unitKey}
                     data-kuarters-editor={isEditing ? "true" : undefined}
                     className={[
-                      "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
+                      "border-t border-light-grey/20 transition-colors cursor-auto select-text",
                       unit.isExisted ? "bg-amber-50" : "hover:bg-background/60",
                     ].join(" ")}
                     onDoubleClick={() => {

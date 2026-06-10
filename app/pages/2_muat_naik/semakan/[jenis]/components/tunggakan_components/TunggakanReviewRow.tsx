@@ -59,7 +59,7 @@ export default function TunggakanReviewRow({
     <tr
       data-tunggakan-editor={isEditing ? "true" : undefined}
       className={[
-        "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
+        "border-t border-light-grey/20 transition-colors cursor-auto select-text",
         row.importStatus === "IGNORED"
           ? "bg-amber-50"
           : isEditing

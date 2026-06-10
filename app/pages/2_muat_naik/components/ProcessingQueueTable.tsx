@@ -256,7 +256,7 @@ export default function ProcessingQueueTable({
               paginatedRows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-t border-light-grey/20 transition-colors hover:bg-background/60 cursor-pointer select-text"
+                  className="border-t border-light-grey/20 transition-colors hover:bg-background/60 cursor-auto select-text"
                   onDoubleClick={() => onContinueDraft(row)}
                 >
                   <td className="overflow-hidden text-sm font-semibold text-dark-grey px-3 py-2 text-left">

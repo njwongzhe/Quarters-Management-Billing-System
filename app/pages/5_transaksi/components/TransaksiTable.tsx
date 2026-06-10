@@ -165,7 +165,7 @@ export default function TransaksiTable({
               return (
                 <tr
                   key={tx.id}
-                  className="border-b border-light-grey/20 text-sm transition-colors hover:bg-background/60 cursor-pointer select-text"
+                  className="border-b border-light-grey/20 text-sm transition-colors hover:bg-background/60 cursor-auto select-text"
                   onDoubleClick={() => onView(tx)}
                 >
                   {/* Date */}

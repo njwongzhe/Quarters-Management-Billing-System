@@ -66,7 +66,7 @@ export default function BayaranReviewRow({
     <tr
       data-bayaran-editor={isEditing ? "true" : undefined}
       className={[
-        "border-t border-light-grey/20 transition-colors cursor-pointer select-text",
+        "border-t border-light-grey/20 transition-colors cursor-auto select-text",
         row.isExisted
           ? "bg-amber-50"
           : isEditing
