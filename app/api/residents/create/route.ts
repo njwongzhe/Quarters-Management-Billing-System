@@ -6,6 +6,10 @@ import {
     recordDataAuditLog,
 } from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import {
+    mapResidentRecord,
+    residentRecordSelect,
+} from "@/lib/residents/resident-list";
 import { prisma } from "../../../../lib/prisma";
 
 // Error response helper
@@ -70,18 +74,6 @@ export async function POST(req: NextRequest) {
         }
 
         const normalizedIcNumber = String(icNumber).trim();
-        const existingResident = await prisma.resident.findUnique({
-            where: { icNumber: normalizedIcNumber },
-        });
-
-        if (existingResident) {
-            return createResidentErrorResponse(
-                "No. KP ini sudah wujud dalam sistem.",
-                409,
-                "RESIDENT_IC_EXISTS",
-            );
-        }
-
         // Ensure initial status is only AKTIF or TIDAK_LAYAK
         const desiredStatus = normalizeResidentStatus(status);
         const initialStatus: ResidentStatus = (desiredStatus === "AKTIF" || desiredStatus === "TIDAK_LAYAK") ? desiredStatus : "AKTIF";
@@ -99,19 +91,7 @@ export async function POST(req: NextRequest) {
                     status: initialStatus,
                     description: description || null,
                 },
-                include: {
-                    occupancies: {
-                        where: { status: "CURRENT" },
-                        include: {
-                            unit: {
-                                include: {
-                                    quarterCategory: true,
-                                },
-                            },
-                        },
-                    },
-                    arrearsSummary: true,
-                },
+                select: residentRecordSelect,
             });
 
             await recordDataAuditLog(tx, {
@@ -134,37 +114,11 @@ export async function POST(req: NextRequest) {
             return resident;
         });
 
-        // Map to ResidentRecord format
-        const quarters = newResident.occupancies[0]
-            ? {
-                unitCode: newResident.occupancies[0].unit.unitCode,
-                quarterName: newResident.occupancies[0].unit.quarterCategory.categoryName,
-                moveInDate: newResident.occupancies[0].moveInDate?.toISOString() || null,
-                moveOutDate: newResident.occupancies[0].moveOutDate?.toISOString() || null,
-              }
-            : null;
-
-        const totalArrearsAmount = newResident.arrearsSummary?.totalArrearsAmount ?? null;
-
         return NextResponse.json(
             {
                 success: true,
                 message: "Rekod penghuni berjaya ditambah.",
-                data: {
-                    id: newResident.id,
-                    fullName: newResident.fullName,
-                    icNumber: newResident.icNumber,
-                    phone: newResident.phone,
-                    email: newResident.email,
-                    position: newResident.position,
-                    department: newResident.department,
-                    serviceLevel: newResident.serviceLevel,
-                    status: newResident.status,
-                    description: newResident.description,
-                    updatedAt: newResident.updatedAt.toISOString(),
-                    quarters,
-                    totalArrearsAmount: totalArrearsAmount ? { totalArrearsAmount } : null,
-                },
+                data: mapResidentRecord(newResident),
             },
             { status: 201 }
         );

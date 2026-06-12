@@ -9,7 +9,7 @@ import FilterOption, {
 } from "@/app/components/Filter/FilterOption";
 import { commonIcons } from "@/app/components/Icon/Icon";
 import ToolbarIconButton from "@/app/components/ToolbarIconButton";
-import type { ResidentRecord } from "../page";
+import type { ResidentRecord } from "@/lib/residents/resident-list";
 
 export type PenghuniStatusFilter =
   | "AKTIF"

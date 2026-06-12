@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import AuditLogDetailOverlay from "./AuditLogDetailOverlay";
 import AuditLogHeader from "./AuditLogHeader";
@@ -60,11 +60,14 @@ type JejakAuditPageClientProps = {
     adminId?: string;
     search?: string;
   };
+  initialData?: NonNullable<AuditLogPageResponse["data"]>;
 };
 
 export default function JejakAuditPageClient({
   searchParams,
+  initialData,
 }: JejakAuditPageClientProps) {
+  const hasInitialData = initialData !== undefined;
   const initialPage = Math.max(1, Number(searchParams.page) || 1);
   const initialAuditId = searchParams.auditId;
   const filters = useMemo(
@@ -86,32 +89,44 @@ export default function JejakAuditPageClient({
   );
   const hasActiveFilters = hasActiveAuditLogFilters(filters);
 
-  const [auditRows, setAuditRows] = useState<AuditLogListItem[]>([]);
-  const [pagination, setPagination] = useState<AuditPagination>({
-    currentPage: initialPage,
-    totalPages: 1,
-    totalRecords: 0,
-    firstRecord: 0,
-    lastRecord: 0,
-    perPage: 10,
-  });
-  const [filterOptions, setFilterOptions] = useState({
-    actionTypes: [] as { value: string; label: string }[],
-    admins: [] as { id: string; name: string }[],
-  });
+  const [auditRows, setAuditRows] = useState<AuditLogListItem[]>(
+    initialData?.records ?? [],
+  );
+  const [pagination, setPagination] = useState<AuditPagination>(
+    initialData?.pagination ?? {
+      currentPage: initialPage,
+      totalPages: 1,
+      totalRecords: 0,
+      firstRecord: 0,
+      lastRecord: 0,
+      perPage: 10,
+    },
+  );
+  const [filterOptions, setFilterOptions] = useState(
+    initialData?.filterOptions ?? {
+      actionTypes: [] as { value: string; label: string }[],
+      admins: [] as { id: string; name: string }[],
+    },
+  );
   const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLogDetailItem | null>(null);
   const [overlayAuditId, setOverlayAuditId] = useState<string | undefined>(initialAuditId);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailReloadToken, setDetailReloadToken] = useState(0);
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(!hasInitialData);
   const [bootstrapError, setBootstrapError] = useState("");
+  const shouldSkipInitialFetchRef = useRef(hasInitialData);
 
   useEffect(() => {
     setOverlayAuditId(initialAuditId);
   }, [initialAuditId]);
 
   useEffect(() => {
+    if (shouldSkipInitialFetchRef.current) {
+      shouldSkipInitialFetchRef.current = false;
+      return;
+    }
+
     let isMounted = true;
     const controller = new AbortController();
 

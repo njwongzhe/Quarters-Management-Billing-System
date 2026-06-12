@@ -9,6 +9,7 @@ import {
   getTodayDateInAppTimeZone,
   parseDateOnlyInAppTimeZone,
 } from "@/lib/date-time";
+import { prisma } from "@/lib/prisma";
 import { buildQuarterCategorySummary, type QuarterCategorySummary } from "./quarter-categories";
 
 type ParseSuccess<T> = {
@@ -284,6 +285,19 @@ export function mapQuarterCategoryUnitsDetailForApi(
     }),
     units,
   };
+}
+
+export async function getQuarterCategoryUnitsDetail(categoryId: string) {
+  const quarterCategory = await prisma.quarterCategory.findFirst({
+    where: {
+      id: categoryId,
+    },
+    include: buildQuarterCategoryUnitsDetailInclude(),
+  });
+
+  return quarterCategory
+    ? mapQuarterCategoryUnitsDetailForApi(quarterCategory)
+    : null;
 }
 
 export function resolveQuarterUnitOccupancyState({

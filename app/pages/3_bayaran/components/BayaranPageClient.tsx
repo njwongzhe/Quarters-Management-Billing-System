@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import AddPaymentOverlay from "./AddPaymentOverlay";
+import Icon from "@/app/components/Icon/Icon";
 import BayaranDownload from "./BayaranDownload";
 import BayaranDetailOverlay from "./BayaranDetailOverlay";
 import BayaranFilterShell from "./BayaranFilterShell";
@@ -19,20 +20,13 @@ import {
   filterBayaranRecords,
 } from "@/lib/payments/bayaran-helpers";
 import type {
-  BayaranExportRow,
   BayaranDetail,
   BayaranFilters,
-  BayaranRow,
   BayaranStatCard,
   BayaranStatusFilter,
+  ManualPaymentMutationResult,
 } from "@/lib/payments/bayaran-types";
-
-type BayaranPageData = {
-  rows: BayaranRow[];
-  exportRows: BayaranExportRow[];
-  stats: BayaranStatCard[];
-  detailsByPaymentId: Record<string, BayaranDetail>;
-};
+import type { BayaranPageData } from "@/lib/payments/bayaran-page";
 
 type BayaranPageResponse = {
   success: boolean;
@@ -47,7 +41,6 @@ type BayaranPageState = {
 };
 
 const BAYARAN_ROWS_PER_PAGE = 10;
-const CURRENT_PAYMENT_MONTH_KEY = getMonthKey(new Date());
 const EMPTY_BAYARAN_STATS: BayaranStatCard[] = bayaranStatTemplates.map((stat) => ({
   ...stat,
   value: "0",
@@ -56,28 +49,40 @@ const EMPTY_BAYARAN_STATS: BayaranStatCard[] = bayaranStatTemplates.map((stat) =
 const EMPTY_BAYARAN_DATA: BayaranPageData = {
   rows: [],
   exportRows: [],
-  detailsByPaymentId: {},
   stats: EMPTY_BAYARAN_STATS,
 };
 
-export default function BayaranPageClient() {
+type BayaranPageClientProps = {
+  currentPaymentMonthKey?: string;
+  initialData?: BayaranPageData;
+};
+
+export default function BayaranPageClient({
+  currentPaymentMonthKey = getMonthKey(new Date()),
+  initialData,
+}: BayaranPageClientProps) {
+  const hasInitialData = initialData !== undefined;
   const [filters, setFilters] = useState<BayaranFilters>(
     createDefaultBayaranFilters,
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [paymentMonthKey, setPaymentMonthKey] = useState(
-    CURRENT_PAYMENT_MONTH_KEY,
+    currentPaymentMonthKey,
   );
-  const [reloadToken, setReloadToken] = useState(0);
   const [selectedAddPaymentId, setSelectedAddPaymentId] = useState<string | null>(
     null,
   );
+  const [selectedAddPaymentDetails, setSelectedAddPaymentDetails] =
+    useState<BayaranDetail | null>(null);
+  const [addPaymentError, setAddPaymentError] = useState("");
+  const [isLoadingAddPayment, setIsLoadingAddPayment] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [pageState, setPageState] = useState<BayaranPageState>({
-    data: EMPTY_BAYARAN_DATA,
+    data: initialData ?? EMPTY_BAYARAN_DATA,
     errorMessage: "",
-    isLoaded: false,
+    isLoaded: hasInitialData,
   });
+  const shouldSkipInitialFetchRef = useRef(hasInitialData);
   const isLoading = !pageState.isLoaded;
   const data = pageState.data;
   const errorMessage = pageState.errorMessage;
@@ -122,9 +127,14 @@ export default function BayaranPageClient() {
     totalRecordCount,
   );
   const paymentMonthLabel = formatPaymentMonthLabel(paymentMonthKey);
-  const canGoNextPaymentMonth = paymentMonthKey < CURRENT_PAYMENT_MONTH_KEY;
+  const canGoNextPaymentMonth = paymentMonthKey < currentPaymentMonthKey;
 
   useEffect(() => {
+    if (shouldSkipInitialFetchRef.current) {
+      shouldSkipInitialFetchRef.current = false;
+      return;
+    }
+
     const controller = new AbortController();
     const queryParams = new URLSearchParams({
       paymentMonth: paymentMonthKey,
@@ -165,7 +175,7 @@ export default function BayaranPageClient() {
       });
 
     return () => controller.abort();
-  }, [paymentMonthKey, reloadToken]);
+  }, [paymentMonthKey]);
 
   function handleFilterQueryChange(value: string) {
     setCurrentPage(1);
@@ -185,7 +195,7 @@ export default function BayaranPageClient() {
   }
 
   function handlePaymentMonthChange(direction: -1 | 1) {
-    if (direction === 1 && paymentMonthKey >= CURRENT_PAYMENT_MONTH_KEY) {
+    if (direction === 1 && paymentMonthKey >= currentPaymentMonthKey) {
       return;
     }
 
@@ -201,7 +211,7 @@ export default function BayaranPageClient() {
   }
 
   function handlePaymentMonthSelect(monthKey: string) {
-    if (!/^\d{4}-\d{2}$/.test(monthKey) || monthKey > CURRENT_PAYMENT_MONTH_KEY) {
+    if (!/^\d{4}-\d{2}$/.test(monthKey) || monthKey > currentPaymentMonthKey) {
       return;
     }
 
@@ -217,16 +227,104 @@ export default function BayaranPageClient() {
     setPaymentMonthKey(monthKey);
   }
 
-  function handleReloadBayaranData() {
+  function handleManualPaymentSaved(result: ManualPaymentMutationResult) {
+    if (!selectedAddPaymentDetails) {
+      return;
+    }
+
+    const nextArrears =
+      (selectedAddPaymentDetails.payment.arrearsAmount ?? 0) -
+      result.totalAmount;
+    const nextAmountThisMonth =
+      selectedAddPaymentDetails.payment.amountThisMonth +
+      result.amountThisMonthDelta;
+    const paymentStatus = getPaymentStatus(
+      nextArrears,
+      selectedAddPaymentDetails.resident.status,
+    );
+    const formattedArrears = formatMoney(nextArrears);
+    const formattedAmount = formatMoney(nextAmountThisMonth);
+
+    setSelectedAddPaymentDetails((currentDetails) =>
+      currentDetails
+        ? {
+            ...currentDetails,
+            payment: {
+              ...currentDetails.payment,
+              amountThisMonth: nextAmountThisMonth,
+              arrearsAmount: nextArrears,
+              status: paymentStatus,
+              statusLabel: getPaymentStatusLabel(
+                nextArrears,
+                currentDetails.resident.status,
+              ),
+            },
+          }
+        : null,
+    );
     setPageState((currentState) => ({
+      ...currentState,
       data: {
         ...currentState.data,
-        stats: EMPTY_BAYARAN_STATS,
+        rows: currentState.data.rows.map((row) =>
+          row.residentId === result.residentId
+            ? {
+                ...row,
+                arrears: formattedArrears,
+                amount: formattedAmount,
+                paymentStatus,
+                tone: getPaymentTone(paymentStatus),
+              }
+            : row,
+        ),
+        exportRows: currentState.data.exportRows.map((row) =>
+          row.ic === selectedAddPaymentDetails.resident.ic
+            ? {
+                ...row,
+                arrearsAmount: nextArrears,
+                amount: nextAmountThisMonth,
+                status: getPaymentStatusLabel(
+                  nextArrears,
+                  selectedAddPaymentDetails.resident.status,
+                ),
+                paymentStatus,
+              }
+            : row,
+        ),
       },
-      errorMessage: "",
-      isLoaded: false,
     }));
-    setReloadToken((value) => value + 1);
+  }
+
+  async function handleAddPayment(paymentId: string) {
+    setSelectedAddPaymentId(paymentId);
+    setSelectedAddPaymentDetails(null);
+    setAddPaymentError("");
+    setIsLoadingAddPayment(true);
+
+    try {
+      const queryParams = new URLSearchParams({
+        paymentMonth: paymentMonthKey,
+      });
+      const response = await fetch(
+        `/api/payments/${paymentId}?${queryParams.toString()}`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.success || !payload.data?.payment) {
+        throw new Error(payload?.message ?? "Gagal mendapatkan butiran bayaran.");
+      }
+
+      setSelectedAddPaymentDetails(payload.data.payment as BayaranDetail);
+    } catch (error) {
+      setAddPaymentError(
+        error instanceof Error
+          ? error.message
+          : "Gagal mendapatkan butiran bayaran.",
+      );
+    } finally {
+      setIsLoadingAddPayment(false);
+    }
   }
 
   return (
@@ -254,7 +352,7 @@ export default function BayaranPageClient() {
             isLoading={isLoading}
             loadingColumnCount={5}
             loadingRowCount={10}
-            onAddPayment={setSelectedAddPaymentId}
+            onAddPayment={handleAddPayment}
             onNextPaymentMonth={() => handlePaymentMonthChange(1)}
             onPaymentMonthSelect={handlePaymentMonthSelect}
             onPreviousPaymentMonth={() => handlePaymentMonthChange(-1)}
@@ -276,22 +374,92 @@ export default function BayaranPageClient() {
       {selectedPaymentId ? (
         <BayaranDetailOverlay
           key={selectedPaymentId}
-          initialPaymentDetails={data.detailsByPaymentId[selectedPaymentId]}
           paymentMonthKey={paymentMonthKey}
           paymentId={selectedPaymentId}
           onClose={() => setSelectedPaymentId(null)}
         />
       ) : null}
 
-      {selectedAddPaymentId && data.detailsByPaymentId[selectedAddPaymentId] ? (
+      {selectedAddPaymentId && selectedAddPaymentDetails ? (
         <AddPaymentOverlay
-          paymentDetails={data.detailsByPaymentId[selectedAddPaymentId]}
+          paymentDetails={selectedAddPaymentDetails}
+          paymentMonthKey={paymentMonthKey}
           onClose={() => setSelectedAddPaymentId(null)}
-          onSaved={handleReloadBayaranData}
+          onSaved={handleManualPaymentSaved}
         />
+      ) : null}
+
+      {selectedAddPaymentId &&
+      !selectedAddPaymentDetails &&
+      (isLoadingAddPayment || addPaymentError) ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 text-center shadow-xl">
+            {isLoadingAddPayment ? (
+              <>
+                <Icon
+                  icon="progress_activity"
+                  size={28}
+                  className="mx-auto animate-spin text-dark-blue"
+                />
+                <p className="mt-3 text-sm font-semibold text-content">
+                  Memuatkan butiran bayaran...
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-red">
+                  {addPaymentError}
+                </p>
+                <button
+                  type="button"
+                  className="mt-4 rounded-lg bg-dark-blue px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => setSelectedAddPaymentId(null)}
+                >
+                  Tutup
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       ) : null}
     </main>
   );
+}
+
+function getPaymentStatus(
+  arrearsAmount: number,
+  residentStatus: string,
+): BayaranStatusFilter {
+  if (residentStatus === "DATA_TIDAK_LENGKAP") return "tidak-lengkap";
+  if (arrearsAmount < 0) return "lebih";
+  if (arrearsAmount > 0) return "kurang";
+  return "cukup";
+}
+
+function getPaymentStatusLabel(
+  arrearsAmount: number,
+  residentStatus: string,
+) {
+  if (residentStatus === "DATA_TIDAK_LENGKAP") return "Data Tidak Lengkap";
+  if (arrearsAmount < 0) return "Lebihan Bayaran";
+  if (arrearsAmount > 0) return "Kurang Bayaran";
+  return "Cukup Bayaran";
+}
+
+function getPaymentTone(
+  paymentStatus: BayaranStatusFilter,
+): "green" | "red" | "blue" | "purple" {
+  if (paymentStatus === "cukup") return "green";
+  if (paymentStatus === "kurang") return "red";
+  if (paymentStatus === "lebih") return "blue";
+  return "purple";
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("ms-MY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function getMonthKey(value: Date) {

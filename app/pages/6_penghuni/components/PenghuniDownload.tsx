@@ -7,7 +7,7 @@ import {
   type XlsxCell,
   type XlsxSheet,
 } from "@/lib/download/xlsx-export";
-import type { ResidentRecord } from "../page";
+import type { ResidentRecord } from "@/lib/residents/resident-list";
 
 type PenghuniDownloadProps = {
   residents: ResidentRecord[];

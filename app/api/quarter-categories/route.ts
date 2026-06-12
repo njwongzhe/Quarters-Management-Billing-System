@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import {
   buildQuarterCategoryCreatedMessage,
   buildQuarterCategoryDuplicateMessage,
-  buildQuarterCategorySummary,
+  getQuarterCategoriesPageData,
   mapQuarterCategoryForApi,
   parseQuarterCategoryCreateBody,
 } from "@/lib/quarters/quarter-categories";
@@ -29,52 +29,12 @@ function isPrismaUniqueError(error: unknown) {
 
 export async function GET() {
   try {
-    const [quarterCategories, totalUnits, occupiedUnits, vacantUnits] =
-      await prisma.$transaction([
-        prisma.quarterCategory.findMany({
-          orderBy: {
-            categoryName: "asc",
-          },
-          include: {
-            _count: {
-              select: {
-                units: true,
-              },
-            },
-            units: {
-              select: {
-                status: true,
-              },
-            },
-          },
-        }),
-        prisma.unit.count(),
-        prisma.unit.count({
-          where: {
-            status: "OCCUPIED",
-          },
-        }),
-        prisma.unit.count({
-          where: {
-            status: "VACANT",
-          },
-        }),
-      ]);
+    const data = await getQuarterCategoriesPageData();
 
     return NextResponse.json({
       success: true,
       message: "Data kategori kuarters berjaya diambil.",
-      data: {
-        summary: buildQuarterCategorySummary({
-          totalUnits,
-          occupiedUnits,
-          vacantUnits,
-        }),
-        quarterCategories: quarterCategories.map(mapQuarterCategoryForApi),
-        meta: {
-          totalRecords: quarterCategories.length,
-        },
-      },
+      data,
     });
   } catch (error) {
     console.error("Gagal mendapatkan data kategori kuarters:", error);

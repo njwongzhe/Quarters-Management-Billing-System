@@ -7,6 +7,10 @@ import {
   recordDataAuditLog,
 } from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
+import {
+  mapResidentRecord,
+  residentRecordSelect,
+} from "@/lib/residents/resident-list";
 import { prisma } from "../../../../../lib/prisma";
 
 // Error response helper
@@ -109,19 +113,6 @@ export async function PATCH(
     }
 
     const normalizedIcNumber = String(icNumber).trim();
-    const existingResident = await prisma.resident.findUnique({
-      where: { icNumber: normalizedIcNumber },
-      select: { id: true },
-    });
-
-    if (existingResident && existingResident.id !== id) {
-      return createResidentErrorResponse(
-        "No. KP ini sudah wujud dalam sistem.",
-        409,
-        "RESIDENT_IC_EXISTS",
-      );
-    }
-
     // Server-side: enforce the same status transition rules used by the
     // resident detail editor. Age/status automation may set a resident to
     // PENCEN_MENDATANG, and saving profile fields should not force them to
@@ -173,6 +164,7 @@ export async function PATCH(
       const nextResident = await tx.resident.update({
         where: { id },
         data: updateData,
+        select: residentRecordSelect,
       });
 
       await recordDataAuditLog(tx, {
@@ -195,7 +187,7 @@ export async function PATCH(
       {
         success: true,
         message: "Rekod penghuni berjaya dikemas kini.",
-        data: updatedResident,
+        data: mapResidentRecord(updatedResident),
       },
       { status: 200 }
     );

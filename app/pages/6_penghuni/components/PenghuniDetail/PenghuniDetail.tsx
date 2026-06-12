@@ -4,7 +4,7 @@ import Icon from "@/app/components/Icon/Icon";
 import GlobalFixedMessage from "@/app/components/Message/GlobalFixedMessage";
 import { useState, useEffect } from "react";
 import { calculateAgeByIc } from "@/lib/calculateAge";
-import type { ResidentRecord } from "../../page";
+import type { ResidentRecord } from "@/lib/residents/resident-list";
 import { InputField, InputFieldFormat, InputBox, DropdownField, Topic, type DropdownOption } from "../../../../components/InputField";
 import { handleDelete, handleFieldChange, handleResidentStatusFieldChange, handleSave, stripResidentFormatting } from "../../controller/DatabaseControl";
 import PenghuniDetailHistory from "./PenghuniDetailHistory";

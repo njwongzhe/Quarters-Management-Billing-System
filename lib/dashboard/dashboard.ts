@@ -28,6 +28,12 @@ export interface DashboardSummaryData {
   }>;
 }
 
+type DashboardCategoryAnalysisRow = {
+  categoryName: string;
+  totalOutstanding: unknown;
+  totalPaid: unknown;
+};
+
 export async function getDashboardSummary(): Promise<DashboardSummaryData> {
   const today = new Date();
 
@@ -62,16 +68,12 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     thisYearCollections,
     lastYearCollections,
     billingSummary,
-    totalUnits,
-    occupiedUnits,
-    vacantUnits,
+    unitStatusCounts,
     arrearsSummary,
     arrearsCount,
-    pendingDocs,
+    pendingDocsByCategory,
     pendingUploadsToday,
-    activeOccupancies,
-    paymentSums,
-    categories
+    categoryAnalysisRows,
   ] = await Promise.all([
     // Current Month's Collections
     prisma.payment.aggregate({
@@ -112,15 +114,11 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
       where: { chargeMonth: targetMonth },
       _sum: { totalMonthlyCharge: true, paymentReceived: true },
     }),
-    // Total Units Count
-    prisma.unit.count(),
-    // Occupied Units Count
-    prisma.unit.count({
-      where: { status: "OCCUPIED" },
-    }),
-    // Vacant Units Count
-    prisma.unit.count({
-      where: { status: "VACANT" },
+    prisma.unit.groupBy({
+      by: ["status"],
+      _count: {
+        _all: true,
+      },
     }),
     // Master Arrears aggregate
     prisma.arrearsSummary.aggregate({
@@ -132,7 +130,8 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
       where: { totalArrearsAmount: { gt: 0 } },
     }),
     // Pending documents drafts
-    prisma.uploadedDocument.findMany({
+    prisma.uploadedDocument.groupBy({
+      by: ["category"],
       where: {
         OR: [
           { residentDrafts: { some: {} } },
@@ -142,36 +141,48 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
           { quarterCategoryDrafts: { some: {} } },
         ],
       },
-      select: {
-        category: true,
+      _count: {
+        _all: true,
       },
     }),
     // Daily Uploads count today
     prisma.uploadedDocument.count({
       where: { uploadedAt: { gte: startOfToday } },
     }),
-    // Category Analysis: fetch current occupants and their arrears in a flat query
-    prisma.unitOccupancy.findMany({
-      where: { status: "CURRENT" },
-      select: {
-        residentId: true,
-        unit: { select: { categoryId: true } },
-        resident: {
-          select: {
-            arrearsSummary: { select: { totalArrearsAmount: true } },
-          },
-        },
-      },
-    }),
-    // Category Analysis: sum payments grouped by resident ID in the DB
-    prisma.payment.groupBy({
-      by: ["residentId"],
-      _sum: { amount: true },
-    }),
-    // Categories List
-    prisma.quarterCategory.findMany({
-      select: { id: true, categoryName: true },
-    }),
+    prisma.$queryRaw<DashboardCategoryAnalysisRow[]>`
+      WITH resident_payments AS (
+        SELECT
+          "residentId",
+          SUM("amount") AS "totalPaid"
+        FROM "Payment"
+        GROUP BY "residentId"
+      )
+      SELECT
+        qc."categoryName",
+        COALESCE(
+          SUM(
+            CASE
+              WHEN COALESCE(a."totalArrearsAmount", 0) > 0
+                THEN a."totalArrearsAmount"
+              ELSE 0
+            END
+          ),
+          0
+        ) AS "totalOutstanding",
+        COALESCE(SUM(COALESCE(rp."totalPaid", 0)), 0) AS "totalPaid"
+      FROM "QuarterCategory" qc
+      LEFT JOIN "Unit" u
+        ON u."categoryId" = qc."id"
+      LEFT JOIN "UnitOccupancy" o
+        ON o."unitId" = u."id"
+        AND o."status" = 'CURRENT'::"OccupancyStatus"
+      LEFT JOIN "ArrearsSummary" a
+        ON a."residentId" = o."residentId"
+      LEFT JOIN resident_payments rp
+        ON rp."residentId" = o."residentId"
+      GROUP BY qc."id", qc."categoryName"
+      ORDER BY qc."categoryName" ASC
+    `,
   ]);
 
   // --- Calculate Collections Metrics ---
@@ -208,8 +219,13 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
   const totalPercentage = totalExpectedAllTime > 0 ? Math.round((totalKutipanVal / totalExpectedAllTime) * 100) : 0;
 
   // --- Calculate Semakan / Pending Redirection ---
-  const pendingCount = pendingDocs.length;
-  const pendingCategories = new Set(pendingDocs.map((doc) => doc.category));
+  const pendingCount = pendingDocsByCategory.reduce(
+    (total, row) => total + row._count._all,
+    0,
+  );
+  const pendingCategories = new Set(
+    pendingDocsByCategory.map((row) => row.category),
+  );
   let pendingCategory = "bayaran"; // Default fallback
   if (pendingCategories.has("BAYARAN")) {
     pendingCategory = "bayaran";
@@ -221,42 +237,15 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     pendingCategory = "kuarters";
   }
 
-  // --- Calculate Category Arrears analysis ---
-  // Create a map of payment sums by residentId
-  const paymentMap = new Map<string, number>();
-  paymentSums.forEach((item) => {
-    paymentMap.set(item.residentId, Number(item._sum.amount || 0));
-  });
-
-  // Aggregate outstanding arrears and payment totals per category
-  const categoryOutstandingMap = new Map<string, number>();
-  const categoryPaidMap = new Map<string, number>();
-
-  activeOccupancies.forEach((occ) => {
-    const categoryId = occ.unit.categoryId;
-    const outstanding = Number(occ.resident.arrearsSummary?.totalArrearsAmount || 0);
-    const paid = paymentMap.get(occ.residentId) || 0;
-
-    categoryOutstandingMap.set(
-      categoryId,
-      (categoryOutstandingMap.get(categoryId) || 0) + (outstanding > 0 ? outstanding : 0)
-    );
-    categoryPaidMap.set(
-      categoryId,
-      (categoryPaidMap.get(categoryId) || 0) + paid
-    );
-  });
-
-  // Map to final format
-  const analysis = categories.map((cat) => {
-    const totalOutstanding = categoryOutstandingMap.get(cat.id) || 0;
-    const totalPaid = categoryPaidMap.get(cat.id) || 0;
+  const analysis = categoryAnalysisRows.map((category) => {
+    const totalOutstanding = Number(category.totalOutstanding || 0);
+    const totalPaid = Number(category.totalPaid || 0);
 
     const totalExpected = totalPaid + totalOutstanding;
     const settlementRate = totalExpected > 0 ? Math.round((totalPaid / totalExpected) * 100) : 0;
 
     return {
-      className: cat.categoryName,
+      className: category.categoryName,
       amountVal: totalOutstanding,
       amount: `RM ${totalOutstanding.toLocaleString("ms-MY", { minimumFractionDigits: 2 })}`,
       settlementRate,
@@ -277,6 +266,11 @@ export async function getDashboardSummary(): Promise<DashboardSummaryData> {
     settlementRate: item.settlementRate,
     opacity: idx === 0 ? 1.0 : idx === 1 ? 0.7 : 0.4,
   }));
+  const occupiedUnits =
+    unitStatusCounts.find((row) => row.status === "OCCUPIED")?._count._all ?? 0;
+  const vacantUnits =
+    unitStatusCounts.find((row) => row.status === "VACANT")?._count._all ?? 0;
+  const totalUnits = occupiedUnits + vacantUnits;
 
   return {
     monthlyAmount: `RM ${curKutipan.toLocaleString("ms-MY", { minimumFractionDigits: 2 })}`,

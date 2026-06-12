@@ -85,6 +85,20 @@ export type BulkUpdateTunggakanInput = {
   rebat: RebatInput[];
 };
 
+export type BulkUpdateTunggakanResult = {
+  updates: Array<{
+    residentId: string;
+    senggaraDelta: number;
+    tambahanDelta: number;
+    rebatDelta: number;
+    jumlahTunggakanDelta: number;
+  }>;
+  summaryDelta: {
+    jumlahKutipan: number;
+    jumlahTunggakan: number;
+  };
+};
+
 type ParseSuccess<T> = {
   ok: true;
   data: T;

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import { DateField, InputField, Topic } from "@/app/components/InputField";
+import type { BulkUpdateTunggakanResult } from "@/lib/arrears/arrears";
 
 type RowItem = {
   id: string;
@@ -20,7 +21,7 @@ type FeedbackState = {
 type KemasKiniModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSaved?: () => void | Promise<void>;
+  onSaved?: (result: BulkUpdateTunggakanResult) => void | Promise<void>;
   chargeMonth: string;
   selectedCount: number;
   selectedIds: string[];
@@ -247,7 +248,11 @@ export default function KemasKiniModal({
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { ok: boolean; message?: string }
+        | {
+            ok: boolean;
+            message?: string;
+            data?: BulkUpdateTunggakanResult;
+          }
         | null;
 
       if (!response.ok || !payload?.ok) {
@@ -263,10 +268,10 @@ export default function KemasKiniModal({
         message: payload.message ?? "Kemas kini berjaya disimpan.",
       });
 
-      await onSaved?.();
-      setTimeout(() => {
-        onClose();
-      }, 1200);
+      if (payload.data) {
+        await onSaved?.(payload.data);
+      }
+      onClose();
     } catch {
       setFeedback({
         type: "error",

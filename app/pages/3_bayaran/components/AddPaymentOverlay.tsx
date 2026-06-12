@@ -4,12 +4,16 @@ import { useMemo, useState } from "react";
 
 import Icon, { commonIcons } from "@/app/components/Icon/Icon";
 import { DateField, InputField, Topic } from "@/app/components/InputField";
-import type { BayaranDetail } from "@/lib/payments/bayaran-types";
+import type {
+  BayaranDetail,
+  ManualPaymentMutationResult,
+} from "@/lib/payments/bayaran-types";
 
 type AddPaymentOverlayProps = {
   paymentDetails: BayaranDetail;
+  paymentMonthKey: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (result: ManualPaymentMutationResult) => void;
 };
 
 type PaymentDraft = {
@@ -23,6 +27,9 @@ type PaymentDraft = {
 type ManualPaymentResponse = {
   success: boolean;
   message?: string;
+  data?: {
+    result?: ManualPaymentMutationResult;
+  };
 };
 
 function createEmptyPaymentDraft(): PaymentDraft {
@@ -37,6 +44,7 @@ function createEmptyPaymentDraft(): PaymentDraft {
 
 export default function AddPaymentOverlay({
   paymentDetails,
+  paymentMonthKey,
   onClose,
   onSaved,
 }: AddPaymentOverlayProps) {
@@ -88,7 +96,9 @@ export default function AddPaymentOverlay({
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`/api/payments/${paymentDetails.id}/manual`, {
+      const response = await fetch(
+        `/api/payments/${paymentDetails.id}/manual?paymentMonth=${paymentMonthKey}`,
+        {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,16 +111,17 @@ export default function AddPaymentOverlay({
             amount: parseAmount(draft.amount) ?? 0,
           })),
         }),
-      });
+        },
+      );
       const payload = (await response.json().catch(() => null)) as
         | ManualPaymentResponse
         | null;
 
-      if (!response.ok || !payload?.success) {
+      if (!response.ok || !payload?.success || !payload.data?.result) {
         throw new Error(payload?.message ?? "Gagal menyimpan bayaran manual.");
       }
 
-      onSaved();
+      onSaved(payload.data.result);
       onClose();
     } catch (error) {
       setErrorMessage(

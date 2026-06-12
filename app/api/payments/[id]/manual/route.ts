@@ -9,9 +9,12 @@ import {
   recordDataAuditLog,
 } from "@/lib/audit/data-audit";
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
-import { parseDateOnlyInAppTimeZone } from "@/lib/date-time";
-import { getBayaranPaymentDetail } from "@/lib/payments/bayaran-detail";
+import {
+  getMonthStartInAppTimeZone,
+  parseDateOnlyInAppTimeZone,
+} from "@/lib/date-time";
 import { createPaymentRecords } from "@/lib/payments/payment-creation";
+import type { ManualPaymentMutationResult } from "@/lib/payments/bayaran-types";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -54,9 +57,9 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const residentId = await resolvePaymentResidentId(id);
+    const resident = await resolvePaymentResident(id);
 
-    if (!residentId) {
+    if (!resident) {
       return NextResponse.json(
         { success: false, message: "Rekod penghuni tidak ditemui." },
         { status: 404 },
@@ -74,7 +77,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const duplicateRecordIndex = findDuplicateManualPaymentIndex(
-      residentId,
+      resident.id,
       parsedRecords.records,
     );
 
@@ -88,12 +91,12 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      await lockManualPaymentResident(tx, residentId);
+    const paymentIds = await prisma.$transaction(async (tx) => {
+      await lockManualPaymentResident(tx, resident.id);
 
       const existingDuplicateIndex = await findExistingManualPaymentIndex(
         tx,
-        residentId,
+        resident.id,
         parsedRecords.records,
       );
 
@@ -101,10 +104,10 @@ export async function POST(request: Request, context: RouteContext) {
         throw new DuplicateManualPaymentError(existingDuplicateIndex);
       }
 
-      await createPaymentRecords(
+      const createdPaymentIds = await createPaymentRecords(
         tx,
         parsedRecords.records.map((record) => ({
-          residentId,
+          residentId: resident.id,
           paymentDate: record.paymentDate,
           receiptNo: record.receiptNo,
           amount: record.amount,
@@ -115,13 +118,6 @@ export async function POST(request: Request, context: RouteContext) {
         })),
       );
 
-      const resident = await tx.resident.findUnique({
-        where: { id: residentId },
-        select: {
-          fullName: true,
-          icNumber: true,
-        },
-      });
       const totalAmount = parsedRecords.records.reduce(
         (sum, record) => sum + record.amount,
         0,
@@ -132,8 +128,8 @@ export async function POST(request: Request, context: RouteContext) {
         moduleName: "Semakan Bayaran",
         actionType: "CREATE",
         target: formatAuditTarget([
-          resident?.fullName ?? "Penghuni",
-          resident?.icNumber ? `No. KP ${resident.icNumber}` : null,
+          resident.fullName,
+          `No. KP ${resident.icNumber}`,
         ]),
         entityType: "PAYMENT",
         entityId: null,
@@ -148,9 +144,26 @@ export async function POST(request: Request, context: RouteContext) {
             .join(", ")}.`,
         ],
       });
+
+      return createdPaymentIds;
     });
 
-    const payment = await getBayaranPaymentDetail(id);
+    const paymentMonth = getPaymentMonthFromRequest(request);
+    const result: ManualPaymentMutationResult = {
+      residentId: resident.id,
+      totalAmount: parsedRecords.records.reduce(
+        (sum, record) => sum + record.amount,
+        0,
+      ),
+      amountThisMonthDelta: parsedRecords.records.reduce(
+        (sum, record) =>
+          getMonthStartInAppTimeZone(record.paymentDate).getTime() ===
+          paymentMonth.getTime()
+            ? sum + record.amount
+            : sum,
+        0,
+      ),
+    };
 
     revalidatePath(ROUTES.bayaran);
     revalidatePath(ROUTES.transaksi);
@@ -159,7 +172,8 @@ export async function POST(request: Request, context: RouteContext) {
       success: true,
       message: "Bayaran manual berjaya disimpan.",
       data: {
-        payment,
+        result,
+        paymentIds,
       },
     });
   } catch (error) {
@@ -185,22 +199,40 @@ export async function POST(request: Request, context: RouteContext) {
   }
 }
 
-async function resolvePaymentResidentId(recordId: string) {
-  const resident = await prisma.resident.findUnique({
-    where: { id: recordId },
-    select: { id: true },
-  });
+async function resolvePaymentResident(recordId: string) {
+  const residents = await prisma.$queryRaw<
+    { id: string; fullName: string; icNumber: string }[]
+  >(Prisma.sql`
+    SELECT resident.id, resident."fullName", resident."icNumber"
+    FROM "Resident" AS resident
+    WHERE resident.id = ${recordId}::uuid
 
-  if (resident) {
-    return resident.id;
+    UNION ALL
+
+    SELECT resident.id, resident."fullName", resident."icNumber"
+    FROM "Payment" AS payment
+    INNER JOIN "Resident" AS resident
+      ON resident.id = payment."residentId"
+    WHERE payment.id = ${recordId}::uuid
+
+    LIMIT 1
+  `);
+
+  return residents[0] ?? null;
+}
+
+function getPaymentMonthFromRequest(request: Request) {
+  const monthValue = new URL(request.url).searchParams.get("paymentMonth");
+
+  if (monthValue && /^\d{4}-\d{2}$/.test(monthValue)) {
+    const parsedMonth = parseDateOnlyInAppTimeZone(`${monthValue}-01`);
+
+    if (parsedMonth) {
+      return parsedMonth;
+    }
   }
 
-  const payment = await prisma.payment.findUnique({
-    where: { id: recordId },
-    select: { residentId: true },
-  });
-
-  return payment?.residentId ?? null;
+  return getMonthStartInAppTimeZone();
 }
 
 function parseManualPaymentRecords(body: unknown):

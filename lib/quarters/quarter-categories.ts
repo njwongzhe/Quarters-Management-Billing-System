@@ -1,5 +1,7 @@
 import type { QuarterCategory } from "@prisma/client";
 
+import { prisma } from "@/lib/prisma";
+
 export type QuarterCategoryListItem = {
   id: string;
   categoryName: string;
@@ -19,6 +21,14 @@ export type QuarterCategorySummary = {
   occupiedUnits: number;
   vacantUnits: number;
   occupancyRate: number;
+};
+
+export type QuarterCategoriesPageData = {
+  summary: QuarterCategorySummary;
+  quarterCategories: QuarterCategoryListItem[];
+  meta: {
+    totalRecords: number;
+  };
 };
 
 type QuarterCategoryWithUnitCount = QuarterCategory & {
@@ -113,6 +123,94 @@ export function buildQuarterCategorySummary(summary: {
   return {
     ...summary,
     occupancyRate,
+  };
+}
+
+export async function getQuarterCategoriesPageData(): Promise<QuarterCategoriesPageData> {
+  const [quarterCategories, unitStatusCounts] = await Promise.all([
+    prisma.quarterCategory.findMany({
+      orderBy: {
+        categoryName: "asc",
+      },
+      select: {
+        id: true,
+        categoryName: true,
+        address: true,
+        rentalPrice: true,
+        maintenancePrice: true,
+        penaltyPrice: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            units: true,
+          },
+        },
+      },
+    }),
+    prisma.unit.groupBy({
+      by: ["categoryId", "status"],
+      _count: {
+        _all: true,
+      },
+    }),
+  ]);
+
+  const statusCountsByCategory = new Map<
+    string,
+    { occupied: number; vacant: number }
+  >();
+  let occupiedUnits = 0;
+  let vacantUnits = 0;
+
+  for (const row of unitStatusCounts) {
+    const count = row._count._all;
+    const current = statusCountsByCategory.get(row.categoryId) ?? {
+      occupied: 0,
+      vacant: 0,
+    };
+
+    if (row.status === "OCCUPIED") {
+      current.occupied += count;
+      occupiedUnits += count;
+    } else if (row.status === "VACANT") {
+      current.vacant += count;
+      vacantUnits += count;
+    }
+
+    statusCountsByCategory.set(row.categoryId, current);
+  }
+
+  const mappedCategories = quarterCategories.map((quarterCategory) => {
+    const statusCounts = statusCountsByCategory.get(quarterCategory.id) ?? {
+      occupied: 0,
+      vacant: 0,
+    };
+
+    return {
+      id: quarterCategory.id,
+      categoryName: quarterCategory.categoryName,
+      address: quarterCategory.address,
+      rentalPrice: Number(quarterCategory.rentalPrice),
+      maintenancePrice: Number(quarterCategory.maintenancePrice),
+      penaltyPrice: Number(quarterCategory.penaltyPrice),
+      unitCount: quarterCategory._count.units,
+      occupiedUnitCount: statusCounts.occupied,
+      vacantUnitCount: statusCounts.vacant,
+      canDelete: quarterCategory._count.units === 0,
+      updatedAt: quarterCategory.updatedAt.toISOString(),
+    };
+  });
+
+  return {
+    summary: buildQuarterCategorySummary({
+      totalUnits: occupiedUnits + vacantUnits,
+      occupiedUnits,
+      vacantUnits,
+    }),
+    quarterCategories: mappedCategories,
+    meta: {
+      totalRecords: mappedCategories.length,
+    },
   };
 }
 

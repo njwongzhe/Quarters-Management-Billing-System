@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { areAllFilterOptionsSelected } from "@/app/components/Filter/FilterOption";
-import { defaultFilter, type TunggakanFilter } from "@/lib/arrears/arrears";
+import {
+  defaultFilter,
+  type BulkUpdateTunggakanResult,
+  type TunggakanFilter,
+} from "@/lib/arrears/arrears";
 import Icon from "@/app/components/Icon/Icon";
 import type { TunggakanListItem, TunggakanSummary } from "@/lib/arrears/arrears";
 import KemasKiniModal from "@/app/pages/4_tunggakan/components/KemasKiniModal";
@@ -39,11 +43,25 @@ const formatMonthLabel = (monthValue: string) => {
   }).format(new Date(Date.UTC(year, month - 1, 1)));
 };
 
-export default function TunggakanPageClient() {
+type TunggakanPageClientProps = {
+  initialChargeMonth?: string;
+  initialData?: TunggakanListItem[];
+  initialSummary?: TunggakanSummary;
+};
+
+export default function TunggakanPageClient({
+  initialChargeMonth = getCurrentMonthInputValue(),
+  initialData,
+  initialSummary,
+}: TunggakanPageClientProps) {
+  const hasInitialData = initialData !== undefined && initialSummary !== undefined;
   // --- STATE MANAGEMENT ---
-  const [data, setData] = useState<TunggakanListItem[]>([]);
-  const [summary, setSummary] = useState<TunggakanSummary>({ jumlahRekod: 0, jumlahKutipan: 0, jumlahTunggakan: 0 });
-  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<TunggakanListItem[]>(initialData ?? []);
+  const [summary, setSummary] = useState<TunggakanSummary>(
+    initialSummary ?? { jumlahRekod: 0, jumlahKutipan: 0, jumlahTunggakan: 0 },
+  );
+  const [isLoading, setIsLoading] = useState(!hasInitialData);
+  const shouldSkipInitialFetchRef = useRef(hasInitialData);
 
   // Billing Automation States
   const [isBilledThisMonth, setIsBilledThisMonth] = useState(false);
@@ -60,14 +78,13 @@ export default function TunggakanPageClient() {
   const [isKemasKiniModalOpen, setIsKemasKiniModalOpen] = useState(false);
   const [viewResidentId, setViewResidentId] = useState<string | null>(null);
   const [filters, setFilters] = useState<TunggakanFilter>(defaultFilter);
-  const [selectedChargeMonth, setSelectedChargeMonth] = useState(getCurrentMonthInputValue);
+  const [selectedChargeMonth, setSelectedChargeMonth] = useState(initialChargeMonth);
   const selectedChargeMonthLabel = useMemo(() => formatMonthLabel(selectedChargeMonth), [selectedChargeMonth]);
 
   const [searchQuery, setSearchQuery] = useState("");
 
   const {
     isOpen: isSearchOpen,
-    isSearchActive,
     searchInputRef,
     handleToggleSearch,
     handleClearSearch,
@@ -113,13 +130,6 @@ export default function TunggakanPageClient() {
           jumlahTunggakan: result.summary?.jumlahTunggakan ?? 0, 
         });
         
-        if (autoSelect && !hasAutoSelected) {
-          const idsWithArrears = (result.data as TunggakanListItem[])
-            .filter((item) => item.jumlahTunggakan > 0)
-            .map((item) => item.id);
-          setSelectedIds(idsWithArrears);
-          setHasAutoSelected(true);
-        }
       } else {
         console.error("API Error:", result.message);
       }
@@ -132,10 +142,27 @@ export default function TunggakanPageClient() {
 
   // Fetch on page load.
   useEffect(() => {
+    if (shouldSkipInitialFetchRef.current) {
+      shouldSkipInitialFetchRef.current = false;
+      void fetchBillingStatus();
+      return;
+    }
+
     setData([]);
-    fetchTunggakanData();
-    fetchBillingStatus();
+    void fetchTunggakanData();
+    void fetchBillingStatus();
   }, [selectedChargeMonth]);
+
+  useEffect(() => {
+    if (!autoSelect || hasAutoSelected || data.length === 0) {
+      return;
+    }
+
+    setSelectedIds(
+      data.filter((item) => item.jumlahTunggakan > 0).map((item) => item.id),
+    );
+    setHasAutoSelected(true);
+  }, [autoSelect, data, hasAutoSelected]);
 
   // --- HANDLERS ---
   const formatRM = (value: number) => {
@@ -242,6 +269,37 @@ export default function TunggakanPageClient() {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
     );
+  };
+
+  const handleArrearsSaved = (result: BulkUpdateTunggakanResult) => {
+    const updateByResidentId = new Map(
+      result.updates.map((update) => [update.residentId, update]),
+    );
+
+    setData((previousData) =>
+      previousData.map((row) => {
+        const update = updateByResidentId.get(row.id);
+
+        return update
+          ? {
+              ...row,
+              senggara: row.senggara + update.senggaraDelta,
+              tambahan: row.tambahan + update.tambahanDelta,
+              rebat: row.rebat + update.rebatDelta,
+              jumlahTunggakan:
+                row.jumlahTunggakan + update.jumlahTunggakanDelta,
+            }
+          : row;
+      }),
+    );
+    setSummary((previousSummary) => ({
+      ...previousSummary,
+      jumlahKutipan:
+        previousSummary.jumlahKutipan + result.summaryDelta.jumlahKutipan,
+      jumlahTunggakan:
+        previousSummary.jumlahTunggakan + result.summaryDelta.jumlahTunggakan,
+    }));
+    setSelectedIds([]);
   };
 
   const handleManualRun = async () => {
@@ -422,10 +480,7 @@ export default function TunggakanPageClient() {
         onClose={() => {
           setIsKemasKiniModalOpen(false);
         }} 
-        onSaved={async () => {
-          await fetchTunggakanData();
-          setSelectedIds([]);
-        }}
+        onSaved={handleArrearsSaved}
         chargeMonth={selectedChargeMonth}
         selectedCount={selectedIds.length} 
         selectedIds={selectedIds}

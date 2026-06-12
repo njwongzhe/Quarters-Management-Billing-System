@@ -9,7 +9,7 @@ const UPLOADED_PAYMENT_DESCRIPTION = "Bayaran daripada muat naik.";
 const MANUAL_PAYMENT_DESCRIPTION = "bayaran";
 
 type PaymentRecordClient = Prisma.TransactionClient;
-type SchemaClient = Pick<Prisma.TransactionClient, "$executeRaw" | "$queryRaw">;
+type SchemaClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 
 export type CreatePaymentRecordInput = {
   residentId: string;
@@ -54,6 +54,13 @@ type BalanceTableColumns = {
   arrearsSummary: Set<string>;
 };
 
+type PaymentSchemaColumns = BalanceTableColumns & {
+  payment: Set<string>;
+  transaction: Set<string>;
+};
+
+let paymentSchemaColumnsPromise: Promise<PaymentSchemaColumns> | null = null;
+
 export async function createPaymentRecords(
   tx: PaymentRecordClient,
   entries: CreatePaymentRecordInput[],
@@ -62,12 +69,10 @@ export async function createPaymentRecords(
     return [];
   }
 
-  const [transactionNos, paymentColumns, transactionColumns, balanceColumns] =
+  const [transactionNos, schemaColumns] =
     await Promise.all([
       generateTransactionNos(tx, entries.length),
-      getTableColumns(tx, "Payment"),
-      getTableColumns(tx, "Transaction"),
-      getBalanceTableColumns(tx),
+      getPaymentSchemaColumns(tx),
     ]);
 
   const paymentRows = entries.map((entry): PreparedPaymentRow => {
@@ -111,9 +116,9 @@ export async function createPaymentRecords(
     };
   });
 
-  await insertPaymentRows(tx, paymentRows, paymentColumns);
-  await insertTransactionRows(tx, transactionRows, transactionColumns);
-  await applyPaymentsToResidentBalances(tx, entries, balanceColumns);
+  await insertPaymentRows(tx, paymentRows, schemaColumns.payment);
+  await insertTransactionRows(tx, transactionRows, schemaColumns.transaction);
+  await applyPaymentsToResidentBalances(tx, entries, schemaColumns);
 
   return paymentRows.map((row) => row.id);
 }
@@ -522,24 +527,52 @@ function aggregateArrearsPaymentRows(entries: CreatePaymentRecordInput[]) {
   return [...rowsByResident.values()];
 }
 
-async function getBalanceTableColumns(client: SchemaClient) {
-  const [monthlyCharge, arrearsSummary] = await Promise.all([
-    getTableColumns(client, "MonthlyCharge"),
-    getTableColumns(client, "ArrearsSummary"),
-  ]);
+function getPaymentSchemaColumns(client: SchemaClient) {
+  if (!paymentSchemaColumnsPromise) {
+    paymentSchemaColumnsPromise = loadPaymentSchemaColumns(client).catch(
+      (error) => {
+        paymentSchemaColumnsPromise = null;
+        throw error;
+      },
+    );
+  }
 
-  return { monthlyCharge, arrearsSummary };
+  return paymentSchemaColumnsPromise;
 }
 
-async function getTableColumns(client: SchemaClient, tableName: string) {
-  const rows = await client.$queryRaw<{ column_name: string }[]>(Prisma.sql`
-    SELECT column_name
+async function loadPaymentSchemaColumns(
+  client: SchemaClient,
+): Promise<PaymentSchemaColumns> {
+  const rows = await client.$queryRaw<
+    { table_name: string; column_name: string }[]
+  >(Prisma.sql`
+    SELECT table_name, column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = ${tableName}
+      AND table_name IN (
+        'Payment',
+        'Transaction',
+        'MonthlyCharge',
+        'ArrearsSummary'
+      )
   `);
 
-  return new Set(rows.map((row) => row.column_name));
+  const columnsByTable = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const columns = columnsByTable.get(row.table_name) ?? new Set<string>();
+    columns.add(row.column_name);
+    columnsByTable.set(row.table_name, columns);
+  }
+
+  return {
+    payment: columnsByTable.get("Payment") ?? new Set<string>(),
+    transaction: columnsByTable.get("Transaction") ?? new Set<string>(),
+    monthlyCharge:
+      columnsByTable.get("MonthlyCharge") ?? new Set<string>(),
+    arrearsSummary:
+      columnsByTable.get("ArrearsSummary") ?? new Set<string>(),
+  };
 }
 
 function normalizePaymentAmount(value: Prisma.Decimal | string | number) {

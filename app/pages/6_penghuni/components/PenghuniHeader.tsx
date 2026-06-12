@@ -1,5 +1,5 @@
 import Icon from "@/app/components/Icon/Icon";
-import type { PenghuniHeaderProps } from "../page";
+import type { PenghuniHeaderProps } from "@/lib/residents/resident-list";
 
 // Helper function to create a header card with dynamic content and styling.
 function headerCard(title: string, value: string, statusText: string, statusIcon: string, statusColor?: string) {

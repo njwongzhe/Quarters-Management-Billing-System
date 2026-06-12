@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { ResidentRecord } from "../page";
+import type { ResidentRecord } from "@/lib/residents/resident-list";
 import type { PenghuniFilterState } from "../components/PenghuniFilter";
 
 export type NotificationType = "success" | "error";
@@ -301,16 +301,8 @@ export async function handleSave(params: {
             throw new Error(getResidentApiErrorMessage(errorData, "Gagal menyimpan rekod."));
         }
 
-        const readResponse = await fetch(`/api/residents/${residentId}/read`);
-
-        if (!readResponse.ok) {
-            const errorData = await readResponse.json().catch(() => ({}));
-            console.error("Gagal mendapatkan data terkini:", errorData);
-            throw new Error(getResidentApiErrorMessage(errorData, "Gagal membaca data terkini dari database."));
-        }
-
-        const readData = (await readResponse.json()) as any;
-        const freshData = normalizeResidentRecord(readData.data);
+        const updateData = await updateResponse.json();
+        const freshData = normalizeResidentRecord(updateData.data);
 
         showNotification("success", "Rekod penghuni berjaya disimpan.");
         setKemasKini(false);

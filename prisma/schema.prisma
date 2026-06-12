@@ -307,6 +307,8 @@ model Transaction {
   @@index([category])
   @@index([status])
   @@index([relatedTransactionId])
+  @@index([relatedTransactionId, createdAt])
+  @@index([createdAt, transactionNo])
   @@index([receiptNo])
   @@index([transactionNo]) // <-- 2. ADD THIS INDEX FOR FAST SEARCHING
 }
@@ -335,6 +337,7 @@ model UploadedDocument {
   paymentDrafts         PaymentDraft[]
 
   @@index([category])
+  @@index([category, uploadedAt])
   @@index([uploadedAt])
   @@index([uploadedById])
 }

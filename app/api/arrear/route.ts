@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
-import { mapTunggakanForApi, parseBulkUpdateBody } from "../../../lib/arrears/arrears";
+import {
+  parseBulkUpdateBody,
+  type BulkUpdateTunggakanResult,
+} from "../../../lib/arrears/arrears";
 import {
   formatAuditTarget,
   formatAuditValue,
@@ -11,7 +17,8 @@ import {
   getMonthStartInAppTimeZone,
   parseDateOnlyInAppTimeZone,
 } from "@/lib/date-time";
-import { generateTransactionNo } from "@/lib/transactions/transactions"; 
+import { generateTransactionNos } from "@/lib/transactions/transactions";
+import { getArrearsPageData } from "@/lib/arrears/arrears-list";
 
 export const dynamic = "force-dynamic";
 
@@ -42,58 +49,12 @@ function getFormattedMonthSuffix(date: Date): string {
 export async function GET(request: Request) {
   try {
     const selectedChargeMonth = getChargeMonthFromRequest(request);
+    const result = await getArrearsPageData(selectedChargeMonth);
 
-    // 1. Fetch all residents with their active units and complete charge history
-    const residents = await prisma.resident.findMany({
-      // We only want verified residents. You can adjust this 'where' clause 
-      // if you need to filter out people who have completely moved out (KELUAR).
-      include: {
-        arrearsSummary: true, 
-        occupancies: {
-          where: { status: "CURRENT" },
-          include: {
-            unit: {
-              include: { quarterCategory: true },
-            },
-          },
-        },
-        monthlyCharges: {
-          where: { chargeMonth: selectedChargeMonth },
-          include: {
-            additionalCharges: true,
-            rebates: true,
-          },
-        },
-      },
-    });
-
-    // 2. Map the raw database data into the clean frontend list format
-    const tunggakanList = residents.map(mapTunggakanForApi);
-
-    // 3. Calculate Live KPIs
-    // A. Jumlah Tunggakan (Live sum of current outstanding debts)
-    const jumlahTunggakan = tunggakanList.reduce((sum, item) => sum + item.jumlahTunggakan, 0);
-
-    // B. Jumlah Rekod (Total historical revenue charged across the whole system)
-    const historicalDebits = await prisma.transaction.aggregate({
-      _sum: {
-        debitAmount: true,
-      },
-      where: {
-        status: "NORMAL",
-      }
-    });
-    
-    const jumlahRekod = Number(historicalDebits._sum.debitAmount || 0);
-
-    // 4. Return the successful response
     return NextResponse.json({
       ok: true,
-      summary: {
-        jumlahRekod,
-        jumlahTunggakan,
-      },
-      data: tunggakanList,
+      summary: result.summary,
+      data: result.data,
     });
 
   } catch (error) {
@@ -134,211 +95,304 @@ export async function POST(request: Request) {
     // 2. Fetch required reference data for the selected residents
     const residentsInfo = await prisma.resident.findMany({
       where: { id: { in: residentIds } },
-      include: {
+      select: {
+        id: true,
+        fullName: true,
+        icNumber: true,
         occupancies: {
           where: { status: "CURRENT" },
-          include: { unit: { include: { quarterCategory: true } } }
+          take: 1,
+          select: {
+            unitId: true,
+            unit: {
+              select: {
+                quarterCategory: {
+                  select: {
+                    maintenancePrice: true,
+                  },
+                },
+              },
+            },
+          },
         }
       }
     });
 
+    const additionalItems = cajTambahan.map((item) => ({
+      ...item,
+      chargeMonth: getMonthStartInAppTimeZone(item.tarikh),
+    }));
+    const rebateItems = rebat.map((item) => ({
+      ...item,
+      chargeMonth: getMonthStartInAppTimeZone(item.tarikh),
+    }));
+    const requiredChargeMonths = [
+      ...new Map(
+        [chargeMonth, ...additionalItems.map((item) => item.chargeMonth), ...rebateItems.map((item) => item.chargeMonth)]
+          .map((month) => [month.getTime(), month]),
+      ).values(),
+    ];
+
     // 3. Execute the complex database update inside a Transaction
-    await prisma.$transaction(async (tx) => {
-      
+    const result = await prisma.$transaction(async (tx): Promise<BulkUpdateTunggakanResult> => {
+      if (residentsInfo.length > 0) {
+        await tx.monthlyCharge.createMany({
+          data: residentsInfo.flatMap((resident) =>
+            requiredChargeMonths.map((requiredMonth) => ({
+              residentId: resident.id,
+              chargeMonth: requiredMonth,
+              unitId: resident.occupancies[0]?.unitId ?? null,
+            })),
+          ),
+          skipDuplicates: true,
+        });
+      }
+
+      const monthlyCharges = await tx.monthlyCharge.findMany({
+        where: {
+          residentId: { in: residentsInfo.map((resident) => resident.id) },
+          chargeMonth: { in: requiredChargeMonths },
+        },
+        select: {
+          id: true,
+          residentId: true,
+          chargeMonth: true,
+          maintenanceAmount: true,
+        },
+      });
+      const monthlyChargeByResidentMonth = new Map(
+        monthlyCharges.map((monthlyCharge) => [
+          `${monthlyCharge.residentId}|${monthlyCharge.chargeMonth.getTime()}`,
+          monthlyCharge,
+        ]),
+      );
+      const selectedMonthlyChargeByResident = new Map(
+        monthlyCharges
+          .filter(
+            (monthlyCharge) =>
+              monthlyCharge.chargeMonth.getTime() === chargeMonth.getTime(),
+          )
+          .map((monthlyCharge) => [monthlyCharge.residentId, monthlyCharge]),
+      );
+      const maintenanceResidents = cajSenggaraEnabled
+        ? residentsInfo.filter((resident) => {
+            const monthlyCharge = selectedMonthlyChargeByResident.get(resident.id);
+            return (
+              resident.occupancies.length > 0 &&
+              monthlyCharge &&
+              Number(monthlyCharge.maintenanceAmount) === 0
+            );
+          })
+        : [];
+      const maintenanceResidentIds = new Set(
+        maintenanceResidents.map((resident) => resident.id),
+      );
+      const transactionCount =
+        maintenanceResidents.length +
+        residentsInfo.length * (additionalItems.length + rebateItems.length);
+      const transactionNos = await generateTransactionNos(tx, transactionCount);
+      let transactionNoIndex = 0;
+      const actionDate = new Date();
+      const additionalChargeRows: Prisma.AdditionalChargeCreateManyInput[] = [];
+      const rebateRows: Prisma.RebateCreateManyInput[] = [];
+      const transactionRows: Prisma.TransactionCreateManyInput[] = [];
+      const monthlyChargeDeltas = new Map<
+        string,
+        {
+          id: string;
+          maintenance: number;
+          additional: number;
+          rebate: number;
+        }
+      >();
+      const updates: BulkUpdateTunggakanResult["updates"] = [];
+      let totalDebitDelta = 0;
+      let totalArrearsDelta = 0;
+
+      const addMonthlyDelta = (
+        monthlyChargeId: string,
+        delta: Partial<{
+          maintenance: number;
+          additional: number;
+          rebate: number;
+        }>,
+      ) => {
+        const current = monthlyChargeDeltas.get(monthlyChargeId) ?? {
+          id: monthlyChargeId,
+          maintenance: 0,
+          additional: 0,
+          rebate: 0,
+        };
+        current.maintenance += delta.maintenance ?? 0;
+        current.additional += delta.additional ?? 0;
+        current.rebate += delta.rebate ?? 0;
+        monthlyChargeDeltas.set(monthlyChargeId, current);
+      };
+
       for (const resident of residentsInfo) {
-        
-        // Find or Create the Monthly Charge record for this month
-        let monthlyCharge = await tx.monthlyCharge.findUnique({
-          where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth } }
+        const selectedMonthlyCharge = selectedMonthlyChargeByResident.get(resident.id);
+
+        if (!selectedMonthlyCharge) {
+          throw new Error(`Rekod caj bulanan untuk ${resident.id} gagal disediakan.`);
+        }
+
+        let maintenanceDelta = 0;
+        let visibleAdditionalDelta = 0;
+        let visibleRebateDelta = 0;
+        const shouldAddMaintenance = maintenanceResidentIds.has(resident.id);
+
+        if (shouldAddMaintenance) {
+          maintenanceDelta = Number(
+            resident.occupancies[0].unit.quarterCategory.maintenancePrice,
+          );
+          addMonthlyDelta(selectedMonthlyCharge.id, {
+            maintenance: maintenanceDelta,
+          });
+          transactionRows.push({
+            transactionNo: transactionNos[transactionNoIndex++],
+            residentId: resident.id,
+            transactionDate: actionDate,
+            chargeMonth,
+            category: "CAJ_PENYELENGGARAAN",
+            description: `Caj Penyelenggaraan (${getFormattedMonthSuffix(chargeMonth)})`,
+            debitAmount: maintenanceDelta,
+          });
+          totalDebitDelta += maintenanceDelta;
+        }
+
+        let residentAdditionalTotal = 0;
+        for (const item of additionalItems) {
+          const itemMonthlyCharge = monthlyChargeByResidentMonth.get(
+            `${resident.id}|${item.chargeMonth.getTime()}`,
+          );
+
+          if (!itemMonthlyCharge) {
+            throw new Error(`Rekod caj tambahan untuk ${resident.id} gagal disediakan.`);
+          }
+
+          additionalChargeRows.push({
+            monthlyChargeId: itemMonthlyCharge.id,
+            chargeDate: item.tarikh,
+            description: item.catatan,
+            amount: item.amaun,
+          });
+          transactionRows.push({
+            transactionNo: transactionNos[transactionNoIndex++],
+            residentId: resident.id,
+            transactionDate: actionDate,
+            chargeMonth: item.chargeMonth,
+            category: "CAJ_TAMBAHAN",
+            description: `${item.catatan} (${getFormattedMonthSuffix(item.chargeMonth)})`,
+            debitAmount: item.amaun,
+          });
+          addMonthlyDelta(itemMonthlyCharge.id, { additional: item.amaun });
+          residentAdditionalTotal += item.amaun;
+          totalDebitDelta += item.amaun;
+
+          if (item.chargeMonth.getTime() === chargeMonth.getTime()) {
+            visibleAdditionalDelta += item.amaun;
+          }
+        }
+
+        let residentRebateTotal = 0;
+        for (const item of rebateItems) {
+          const itemMonthlyCharge = monthlyChargeByResidentMonth.get(
+            `${resident.id}|${item.chargeMonth.getTime()}`,
+          );
+
+          if (!itemMonthlyCharge) {
+            throw new Error(`Rekod rebat untuk ${resident.id} gagal disediakan.`);
+          }
+
+          rebateRows.push({
+            monthlyChargeId: itemMonthlyCharge.id,
+            rebateDate: item.tarikh,
+            description: item.catatan,
+            amount: item.amaun,
+          });
+          transactionRows.push({
+            transactionNo: transactionNos[transactionNoIndex++],
+            residentId: resident.id,
+            transactionDate: actionDate,
+            chargeMonth: item.chargeMonth,
+            category: "REBAT",
+            description: `${item.catatan} (${getFormattedMonthSuffix(item.chargeMonth)})`,
+            creditAmount: item.amaun,
+          });
+          addMonthlyDelta(itemMonthlyCharge.id, { rebate: item.amaun });
+          residentRebateTotal += item.amaun;
+
+          if (item.chargeMonth.getTime() === chargeMonth.getTime()) {
+            visibleRebateDelta += item.amaun;
+          }
+        }
+
+        const jumlahTunggakanDelta =
+          maintenanceDelta + residentAdditionalTotal - residentRebateTotal;
+        totalArrearsDelta += jumlahTunggakanDelta;
+        updates.push({
+          residentId: resident.id,
+          senggaraDelta: maintenanceDelta,
+          tambahanDelta: visibleAdditionalDelta,
+          rebatDelta: visibleRebateDelta,
+          jumlahTunggakanDelta,
         });
+      }
 
-        if (!monthlyCharge) {
-            monthlyCharge = await tx.monthlyCharge.create({
-                data: {
-                    residentId: resident.id,
-                    chargeMonth,
-                    unitId: resident.occupancies[0]?.unitId || null,
-                }
-            });
-        }
+      if (additionalChargeRows.length > 0) {
+        await tx.additionalCharge.createMany({ data: additionalChargeRows });
+      }
 
-        let totalNewTambahan = 0;
-        let totalNewRebat = 0;
-        let senggaraChargeToAdd = 0;
+      if (rebateRows.length > 0) {
+        await tx.rebate.createMany({ data: rebateRows });
+      }
 
-        // A. Handle Senggara (Maintenance) Toggle
-        if (cajSenggaraEnabled && resident.occupancies.length > 0) {
-            const maintenanceRate = Number(resident.occupancies[0].unit.quarterCategory.maintenancePrice);
-            
-            // Only add if they haven't been charged for maintenance this month yet
-            if (Number(monthlyCharge.maintenanceAmount) === 0) {
-                senggaraChargeToAdd = maintenanceRate;
-                
-                // Log Transaction for Senggara
-                const txNoSenggara = await generateTransactionNo(tx); // 1. ADD THIS
-                const monthSuffix = getFormattedMonthSuffix(chargeMonth);
+      if (transactionRows.length > 0) {
+        await tx.transaction.createMany({ data: transactionRows });
+      }
 
-                await tx.transaction.create({
-                    data: {
-                        transactionNo: txNoSenggara,
-                        residentId: resident.id,
-                        transactionDate: new Date(), // Actual date of creation
-                        chargeMonth: chargeMonth,    // Target billing period
-                        category: "CAJ_PENYELENGGARAAN",
-                        description: `Caj Penyelenggaraan (${monthSuffix})`,
-                        debitAmount: maintenanceRate,
-                    }
-                });
-            }
-        }
+      const monthlyDeltas = [...monthlyChargeDeltas.values()];
+      if (monthlyDeltas.length > 0) {
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE "MonthlyCharge" AS monthly_charge
+          SET
+            "maintenanceAmount" = monthly_charge."maintenanceAmount" + changes.maintenance,
+            "additionalChargesTotal" = monthly_charge."additionalChargesTotal" + changes.additional,
+            "rebateTotal" = monthly_charge."rebateTotal" + changes.rebate,
+            "totalMonthlyCharge" = monthly_charge."totalMonthlyCharge" + changes.maintenance + changes.additional,
+            "balanceForMonth" = monthly_charge."balanceForMonth" + changes.maintenance + changes.additional - changes.rebate,
+            "updatedAt" = now()
+          FROM (
+            VALUES ${Prisma.join(
+              monthlyDeltas.map(
+                (delta) =>
+                  Prisma.sql`(${delta.id}::uuid, ${delta.maintenance}::numeric, ${delta.additional}::numeric, ${delta.rebate}::numeric)`,
+              ),
+            )}
+          ) AS changes(id, maintenance, additional, rebate)
+          WHERE monthly_charge.id = changes.id
+        `);
+      }
 
-        // B. Handle Caj Tambahan
-        for (const item of cajTambahan) {
-            totalNewTambahan += item.amaun;
-            
-            // Resolve specific target month based on item.tarikh (already parsed as Date)
-            const itemChargeMonth = item.tarikh 
-                ? getMonthStartInAppTimeZone(item.tarikh)
-                : chargeMonth;
-
-            // Find or Create the Monthly Charge record for this specific month
-            let itemMonthlyCharge = await tx.monthlyCharge.findUnique({
-              where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth: itemChargeMonth } }
-            });
-
-            if (!itemMonthlyCharge) {
-                itemMonthlyCharge = await tx.monthlyCharge.create({
-                    data: {
-                        residentId: resident.id,
-                        chargeMonth: itemChargeMonth,
-                        unitId: resident.occupancies[0]?.unitId || null,
-                    }
-                });
-            }
-
-            // 1. Add to AdditionalCharge Table
-            await tx.additionalCharge.create({
-                data: {
-                    monthlyChargeId: itemMonthlyCharge.id,
-                    chargeDate: item.tarikh,
-                    description: item.catatan,
-                    amount: item.amaun,
-                }
-            });
-
-            // 2. Log Transaction (Debit)
-            const txNoTambahan = await generateTransactionNo(tx);
-            const monthSuffix = getFormattedMonthSuffix(itemChargeMonth);
-
-            await tx.transaction.create({
-                data: {
-                    transactionNo: txNoTambahan,
-                    residentId: resident.id,
-                    transactionDate: new Date(), // Actual date of creation (today)
-                    chargeMonth: itemChargeMonth, // Target billing period
-                    category: "CAJ_TAMBAHAN",
-                    description: item.catatan ? `${item.catatan} (${monthSuffix})` : `Caj Tambahan (${monthSuffix})`,
-                    debitAmount: item.amaun,
-                }
-            });
-
-            // Update this specific monthlyCharge record
-            await tx.monthlyCharge.update({
-                where: { id: itemMonthlyCharge.id },
-                data: {
-                    additionalChargesTotal: { increment: item.amaun },
-                    totalMonthlyCharge: { increment: item.amaun },
-                    balanceForMonth: { increment: item.amaun }
-                }
-            });
-        }
-
-        // C. Handle Rebat
-        for (const item of rebat) {
-            totalNewRebat += item.amaun;
-            
-            // Resolve specific target month based on item.tarikh (already parsed as Date)
-            const itemChargeMonth = item.tarikh 
-                ? getMonthStartInAppTimeZone(item.tarikh)
-                : chargeMonth;
-
-            // Find or Create the Monthly Charge record for this specific month
-            let itemMonthlyCharge = await tx.monthlyCharge.findUnique({
-              where: { residentId_chargeMonth: { residentId: resident.id, chargeMonth: itemChargeMonth } }
-            });
-
-            if (!itemMonthlyCharge) {
-                itemMonthlyCharge = await tx.monthlyCharge.create({
-                    data: {
-                        residentId: resident.id,
-                        chargeMonth: itemChargeMonth,
-                        unitId: resident.occupancies[0]?.unitId || null,
-                    }
-                });
-            }
-
-            // 1. Add to Rebate Table
-            await tx.rebate.create({
-                data: {
-                    monthlyChargeId: itemMonthlyCharge.id,
-                    rebateDate: item.tarikh,
-                    description: item.catatan,
-                    amount: item.amaun,
-                }
-            });
-
-            // 2. Log Transaction (Credit)
-            const txNoRebat = await generateTransactionNo(tx);
-            const monthSuffix = getFormattedMonthSuffix(itemChargeMonth);
-
-            await tx.transaction.create({
-                data: {
-                    transactionNo: txNoRebat,
-                    residentId: resident.id,
-                    transactionDate: new Date(), // Actual date of creation (today)
-                    chargeMonth: itemChargeMonth, // Target billing period
-                    category: "REBAT",
-                    description: item.catatan ? `${item.catatan} (${monthSuffix})` : `Rebat (${monthSuffix})`,
-                    creditAmount: item.amaun,
-                }
-            });
-
-            // Update this specific monthlyCharge record
-            await tx.monthlyCharge.update({
-                where: { id: itemMonthlyCharge.id },
-                data: {
-                    rebateTotal: { increment: item.amaun },
-                    balanceForMonth: { increment: -item.amaun }
-                }
-            });
-        }
-
-        // D. Update the top-level MonthlyCharge totals for Senggara
-        if (senggaraChargeToAdd > 0) {
-            await tx.monthlyCharge.update({
-                where: { id: monthlyCharge.id },
-                data: {
-                    maintenanceAmount: { increment: senggaraChargeToAdd },
-                    totalMonthlyCharge: { increment: senggaraChargeToAdd },
-                    balanceForMonth: { increment: senggaraChargeToAdd },
-                }
-            });
-        }
-
-        // E. Update the Master Arrears Summary (Live Sum)
-        // Arrears = Previous Arrears + New Senggara + New Tambahan - New Rebat
-        const netChange = senggaraChargeToAdd + totalNewTambahan - totalNewRebat;
-
-        await tx.arrearsSummary.upsert({
-            where: { residentId: resident.id },
-            create: {
-                residentId: resident.id,
-                totalArrearsAmount: netChange,
-            },
-            update: {
-                totalArrearsAmount: { increment: netChange }
-            }
-        });
+      if (updates.length > 0) {
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO "ArrearsSummary" (
+            "id",
+            "residentId",
+            "totalArrearsAmount",
+            "createdAt",
+            "updatedAt"
+          )
+          VALUES ${Prisma.join(
+            updates.map(
+              (update) =>
+                Prisma.sql`(${randomUUID()}::uuid, ${update.residentId}::uuid, ${update.jumlahTunggakanDelta}::numeric, now(), now())`,
+            ),
+          )}
+          ON CONFLICT ("residentId") DO UPDATE SET
+            "totalArrearsAmount" = "ArrearsSummary"."totalArrearsAmount" + EXCLUDED."totalArrearsAmount",
+            "updatedAt" = now()
+        `);
       }
 
       const totalTambahan = cajTambahan.reduce((sum, item) => sum + item.amaun, 0);
@@ -360,6 +414,14 @@ export async function POST(request: Request) {
           `Senarai penghuni terlibat: ${residentsInfo.map((resident) => `${resident.fullName} (${resident.icNumber})`).join(", ")}.`,
         ],
       });
+
+      return {
+        updates,
+        summaryDelta: {
+          jumlahKutipan: totalDebitDelta,
+          jumlahTunggakan: totalArrearsDelta,
+        },
+      };
     },
       {
         maxWait: 5000,
@@ -369,7 +431,8 @@ export async function POST(request: Request) {
     // 4. Return Success Response
     return NextResponse.json({
         ok: true,
-        message: `Maklumat tunggakan berjaya dikemas kini untuk ${residentIds.length} penghuni.`
+        message: `Maklumat tunggakan berjaya dikemas kini untuk ${residentIds.length} penghuni.`,
+        data: result,
     });
 
   } catch (error) {

@@ -2,63 +2,13 @@ import { NextResponse } from "next/server";
 
 import { getCurrentAdmin } from "@/lib/auth/current-admin";
 import { prisma } from "@/lib/prisma";
+import { mapAdminProfile } from "@/lib/profile/profile-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function mapProfile(
-  profile: {
-    id: string;
-    fullName: string;
-    email: string;
-    phoneNumber: string | null;
-    department: string | null;
-    gender: string | null;
-    role: string;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  },
-  token: string,
-) {
-  return {
-    id: profile.id,
-    fullName: profile.fullName,
-    email: profile.email,
-    phoneNumber: profile.phoneNumber,
-    department: profile.department,
-    gender: profile.gender,
-    role: profile.role,
-    isActive: profile.isActive,
-    createdAt: profile.createdAt.toISOString(),
-    updatedAt: profile.updatedAt.toISOString(),
-    sessionLoginAt: getJwtIssuedAt(token),
-  };
-}
-
-function getJwtIssuedAt(token: string) {
-  try {
-    const payload = token.split(".")[1];
-
-    if (!payload) {
-      return null;
-    }
-
-    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const decodedPayload = JSON.parse(
-      Buffer.from(normalizedPayload, "base64").toString("utf8"),
-    ) as { iat?: unknown };
-
-    return typeof decodedPayload.iat === "number"
-      ? new Date(decodedPayload.iat * 1000).toISOString()
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function GET() {
@@ -74,7 +24,7 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     data: {
-      profile: mapProfile(currentAdmin.profile, currentAdmin.token),
+      profile: mapAdminProfile(currentAdmin.profile, currentAdmin.token),
     },
   });
 }
@@ -119,7 +69,7 @@ export async function PUT(request: Request) {
       success: true,
       message: "Profil berjaya dikemaskini.",
       data: {
-        profile: mapProfile(profile, currentAdmin.token),
+        profile: mapAdminProfile(profile, currentAdmin.token),
       },
     });
   } catch (error) {

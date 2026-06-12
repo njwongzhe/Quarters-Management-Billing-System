@@ -106,7 +106,10 @@ export default function AuditLogTablePanel({
       return;
     }
 
-    const queryString = buildAuditLogQueryString(filters, { page: safePage });
+    const queryString = buildAuditLogQueryString(filters, {
+      page: safePage,
+      includeFilterOptions: "false",
+    });
 
     setIsLoadingPage(true);
     setPageError(null);
@@ -133,7 +136,9 @@ export default function AuditLogTablePanel({
       window.history.replaceState(
         null,
         "",
-        `/pages/8_jejak_audit${queryString}`,
+        `/pages/8_jejak_audit${buildAuditLogQueryString(filters, {
+          page: safePage,
+        })}`,
       );
     } catch (error) {
       setPageError({

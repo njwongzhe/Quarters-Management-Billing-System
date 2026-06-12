@@ -1,4 +1,5 @@
 import KuartersCategoryDetailPageClient from "./components/KuartersCategoryDetailPageClient";
+import { getQuarterCategoryUnitsDetail } from "@/lib/quarters/quarter-units";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,12 @@ export default async function KuartersCategoryDetailPage({
   const resolvedSearchParams = await searchParams;
   const initialTargetUnitId =
     resolvedSearchParams?.targetUnitId ?? resolvedSearchParams?.unitId ?? "";
+  const initialData = await getQuarterCategoryUnitsDetail(id);
 
   return (
     <KuartersCategoryDetailPageClient
       categoryId={id}
+      initialData={initialData ?? undefined}
       initialTargetUnitId={initialTargetUnitId}
     />
   );

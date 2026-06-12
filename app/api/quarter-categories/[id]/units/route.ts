@@ -2,13 +2,12 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import {
-  buildQuarterCategoryUnitsDetailInclude,
   buildQuarterUnitCurrentOccupancyInclude,
   buildQuarterUnitCreatedMessage,
   buildQuarterUnitDuplicateMessage,
   buildQuarterUnitResidentNotFoundMessage,
+  getQuarterCategoryUnitsDetail,
   getTodayStartInMalaysia,
-  mapQuarterCategoryUnitsDetailForApi,
   mapQuarterUnitForApi,
   parseQuarterUnitCreateBody,
   resolveQuarterUnitOccupancyState,
@@ -43,12 +42,9 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const quarterCategory = await prisma.quarterCategory.findFirst({
-      where: { id },
-      include: buildQuarterCategoryUnitsDetailInclude(),
-    });
+    const detail = await getQuarterCategoryUnitsDetail(id);
 
-    if (!quarterCategory) {
+    if (!detail) {
       return NextResponse.json(
         {
           success: false,
@@ -59,8 +55,6 @@ export async function GET(_request: Request, context: RouteContext) {
         },
       );
     }
-
-    const detail = mapQuarterCategoryUnitsDetailForApi(quarterCategory);
 
     return NextResponse.json({
       success: true,
@@ -125,15 +119,38 @@ export async function POST(request: Request, context: RouteContext) {
 
     requestedUnitCode = parsedBody.data.unitCode;
 
-    const quarterCategory = await prisma.quarterCategory.findUnique({
-      where: {
-        id,
-      },
-      select: {
-        id: true,
-        categoryName: true,
-      },
-    });
+    const [quarterCategory, existingUnit, resident] = await Promise.all([
+      prisma.quarterCategory.findUnique({
+        where: {
+          id,
+        },
+        select: {
+          id: true,
+          categoryName: true,
+        },
+      }),
+      prisma.unit.findFirst({
+        where: {
+          categoryId: id,
+          unitCode: parsedBody.data.unitCode,
+        },
+        select: {
+          id: true,
+        },
+      }),
+      parsedBody.data.occupantIcNumber
+        ? prisma.resident.findUnique({
+            where: {
+              icNumber: parsedBody.data.occupantIcNumber,
+            },
+            select: {
+              id: true,
+              fullName: true,
+              icNumber: true,
+            },
+          })
+        : Promise.resolve(null),
+    ]);
 
     if (!quarterCategory) {
       return NextResponse.json(
@@ -147,16 +164,6 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const existingUnit = await prisma.unit.findFirst({
-      where: {
-        categoryId: id,
-        unitCode: parsedBody.data.unitCode,
-      },
-      select: {
-        id: true,
-      },
-    });
-
     if (existingUnit) {
       return NextResponse.json(
         {
@@ -169,26 +176,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    let resident:
-      | {
-          id: string;
-          fullName: string;
-          icNumber: string;
-        }
-      | null = null;
-
     if (parsedBody.data.occupantIcNumber) {
-      resident = await prisma.resident.findUnique({
-        where: {
-          icNumber: parsedBody.data.occupantIcNumber,
-        },
-        select: {
-          id: true,
-          fullName: true,
-          icNumber: true,
-        },
-      });
-
       if (!resident) {
         return NextResponse.json(
           {

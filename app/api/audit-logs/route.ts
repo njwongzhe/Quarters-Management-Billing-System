@@ -20,16 +20,20 @@ export async function GET(request: Request) {
       adminId: searchParams.get("adminId") ?? undefined,
       search: searchParams.get("search") ?? undefined,
     });
+    const includeFilterOptions =
+      searchParams.get("includeFilterOptions") !== "false";
     const [auditPage, filterOptions] = await Promise.all([
       getAuditLogPage(page, filters),
-      getAuditLogFilterOptions(),
+      includeFilterOptions
+        ? getAuditLogFilterOptions()
+        : Promise.resolve(undefined),
     ]);
 
     return NextResponse.json({
       success: true,
       data: {
         ...auditPage,
-        filterOptions,
+        ...(filterOptions ? { filterOptions } : {}),
       },
     });
   } catch (error) {

@@ -9,6 +9,7 @@ import { buildBayaranExtractResultFromDraftRows } from "@/lib/uploaded-document/
 import { buildKuartersExtractResultFromDraftRows } from "@/lib/uploaded-document/kuarters/documents";
 import { buildPenghuniExtractResultFromDraftRows } from "@/lib/uploaded-document/penghuni/documents";
 import { buildTunggakanExtractResultFromDraftRows } from "@/lib/uploaded-document/tunggakan/documents";
+import { prisma } from "@/lib/prisma";
 
 export type UploadedDocumentWithUploader = UploadedDocument & {
   uploadedBy?: {
@@ -62,6 +63,39 @@ export function mapUploadedDocumentForQueue(
     uploadedBy: document.uploadedBy?.fullName ?? "Username",
     uploadedAt: document.uploadedAt.toISOString(),
   };
+}
+
+export async function getUploadedDocumentsForQueue(
+  category?: UploadedDocumentCategory,
+) {
+  const documents = await prisma.uploadedDocument.findMany({
+    where: category
+      ? {
+          category,
+        }
+      : undefined,
+    orderBy: {
+      uploadedAt: "desc",
+    },
+    select: {
+      id: true,
+      category: true,
+      fileName: true,
+      originalName: true,
+      fileType: true,
+      fileSize: true,
+      uploadedAt: true,
+      uploadedBy: {
+        select: {
+          fullName: true,
+        },
+      },
+    },
+  });
+
+  return documents
+    .map(mapUploadedDocumentForQueue)
+    .filter((document) => document !== null);
 }
 
 export async function mapUploadedDocumentForReview(

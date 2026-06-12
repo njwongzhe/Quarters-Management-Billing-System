@@ -45,18 +45,32 @@ const DEFAULT_FILTERS: FilterState = {
 
 const ITEMS_PER_PAGE = 10;
 
-export default function TransaksiPageClient() {
+type TransaksiPageClientProps = {
+  initialData?: any[];
+  initialSummary?: SummaryData;
+  initialTotalItems?: number;
+};
+
+export default function TransaksiPageClient(props: TransaksiPageClientProps) {
+  const hasInitialData = props.initialData !== undefined;
+  const initialData = props.initialData ?? [];
+  const initialSummary = props.initialSummary ?? {
+    totalCount: 0,
+    totalDebit: 0,
+    totalCredit: 0,
+  };
+  const initialTotalItems = props.initialTotalItems ?? 0;
   // -------------------------------------------------------------------------
   // STATE MANAGEMENT
   // -------------------------------------------------------------------------
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasInitialData);
   const [isFetching, setIsFetching] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [totalItems, setTotalItems] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>(initialData);
+  const [totalItems, setTotalItems] = useState(initialTotalItems);
   const [currentPage, setCurrentPage] = useState(1);
-  const [summary, setSummary] = useState<SummaryData>({ totalCount: 0, totalDebit: 0, totalCredit: 0 });
+  const [summary, setSummary] = useState<SummaryData>(initialSummary);
   const [activeFilters, setActiveFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
   // Modal Context State Anchors
@@ -68,10 +82,13 @@ export default function TransaksiPageClient() {
   // CONCURRENCY & PERFORMANCE CONTROLLERS (REFS)
   // -------------------------------------------------------------------------
   /** Tracks whether the dashboard total numbers have been populated to skip heavy db recalculations */
-  const hasLoadedSummaryRef = useRef(false);
-  const lastSummaryFilterKeyRef = useRef<string>("");
+  const hasLoadedSummaryRef = useRef(hasInitialData);
+  const lastSummaryFilterKeyRef = useRef<string>(
+    hasInitialData ? buildFilterKey(DEFAULT_FILTERS) : "",
+  );
   /** Tracks if there is an active row set to toggle background fetching indicators vs full page spinners */
-  const hasLoadedRowsRef = useRef(false);
+  const hasLoadedRowsRef = useRef(hasInitialData);
+  const shouldSkipInitialFetchRef = useRef(hasInitialData);
   /** Monotonically increasing ID to reject stale API requests when users click rapid filters */
   const fetchRequestIdRef = useRef(0);
   /** AbortController reference to physically kill pending browser HTTP requests in-flight */
@@ -351,6 +368,11 @@ export default function TransaksiPageClient() {
 
   // Sync execution anchor on state dependencies transformations
   useEffect(() => {
+    if (shouldSkipInitialFetchRef.current) {
+      shouldSkipInitialFetchRef.current = false;
+      return;
+    }
+
     fetchTransactions(activeFilters, currentPage);
   }, [activeFilters, currentPage, fetchTransactions]);
 

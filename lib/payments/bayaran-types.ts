@@ -59,6 +59,12 @@ export type BayaranDetail = {
   history: BayaranPaymentHistoryRow[];
 };
 
+export type ManualPaymentMutationResult = {
+  residentId: string;
+  totalAmount: number;
+  amountThisMonthDelta: number;
+};
+
 export type PaymentQueryRow = {
   id: string;
   residentId: string;

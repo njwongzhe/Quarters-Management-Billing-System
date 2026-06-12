@@ -44,6 +44,7 @@ type ResidentPickerState = {
 
 type KuartersCategoryDetailPageClientProps = {
   categoryId: string;
+  initialData?: KuartersCategoryDetailInitialData;
   initialTargetUnitId?: string;
   initialNotice?: KuartersNotice | null;
 };
@@ -82,31 +83,37 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
 
 export default function KuartersCategoryDetailPageClient({
   categoryId,
+  initialData,
   initialTargetUnitId = "",
   initialNotice = null,
 }: KuartersCategoryDetailPageClientProps) {
+  const hasInitialData = initialData !== undefined;
   const targetUnitId = initialTargetUnitId.trim();
   const hasNavigatedToTargetUnitRef = useRef(false);
-  const [detailData, setDetailData] = useState<KuartersCategoryDetailInitialData>({
-    id: categoryId,
-    categoryName: "Maklumat kategori kuarters",
-    address: null,
-    rates: {
-      rentalPrice: null,
-      maintenancePrice: null,
-      penaltyPrice: null,
+  const [detailData, setDetailData] = useState<KuartersCategoryDetailInitialData>(
+    initialData ?? {
+      id: categoryId,
+      categoryName: "Maklumat kategori kuarters",
+      address: null,
+      rates: {
+        rentalPrice: null,
+        maintenancePrice: null,
+        penaltyPrice: null,
+      },
+      summary: null,
+      units: [],
     },
-    summary: null,
-    units: [],
-  });
-  const [units, setUnits] = useState<QuarterUnitRecord[]>([]);
+  );
+  const [units, setUnits] = useState<QuarterUnitRecord[]>(
+    initialData ? sortQuarterUnits(initialData.units) : [],
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState(createEmptyQuarterUnitFilters);
   const [editor, setEditor] = useState<KuartersUnitEditorState | null>(null);
   const [notice, setNotice] = useState<KuartersNotice | null>(initialNotice);
   const [pendingUnitId, setPendingUnitId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const [isTableLoading, setIsTableLoading] = useState(true);
+  const [isTableLoading, setIsTableLoading] = useState(!hasInitialData);
   const [residentPicker, setResidentPicker] = useState<ResidentPickerState>({
     isOpen: false,
     isLoading: false,
@@ -131,6 +138,10 @@ export default function KuartersCategoryDetailPageClient({
   }, [categoryId, targetUnitId]);
 
   useEffect(() => {
+    if (hasInitialData) {
+      return;
+    }
+
     const controller = new AbortController();
 
     async function loadQuarterUnitsData() {
@@ -174,7 +185,7 @@ export default function KuartersCategoryDetailPageClient({
     return () => {
       controller.abort();
     };
-  }, [categoryId]);
+  }, [categoryId, hasInitialData]);
 
   useEffect(() => {
     if (!residentPicker.isOpen) {

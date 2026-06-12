@@ -5,8 +5,18 @@ import {
   getDateOnlyRangeInAppTimeZone,
   getMonthStartInAppTimeZone,
 } from "@/lib/date-time";
+import {
+  formatAuditTarget,
+  recordDataAuditLog,
+} from "@/lib/audit/data-audit";
 
 type TransactionNoClient = Pick<Prisma.TransactionClient, "$executeRaw" | "transaction">;
+type TransactionAuditActor = {
+  profile: {
+    id: string;
+    fullName: string;
+  };
+} | null;
 
 export interface TransactionFilterParams {
   search?: string;
@@ -107,71 +117,6 @@ const transactionListSelect = {
   childTransactions: { select: transactionChildSelect },
 } satisfies Prisma.TransactionSelect;
 
-type TransactionListItem = Prisma.TransactionGetPayload<{ select: typeof transactionListSelect }>;
-
-// -------------------------------------------------------------------------
-// REVERSAL AND ADJUSTMENT VIEW INTERPOLATOR LOGIC
-// -------------------------------------------------------------------------
-/**
- * Processes incoming full data-arrays and returns visible entries by condensing 
- * parent logs overridden by modern adjustment (Pelarasan/Pembalikan) chains.
- */
-function getVisibleTransactions(transactions: TransactionListItem[]): TransactionListItem[] {
-  // Sort dataset to establish standard traversal linearity
-  const sortedTransactions = [...transactions].sort((a, b) => {
-    const timeA = new Date(a.createdAt || a.transactionDate).getTime();
-    const timeB = new Date(b.createdAt || b.transactionDate).getTime();
-    if (timeB !== timeA) return timeB - timeA;
-    return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
-  });
-
-  const newestRelatedChildByParentId = new Map<string, string>();
-
-  // Extract newest adjustments parameters constraints maps pointers configurations
-  sortedTransactions.forEach((transaction) => {
-    const isRelatedChild =
-      ["PELARASAN", "PEMBALIKAN"].includes(transaction.status) &&
-      transaction.relatedTransactionId;
-
-    if (!isRelatedChild || !transaction.relatedTransactionId) return;
-
-    if (!newestRelatedChildByParentId.has(transaction.relatedTransactionId)) {
-      newestRelatedChildByParentId.set(transaction.relatedTransactionId, transaction.id);
-    }
-  });
-
-  // Evaluate final layout arrays presentation matrices outputs filters definitions
-  return sortedTransactions.filter((transaction) => {
-    const isRelatedChild =
-      ["PELARASAN", "PEMBALIKAN"].includes(transaction.status) &&
-      transaction.relatedTransactionId;
-
-    if (!isRelatedChild) return true;
-
-    const relatedChildren = (
-      transaction.relatedTransaction?.childTransactions ||
-      transaction.childTransactions ||
-      []
-    )
-      .filter((child) => child.status === "PELARASAN" || child.status === "PEMBALIKAN")
-      .sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.transactionDate).getTime();
-        const timeB = new Date(b.createdAt || b.transactionDate).getTime();
-        if (timeB !== timeA) return timeB - timeA;
-        return (b.transactionNo || b.id).localeCompare(a.transactionNo || a.id);
-      });
-
-    if (relatedChildren.length > 0) {
-      return relatedChildren[0].id === transaction.id;
-    }
-
-    return (
-      !!transaction.relatedTransactionId &&
-      newestRelatedChildByParentId.get(transaction.relatedTransactionId) === transaction.id
-    );
-  });
-}
-
 // -------------------------------------------------------------------------
 // DATABASE READ READ-OPERATIONS
 // -------------------------------------------------------------------------
@@ -193,36 +138,192 @@ export async function getTransactionsSummary(params: TransactionFilterParams = {
 
 export async function getTransactionsList(params: TransactionFilterParams) {
   const { page = 1, limit = 10 } = params;
-  const whereClause = buildTransactionWhereClause(params);
+  const safePage = Math.max(1, page);
+  const safeLimit = Math.max(1, limit);
+  const offset = (safePage - 1) * safeLimit;
+  const sqlConditions = buildTransactionSqlConditions(params);
+  const whereSql =
+    sqlConditions.length > 0
+      ? Prisma.sql`WHERE ${Prisma.join(sqlConditions, " AND ")}`
+      : Prisma.empty;
 
-  // Execute complete matching records collection safely for memory aggregation and condensation
-  const rawTransactions = await prisma.transaction.findMany({
-    where: whereClause,
+  const pageRows = await prisma.$queryRaw<
+    { id: string; totalCount: bigint }[]
+  >(Prisma.sql`
+    WITH filtered_transactions AS (
+      SELECT
+        t."id",
+        t."relatedTransactionId",
+        t."status",
+        t."createdAt",
+        t."transactionNo",
+        ROW_NUMBER() OVER (
+          PARTITION BY
+            CASE
+              WHEN t."status" IN (
+                'PELARASAN'::"TransactionStatus",
+                'PEMBALIKAN'::"TransactionStatus"
+              )
+              AND t."relatedTransactionId" IS NOT NULL
+                THEN CONCAT('child:', t."relatedTransactionId"::text)
+              ELSE CONCAT('row:', t."id"::text)
+            END
+          ORDER BY
+            t."createdAt" DESC,
+            COALESCE(t."transactionNo", t."id"::text) DESC,
+            t."id" DESC
+        ) AS "relatedRank"
+      FROM "Transaction" t
+      LEFT JOIN "Resident" r
+        ON r."id" = t."residentId"
+      ${whereSql}
+    ),
+    visible_transactions AS (
+      SELECT
+        "id",
+        "createdAt",
+        "transactionNo"
+      FROM filtered_transactions
+      WHERE
+        NOT (
+          "status" IN (
+            'PELARASAN'::"TransactionStatus",
+            'PEMBALIKAN'::"TransactionStatus"
+          )
+          AND "relatedTransactionId" IS NOT NULL
+        )
+        OR "relatedRank" = 1
+    )
+    SELECT
+      "id",
+      COUNT(*) OVER ()::bigint AS "totalCount"
+    FROM visible_transactions
+    ORDER BY
+      "createdAt" DESC,
+      COALESCE("transactionNo", "id"::text) DESC,
+      "id" DESC
+    OFFSET ${offset}
+    LIMIT ${safeLimit}
+  `);
+
+  const orderedIds = pageRows.map((row) => row.id);
+  const total = Number(pageRows[0]?.totalCount ?? 0);
+
+  if (orderedIds.length === 0) {
+    return {
+      data: [],
+      total,
+      page: safePage,
+      totalPages: Math.ceil(total / safeLimit),
+    };
+  }
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      id: {
+        in: orderedIds,
+      },
+    },
     select: transactionListSelect,
-    orderBy: [{ createdAt: "desc" }, { transactionNo: "desc" }],
+  });
+  const transactionById = new Map(
+    transactions.map((transaction) => [transaction.id, transaction]),
+  );
+  const data = orderedIds.flatMap((id) => {
+    const transaction = transactionById.get(id);
+    return transaction ? [transaction] : [];
   });
 
-  // Filter out overridden items, perform memory array slicing pagination offsets metrics calculations
-  const visibleTransactions = getVisibleTransactions(rawTransactions);
-  const total = visibleTransactions.length;
-  const skip = (page - 1) * limit;
-  const data = visibleTransactions.slice(skip, skip + limit);
-
-  return { data, total, page, totalPages: Math.ceil(total / limit) };
+  return {
+    data,
+    total,
+    page: safePage,
+    totalPages: Math.ceil(total / safeLimit),
+  };
 }
 
 function isDateInput(value: string | undefined): value is string {
   return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
+function buildTransactionSqlConditions(params: TransactionFilterParams) {
+  const conditions: Prisma.Sql[] = [];
+
+  if (isDateInput(params.startDate)) {
+    const range = getDateOnlyRangeInAppTimeZone(params.startDate);
+    if (range) {
+      conditions.push(Prisma.sql`t."transactionDate" >= ${range.start}`);
+    }
+  }
+
+  if (isDateInput(params.endDate)) {
+    const range = getDateOnlyRangeInAppTimeZone(params.endDate);
+    if (range) {
+      conditions.push(Prisma.sql`t."transactionDate" <= ${range.end}`);
+    }
+  }
+
+  if (params.categories?.length) {
+    conditions.push(
+      Prisma.sql`t."category" IN (${Prisma.join(
+        params.categories.map(
+          (category) => Prisma.sql`${category}::"TransactionCategory"`,
+        ),
+      )})`,
+    );
+  }
+
+  if (params.statuses?.length) {
+    conditions.push(
+      Prisma.sql`t."status" IN (${Prisma.join(
+        params.statuses.map(
+          (status) => Prisma.sql`${status}::"TransactionStatus"`,
+        ),
+      )})`,
+    );
+  }
+
+  if (params.type === "DEBIT") {
+    conditions.push(Prisma.sql`t."debitAmount" > 0`);
+  } else if (params.type === "CREDIT") {
+    conditions.push(Prisma.sql`t."creditAmount" > 0`);
+  }
+
+  const search = params.search?.trim();
+  if (search) {
+    const searchPattern = `%${search}%`;
+    conditions.push(Prisma.sql`(
+      t."transactionNo" ILIKE ${searchPattern}
+      OR t."description" ILIKE ${searchPattern}
+      OR t."receiptNo" ILIKE ${searchPattern}
+      OR r."fullName" ILIKE ${searchPattern}
+      OR r."icNumber" ILIKE ${searchPattern}
+    )`);
+  }
+
+  return conditions;
+}
+
 // -------------------------------------------------------------------------
 // DATABASE MUTATION DATA-WRITE LEDGER CONFIGURATIONS
 // -------------------------------------------------------------------------
-export async function reverseTransaction(originalTxId: string, _adminId: string, remarks: string) {
+export async function reverseTransaction(
+  originalTxId: string,
+  actor: TransactionAuditActor,
+  remarks: string,
+) {
   return prisma.$transaction(async (tx) => {
     const original = await tx.transaction.findUnique({ 
       where: { id: originalTxId },
-      include: { childTransactions: true } 
+      include: {
+        childTransactions: true,
+        resident: {
+          select: {
+            fullName: true,
+            icNumber: true,
+          },
+        },
+      },
     });
     if (!original) throw new Error("Transaksi asal tidak dijumpai.");
     if (original.status !== "NORMAL" && original.status !== "DILARASKAN") {
@@ -263,7 +364,7 @@ export async function reverseTransaction(originalTxId: string, _adminId: string,
       reverseDebit = currentNet;
     }
 
-    return tx.transaction.create({
+    const reversal = await tx.transaction.create({
       data: {
         transactionNo: newTransactionNo, 
         residentId: original.residentId,
@@ -277,14 +378,50 @@ export async function reverseTransaction(originalTxId: string, _adminId: string,
         chargeMonth: original.chargeMonth,
       },
     });
+
+    await recordDataAuditLog(tx, {
+      actor,
+      moduleName: "Transaksi",
+      actionType: "REVERSAL",
+      target: formatAuditTarget([
+        original.transactionNo ?? originalTxId,
+        original.resident?.fullName,
+        original.resident?.icNumber
+          ? `No. KP ${original.resident.icNumber}`
+          : null,
+      ]),
+      entityType: "TRANSACTION",
+      entityId: originalTxId,
+      summary: "Membalikkan transaksi dan menjana rekod imbangan.",
+      details: [
+        `Transaksi asal: ${original.transactionNo ?? originalTxId}.`,
+        `Transaksi pembalikan: ${reversal.transactionNo ?? reversal.id}.`,
+        `Catatan: ${remarks}.`,
+      ],
+    });
+
+    return reversal;
   });
 }
 
-export async function adjustTransaction(originalTxId: string, _adminId: string, newAmount: number, remarks: string) {
+export async function adjustTransaction(
+  originalTxId: string,
+  actor: TransactionAuditActor,
+  newAmount: number,
+  remarks: string,
+) {
   return prisma.$transaction(async (tx) => {
     const original = await tx.transaction.findUnique({ 
       where: { id: originalTxId },
-      include: { childTransactions: true }
+      include: {
+        childTransactions: true,
+        resident: {
+          select: {
+            fullName: true,
+            icNumber: true,
+          },
+        },
+      },
     });
     
     if (!original) throw new Error("Transaksi asal tidak dijumpai.");
@@ -332,7 +469,7 @@ export async function adjustTransaction(originalTxId: string, _adminId: string, 
 
     const newTransactionNo = await generateTransactionNo(tx); 
 
-    return tx.transaction.create({
+    const adjustment = await tx.transaction.create({
       data: {
         transactionNo: newTransactionNo, 
         residentId: original.residentId,
@@ -346,6 +483,30 @@ export async function adjustTransaction(originalTxId: string, _adminId: string, 
         chargeMonth: original.chargeMonth,
       },
     });
+
+    await recordDataAuditLog(tx, {
+      actor,
+      moduleName: "Transaksi",
+      actionType: "ADJUSTMENT",
+      target: formatAuditTarget([
+        original.transactionNo ?? originalTxId,
+        original.resident?.fullName,
+        original.resident?.icNumber
+          ? `No. KP ${original.resident.icNumber}`
+          : null,
+      ]),
+      entityType: "TRANSACTION",
+      entityId: originalTxId,
+      summary: "Melaraskan amaun transaksi.",
+      details: [
+        `Transaksi asal: ${original.transactionNo ?? originalTxId}.`,
+        `Transaksi pelarasan: ${adjustment.transactionNo ?? adjustment.id}.`,
+        `Amaun baharu: RM ${Number(newAmount).toFixed(2)}.`,
+        `Catatan: ${remarks}.`,
+      ],
+    });
+
+    return adjustment;
   });
 }
 

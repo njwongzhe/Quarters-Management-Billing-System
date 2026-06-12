@@ -17,7 +17,10 @@ import PenghuniFilter, {
 } from "./PenghuniFilter";
 import PenghuniDownload from "./PenghuniDownload";
 import { PatternFormat } from "react-number-format";
-import type { ResidentRecord, PenghuniTableProps } from "../page";
+import type {
+    ResidentRecord,
+    PenghuniTableProps,
+} from "@/lib/residents/resident-list";
 import { handleResidentDelete, handleResidentUpdate } from "../controller/DatabaseControl";
 
 // Text size constants for table display
