@@ -254,7 +254,7 @@ export default function MuatNaikPageClient({
               <h1 className="text-2xl font-extrabold leading-9 tracking-tight text-content">
                 Muat Naik Document
               </h1>
-              <AiServiceStatus className={parsingMode === "strict" ? "" : "hidden"} />
+              <AiServiceStatus />
             </div>
             <p className="text-sm font-extralight text-grey/70">
               Sila muat naik fail untuk pemprosesan maklumat sistem.

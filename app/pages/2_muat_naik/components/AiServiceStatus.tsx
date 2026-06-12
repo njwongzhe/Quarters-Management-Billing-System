@@ -45,10 +45,10 @@ export default function AiServiceStatus({ className }: { className?: string }) {
         }`}
         title={
           status === "online"
-            ? "AI untuk Mod Ketat sedang beroperasi."
+            ? "AI sedang beroperasi."
             : status === "offline"
-              ? "AI untuk Mod Ketat masih belum dimulakan. Mengambil masa kira-kira 1-5 minit. Sila hubungi pentadbir jika ia masih belum aktif selepas 5 minit."
-              : "Menyemak status AI untuk Mod Ketat..."
+              ? "AI masih belum dimulakan. Mengambil masa kira-kira 1-5 minit. Sila hubungi pentadbir jika ia masih belum aktif selepas 5 minit."
+              : "Menyemak status AI..."
         }
       >
         {/* Pulsing indicator dot */}
