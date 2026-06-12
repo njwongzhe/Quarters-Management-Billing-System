@@ -27,8 +27,8 @@ export default function LamanUtamaOccupancyGauge({
   const occupancyRate = total > 0 ? occupied / total : 0;
   const vacancyRate = total > 0 ? vacant / total : 0;
 
-  const occupancyPercent = Math.round(occupancyRate * 100);
-  const vacancyPercent = Math.round(vacancyRate * 100);
+  const occupancyPercent = Math.round(occupancyRate * 100).toFixed(2);
+  const vacancyPercent = Math.round(vacancyRate * 100).toFixed(2);
 
   // SVG Path settings
   // The path starts at the top middle: (160, 6)
