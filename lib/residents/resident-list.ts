@@ -41,6 +41,7 @@ export type PenghuniTableProps = {
   residents: ResidentRecord[];
   isLoading: boolean;
   errorMessage: string | null;
+  targetResidentId?: string;
   setResidents: Dispatch<SetStateAction<ResidentRecord[]>>;
   onFilteredResidentsChange: (rows: ResidentRecord[]) => void;
 };

@@ -12,8 +12,10 @@ import PenghuniTable from "./PenghuniTable";
 
 export default function PenghuniPageClient({
   initialResidents,
+  targetResidentId,
 }: {
   initialResidents: ResidentRecord[];
+  targetResidentId?: string;
 }) {
   const [residents, setResidents] =
     useState<ResidentRecord[]>(initialResidents);
@@ -31,6 +33,7 @@ export default function PenghuniPageClient({
           residents={residents}
           isLoading={false}
           errorMessage={null}
+          targetResidentId={targetResidentId}
           setResidents={setResidents}
           onFilteredResidentsChange={setFilteredResidents}
         />

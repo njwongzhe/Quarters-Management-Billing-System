@@ -2,12 +2,9 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 
-import { useSearchParams } from "next/navigation";
-
 import ViewIconButton from "@/app/components/ViewIconButton";
 import SearchBar, { SearchBarToggleButton, searchRecords, useSearchBarLogic } from "@/app/components/SearchBar";
 import { loadingTableRows } from "@/app/components/Loading/LoadingTableRows";
-import SearchingDataOverlay from "@/app/components/Loading/SearchingDataOverlay";
 import { usePaginationLogic, PaginationControls } from "@/app/components/Pagination/Pagination";
 import PenghuniDetail from "./PenghuniDetail/PenghuniDetail";
 import PenghuniFilter, {
@@ -66,6 +63,7 @@ export default function PenghuniTable({
     residents,
     isLoading,
     errorMessage,
+    targetResidentId,
     setResidents,
     onFilteredResidentsChange,
 }: PenghuniTableProps) {
@@ -107,28 +105,34 @@ export default function PenghuniTable({
     const currentResidents = filteredResidents.slice(startIndex, endIndex);
 
     // Selected Resident for Detail View
-    const [selectedResident, setSelectedResident] = useState<ResidentRecord | null>(null);
+    const normalizedTargetResidentId = targetResidentId?.trim() ?? "";
+    const [selectedResident, setSelectedResident] = useState<ResidentRecord | null>(
+        () =>
+            residents.find((resident) => resident.id === normalizedTargetResidentId) ??
+            null,
+    );
+    const lastOpenedTargetIdRef = useRef(
+        selectedResident ? normalizedTargetResidentId : "",
+    );
 
-    // Auto-open resident detail when navigated from another page via ?targetId=
-    const searchParams = useSearchParams();
-    const didAutoOpenRef = useRef(false);
+    // Open a new deep-linked resident if the target changes while this page is mounted.
     useEffect(() => {
-        // Wait until the data fetch is complete before trying to open the overlay
-        if (didAutoOpenRef.current || isLoading) return;
-        const targetId = searchParams.get("targetId")?.trim() ?? "";
-        if (!targetId) return;
-        didAutoOpenRef.current = true;
-        const found = residents.find((r) => r.id === targetId);
-        if (!found) return;
+        if (
+            !normalizedTargetResidentId ||
+            lastOpenedTargetIdRef.current === normalizedTargetResidentId
+        ) {
+            return;
+        }
 
-        const timer = window.setTimeout(() => {
+        lastOpenedTargetIdRef.current = normalizedTargetResidentId;
+        const found = residents.find(
+            (resident) => resident.id === normalizedTargetResidentId,
+        );
+
+        if (found) {
             setSelectedResident(found);
-        }, 0);
-
-        return () => {
-            window.clearTimeout(timer);
-        };
-    }, [isLoading, residents, searchParams]);
+        }
+    }, [normalizedTargetResidentId, residents]);
 
     // Handlers for Updating & Deleting Residents
     const onResidentUpdate = handleResidentUpdate.bind(null, setResidents, setSelectedResident, selectedResident?.id ?? null);
@@ -136,7 +140,6 @@ export default function PenghuniTable({
 
     const {
         isOpen: isSearchOpen,
-        isSearchActive: isSearchFilterActive,
         searchInputRef,
         handleToggleSearch,
         handleClearSearch,
@@ -320,11 +323,6 @@ export default function PenghuniTable({
                     </tfoot>
                 </table>
             </div>
-
-            {/* Loading Overlay When Navigated via "?targetId=" & Data is Still Fetching */}
-            {isLoading && searchParams.get("targetId") && (
-                <SearchingDataOverlay />
-            )}
 
             {/* Overlay Window (Resident Detail) */}
             {selectedResident && (
