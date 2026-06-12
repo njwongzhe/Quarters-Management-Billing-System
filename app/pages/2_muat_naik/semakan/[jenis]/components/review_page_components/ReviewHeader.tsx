@@ -2,29 +2,17 @@ import Icon from "../../../../../../components/Icon/Icon";
 
 type ReviewHeaderProps = {
   fileName: string;
-  onReviewLater: () => void;
   parsingMode?: "strict" | "assisted";
 };
 
 export default function ReviewHeader({
   fileName,
-  onReviewLater,
   parsingMode,
 }: ReviewHeaderProps) {
   const isPdf = fileName.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="flex w-full items-start justify-between gap-4">
-      {/* Return Button */}
-      <button
-        type="button"
-        className="fixed left-61 top-6 z-40 inline-flex min-h-10 items-center gap-2 rounded-xl border border-light-grey/25 bg-surface px-4 py-2 text-sm font-bold text-grey shadow-2xl transition-colors hover:border-dark-blue hover:text-dark-blue"
-        onClick={onReviewLater}
-      >
-        <Icon icon="arrow_back" size={18} />
-        Semak Nanti
-      </button>
-
       {/* Header */}
       <div className="flex items-center justify-center gap-4">
         {/* File Type */}

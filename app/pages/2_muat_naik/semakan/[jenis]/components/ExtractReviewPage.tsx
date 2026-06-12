@@ -22,6 +22,7 @@ import ReviewActions from "./review_page_components/ReviewActions";
 import ReviewHeader from "./review_page_components/ReviewHeader";
 import ReviewPreviewPanel from "./review_page_components/ReviewPreviewPanel";
 import StatCards from "./review_page_components/StatCards";
+import HeaderBackButton from "@/app/components/Layout/HeaderBackButton";
 import type {
   ReviewKind,
   VerifyingMode,
@@ -636,9 +637,9 @@ export default function ExtractReviewPage({
     clearVerificationNotice();
   };
 
-  const handleReviewLater = () => {
+  const handleReviewLater = useCallback(() => {
     router.push(uploadPageForKind);
-  };
+  }, [router, uploadPageForKind]);
 
   const handleVerifyData = async (mode: VerifyingMode) => {
     if (verifyingMode) {
@@ -748,6 +749,7 @@ export default function ExtractReviewPage({
 
   return (
     <section className="relative min-h-full bg-background">
+      <HeaderBackButton onBack={handleReviewLater} />
       {isLoadingDraft && (
         <SearchingDataOverlay message="Memuatkan draf..." isFixed />
       )}
@@ -761,7 +763,6 @@ export default function ExtractReviewPage({
       <div className="flex w-full flex-col gap-4 mb-10">
         <ReviewHeader
           fileName={isLoadingDraft ? "Memuatkan draf..." : content.fileName}
-          onReviewLater={handleReviewLater}
           parsingMode={
             // All four extract result types share the same parsingMode field
             extractResult?.parsingMode

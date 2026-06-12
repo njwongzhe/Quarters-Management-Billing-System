@@ -9,6 +9,7 @@ import ParsingModeTabs from "./ParsingModeTabs";
 import ProcessingQueueTable from "./ProcessingQueueTable";
 import { DateField } from "@/app/components/InputField";
 import UploadDropzone from "./UploadDropzone";
+import AiServiceStatus from "./AiServiceStatus";
 import {
   reviewRoutes,
 } from "./constants";
@@ -248,10 +249,13 @@ export default function MuatNaikPageClient({
     <section className="min-h-full bg-background">
       <div className="flex w-full flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-2xl font-extrabold leading-9 tracking-tight text-content">
-              Muat Naik Document
-            </h1>
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <h1 className="text-2xl font-extrabold leading-9 tracking-tight text-content">
+                Muat Naik Document
+              </h1>
+              <AiServiceStatus className={parsingMode === "strict" ? "" : "hidden"} />
+            </div>
             <p className="text-sm font-extralight text-grey/70">
               Sila muat naik fail untuk pemprosesan maklumat sistem.
             </p>

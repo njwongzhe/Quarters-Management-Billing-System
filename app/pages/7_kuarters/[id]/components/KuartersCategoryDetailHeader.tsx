@@ -1,6 +1,7 @@
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import Icon from "@/app/components/Icon/Icon";
+import HeaderBackButton from "@/app/components/Layout/HeaderBackButton";
 import { formatMoney } from "@/app/pages/7_kuarters/components/kuartersHelpers";
 
 import type { QuarterCategoryRates } from "./kuartersUnitHelpers";
@@ -36,18 +37,17 @@ export default function KuartersCategoryDetailHeader({
   address,
   rates,
 }: KuartersCategoryDetailHeaderProps) {
+  const router = useRouter();
   const resolvedCategoryName = categoryName.trim() || "Maklumat kategori kuarters";
   const resolvedAddress = address?.trim() || "Alamat tidak tersedia";
 
+  const handleBack = () => {
+    router.push("/pages/7_kuarters");
+  };
+
   return (
     <section className="flex flex-col gap-4">
-      <Link
-        href="/pages/7_kuarters"
-        className="fixed left-61 top-6 z-40 inline-flex min-h-10 items-center gap-2 rounded-xl border border-light-grey/25 bg-surface px-4 py-2 text-sm font-bold text-grey shadow-2xl transition-colors hover:border-dark-blue hover:text-dark-blue"
-      >
-        <Icon icon="arrow_back" size={18} />
-        Kembali ke Senarai Kategori
-      </Link>
+      <HeaderBackButton onBack={handleBack} />
 
       <div>
         <h1 className="text-2xl font-extrabold tracking-[-0.03em] text-content">
