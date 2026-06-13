@@ -223,6 +223,55 @@ Triggers are registered on the database to instantly sync and calculate resident
 
 <br />
 
+## 🔄 AI Staging & Import Workflow
+
+QMBS employs a safe draft-and-commit data ingestion pipeline to prevent spreadsheet errors from corrupting the production database:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    Admin->>Next.js Web UI (Vercel): Upload XLSX / PDF (Penghuni / Bayaran)
+    Next.js Web UI (Vercel)->>Next.js Route Handler: POST /api/extract/[kind]
+    Next.js Route Handler->>FastAPI AI Service (Render): POST /extract/[kind] (with parsing_mode)
+    FastAPI AI Service (Render)->>Google Gemini API: Structural Mapping (if Assisted mode)
+    Google Gemini API-->>FastAPI AI Service (Render): Formatted Data JSON
+    FastAPI AI Service (Render)-->>Next.js Route Handler: Extracted Records JSON
+    Next.js Route Handler-->>Next.js Web UI (Vercel): Extracted Records JSON
+    Next.js Web UI (Vercel)->>PostgreSQL (Supabase): Save as Draft Tables (e.g. ResidentDraft)
+    Admin->>Next.js Web UI (Vercel): Review Errors & Conflicts in Semakan View
+    Admin->>Next.js Web UI (Vercel): Click "Verify and Commit"
+    Next.js Web UI (Vercel)->>PostgreSQL (Supabase): Write to Production Tables & Log Audit
+```
+
+1.  **File Selection**: Admin chooses a category (e.g. Payments - *Bayaran*) and uploads the raw document.
+2.  **Next.js API Handler Proxying**: The Next.js client uploads the file to the Next.js API Route Handler (`/api/extract/[kind]`) on Vercel, which forwards the request to the standalone FastAPI microservice (`/extract/[kind]`) running on Render.
+3.  **FastAPI Extraction**: The FastAPI microservice reads the document. Under **Assisted Mode**, it uses a Gemini prompt template to normalize names, align dates, resolve IC formatting, and group currencies.
+4.  **Staging View**: The spreadsheet rows load into Next.js as editable draft cards. If an IC number is missing, or a unit code is invalid, the review table highlights the cells in red.
+5.  **Database Commit**: Once the administrator edits or verifies all validations, clicking the verify action transfers all draft records to the `Resident` or `Payment` production tables in Supabase, automatically clearing the drafts and refreshing the dashboard view.
+
+<br />
+
+---
+
+<br />
+
+## 🔒 Audit Trails & Security
+
+Administrative write operations are automatically recorded. The `AuditLog` captures:
+*   **Time & Date**: Clock-timestamp of the event.
+*   **Administrator**: Username and Profile ID of the admin.
+*   **Target Domain**: The module target (`RESIDENT`, `UNIT`, `PAYMENT`, `TRANSACTION`).
+*   **Action Type**: E.g., `CREATE`, `UPDATE`, `DELETE`, `VERIFY`, `LOGIN`, `LOGOUT`.
+*   **Payload Description**: Detailed text explaining the action (e.g. *"Updated IC Number for Resident John Doe"*).
+
+This log is accessible on the **Jejak Audit** (Audit Trails) panel for oversight and review.
+
+<br />
+
+---
+
+<br />
+
 ## 🚀 Setup & Local Deployment
 
 ### 1. Prerequisites
@@ -482,52 +531,3 @@ Navigate to the **Environment Variables** section of the Vercel project and add 
 
 #### D. Deploy
 Click the **Deploy** button. Vercel will provision the environment, run the database schema types generation, compile the production bundles, and launch the application.
-
-<br />
-
----
-
-<br />
-
-## 🔄 AI Staging & Import Workflow
-
-QMBS employs a safe draft-and-commit data ingestion pipeline to prevent spreadsheet errors from corrupting the production database:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    Admin->>Next.js Web UI (Vercel): Upload XLSX / PDF (Penghuni / Bayaran)
-    Next.js Web UI (Vercel)->>Next.js Route Handler: POST /api/extract/[kind]
-    Next.js Route Handler->>FastAPI AI Service (Render): POST /extract/[kind] (with parsing_mode)
-    FastAPI AI Service (Render)->>Google Gemini API: Structural Mapping (if Assisted mode)
-    Google Gemini API-->>FastAPI AI Service (Render): Formatted Data JSON
-    FastAPI AI Service (Render)-->>Next.js Route Handler: Extracted Records JSON
-    Next.js Route Handler-->>Next.js Web UI (Vercel): Extracted Records JSON
-    Next.js Web UI (Vercel)->>PostgreSQL (Supabase): Save as Draft Tables (e.g. ResidentDraft)
-    Admin->>Next.js Web UI (Vercel): Review Errors & Conflicts in Semakan View
-    Admin->>Next.js Web UI (Vercel): Click "Verify and Commit"
-    Next.js Web UI (Vercel)->>PostgreSQL (Supabase): Write to Production Tables & Log Audit
-```
-
-1.  **File Selection**: Admin chooses a category (e.g. Payments - *Bayaran*) and uploads the raw document.
-2.  **Next.js API Handler Proxying**: The Next.js client uploads the file to the Next.js API Route Handler (`/api/extract/[kind]`) on Vercel, which forwards the request to the standalone FastAPI microservice (`/extract/[kind]`) running on Render.
-3.  **FastAPI Extraction**: The FastAPI microservice reads the document. Under **Assisted Mode**, it uses a Gemini prompt template to normalize names, align dates, resolve IC formatting, and group currencies.
-4.  **Staging View**: The spreadsheet rows load into Next.js as editable draft cards. If an IC number is missing, or a unit code is invalid, the review table highlights the cells in red.
-5.  **Database Commit**: Once the administrator edits or verifies all validations, clicking the verify action transfers all draft records to the `Resident` or `Payment` production tables in Supabase, automatically clearing the drafts and refreshing the dashboard view.
-
-<br />
-
----
-
-<br />
-
-## 🔒 Audit Trails & Security
-
-Administrative write operations are automatically recorded. The `AuditLog` captures:
-*   **Time & Date**: Clock-timestamp of the event.
-*   **Administrator**: Username and Profile ID of the admin.
-*   **Target Domain**: The module target (`RESIDENT`, `UNIT`, `PAYMENT`, `TRANSACTION`).
-*   **Action Type**: E.g., `CREATE`, `UPDATE`, `DELETE`, `VERIFY`, `LOGIN`, `LOGOUT`.
-*   **Payload Description**: Detailed text explaining the action (e.g. *"Updated IC Number for Resident John Doe"*).
-
-This log is accessible on the **Jejak Audit** (Audit Trails) panel for oversight and review.
