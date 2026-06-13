@@ -31,11 +31,11 @@ It integrates a high-performance **Next.js Web Client** with a standalone **Pyth
 3. [Technology Stack](#-technology-stack)
 4. [Directory Structure](#-directory-structure)
 5. [Database Schema Overview](#-database-schema-overview)
-6. [Setup & Local Deployment](#-setup--local-deployment)
-7. [Production Deployment](#-production-deployment)
-8. [AI Staging & Import Workflow](#-ai-staging--import-workflow)
-9. [Audit Trails & Security](#-audit-trails--security)
-
+6. [AI Staging & Import Workflow](#-ai-staging--import-workflow)
+7. [Audit Trails & Security](#-audit-trails--security)
+8. [Setup & Local Deployment](#-setup--local-deployment)
+9. [Production Deployment](#-production-deployment)
+ 
 <br />
 
 ---
